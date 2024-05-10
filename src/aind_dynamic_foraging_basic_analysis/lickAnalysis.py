@@ -5,6 +5,15 @@ import pandas as pd
 from aind_ephys_utils import align
 from PyPDF2 import PdfMerger
 import os
+from pynwb import NWBFile, TimeSeries, NWBHDF5IO
+
+def loadnwb(sessionID):
+    nwb_folder = "/root/capsule/data/foraging_nwb_bonsai"
+    nwb_file = f"{nwb_folder}/{sessionID}"
+
+    io = NWBHDF5IO(nwb_file, mode='r')
+    nwb = io.read()
+    return nwb
 
 def plotLickAnalysis(nwb):
     tblTrials = nwb.trials.to_dataframe()
