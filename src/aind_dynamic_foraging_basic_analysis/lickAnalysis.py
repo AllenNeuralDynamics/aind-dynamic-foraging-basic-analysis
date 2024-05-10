@@ -131,6 +131,7 @@ def plotLickAnalysis(nwb):
 
 
     sessionID = nwb.session_id
+    sessionID = sessionID.split('.')[0]
     box = nwb.scratch['metadata'][0].box.values
     plt.suptitle(f'{sessionID} in {box}')
 
@@ -143,7 +144,7 @@ def plotLickAnalysis(nwb):
     ax.legend()
     ax.set_title('lickLat by lick side')
     ax.set_xlabel('s')
-    return fig
+    return fig, sessionID
 
 def merge_pdfs(input_dir, output_filename='merged.pdf'):
     merger = PdfMerger()
