@@ -148,8 +148,8 @@ def plotLickAnalysis(nwb):
     ax = fig.add_subplot(gs[1, 4])
     lickLat = tblTrials['reward_outcome_time'] - tblTrials['goCue_start_time']
     bins = np.arange(0, 1, 0.02)
-    ax.hist(lickLat[tblTrials['animal_response']==1], bins = bins, alpha = 0.5, label='R')
-    ax.hist(lickLat[tblTrials['animal_response']==0], bins = bins, alpha = 0.5, label='L')
+    ax.hist(lickLat[tblTrials['animal_response']==1], bins=bins, alpha=0.5, label='R')
+    ax.hist(lickLat[tblTrials['animal_response']==0], bins=bins, alpha=0.5, label='L')
     ax.legend()
     ax.set_title('lickLat by lick side')
     ax.set_xlabel('s')
@@ -171,3 +171,4 @@ def merge_pdfs(input_dir, output_filename='merged.pdf'):
         merger.write(output_file)
 
     print(f"PDF files in '{input_dir}' merged into '{output_filename}' successfully.")
+
