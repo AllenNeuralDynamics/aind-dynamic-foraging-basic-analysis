@@ -298,3 +298,11 @@ def merge_pdfs(input_dir, output_filename="merged.pdf"):
     print(
         f"PDF files in '{input_dir}' merged into '{output_filename}'."
     )
+
+
+# example use
+if __name__ == '__main__':
+    sessionFile = '689514_2024-02-01_18-06-43.nwb'
+    # use of loadnwb depends on data struture
+    nwb = loadnwb(sessionFile)
+    fig, sessionID = plotLickAnalysis(nwb)
