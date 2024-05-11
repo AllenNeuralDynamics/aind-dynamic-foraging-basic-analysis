@@ -296,5 +296,5 @@ def merge_pdfs(input_dir, output_filename="merged.pdf"):
         merger.write(output_file)
 
     print(
-        f"PDF files in '{input_dir}' merged into '{output_filename}' successfully."
+        f"PDF files in '{input_dir}' merged into '{output_filename}'."
     )
