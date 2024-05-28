@@ -1,15 +1,21 @@
 """Example test template."""
 
 import unittest
+import matplotlib.pyplot as plt
+from src.aind_dynamic_foraging_basic_analysis.lickAnalysis import (
+    plotLickAnalysis,
+)
+from src.aind_dynamic_foraging_basic_analysis.lickAnalysis import loadnwb
 
 
-class ExampleTest(unittest.TestCase):
+class testLickPlot(unittest.TestCase):
     """Example Test Class"""
 
-    def test_assert_example(self):
+    def test_output_is_figure(self):
         """Example of how to test the truth of a statement."""
-
-        self.assertTrue(1 == 1)
+        nwb = loadnwb("tests\689514_2024-02-01_18-06-43.nwb")
+        fig, sessionID = plotLickAnalysis(nwb)
+        self.assertIsInstance(fig, plt.Figure)
 
 
 if __name__ == "__main__":
