@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from aind_ephys_utils import align
-import os
 from pynwb import NWBHDF5IO
   
 
@@ -66,10 +65,6 @@ def plotLickAnalysis(nwb):
     ax.set_title("ILI")
     ax.set_xlabel("ms")
     # pre trial lick punishment
-<<<<<<< HEAD
-    delay = np.unique(tblTrials["delay_max"])[0]
-=======
->>>>>>> 0f650c15ddd8b678d2948fa58f1d93037f21beb8
     lickDelay = (
         tblTrials["goCue_start_time"]
         - tblTrials["start_time"]
@@ -277,29 +272,8 @@ def plotLickAnalysis(nwb):
     ax.legend()
     ax.set_title("lickLat by lick side")
     ax.set_xlabel("s")
+    plt.suptitle(sessionID)
     return fig, sessionID
-<<<<<<< HEAD
-=======
-
-
-def merge_pdfs(input_dir, output_filename="merged.pdf"):
-    merger = PdfMerger()
-
-    # Iterate through all PDF files in the input directory
-    for i, filename in enumerate(os.listdir(input_dir)):
-        if filename.endswith(".pdf"):
-            if i % 50 == 0:
-                print(f"Merging file {i} out of {len(os.listdir(input_dir))}")
-            filepath = os.path.join(input_dir, filename)
-            merger.append(filepath)
-
-    # Write the merged PDF to the output file
-    with open(output_filename, "wb") as output_file:
-        merger.write(output_file)
-
-    print(
-        f"PDF files in '{input_dir}' merged into '{output_filename}'."
-    )
 
 
 # example use
@@ -308,4 +282,3 @@ if __name__ == '__main__':
     # use of loadnwb depends on data struture
     nwb = loadnwb(sessionFile)
     fig, sessionID = plotLickAnalysis(nwb)
->>>>>>> 0f650c15ddd8b678d2948fa58f1d93037f21beb8
