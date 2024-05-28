@@ -4,16 +4,9 @@ import matplotlib.gridspec as gridspec
 from aind_ephys_utils import align
 import os
 from pynwb import NWBHDF5IO
-<<<<<<< HEAD
-=======
+  
 
->>>>>>> 0f650c15ddd8b678d2948fa58f1d93037f21beb8
-
-
-<<<<<<< HEAD
 def loadnwb(nwb_file):
-=======
->>>>>>> 0f650c15ddd8b678d2948fa58f1d93037f21beb8
     io = NWBHDF5IO(nwb_file, mode="r")
     nwb = io.read()
     return nwb
