@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from aind_ephys_utils import align
 from pynwb import NWBHDF5IO
-  
+
 
 def loadnwb(nwb_file):
     io = NWBHDF5IO(nwb_file, mode="r")
@@ -277,8 +277,8 @@ def plotLickAnalysis(nwb):
 
 
 # example use
-if __name__ == '__main__':
-    sessionFile = '689514_2024-02-01_18-06-43.nwb'
+if __name__ == "__main__":
+    sessionFile = "689514_2024-02-01_18-06-43.nwb"
     # use of loadnwb depends on data struture
     nwb = loadnwb(sessionFile)
     fig, sessionID = plotLickAnalysis(nwb)
