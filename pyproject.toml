@@ -17,6 +17,14 @@ readme = "README.md"
 dynamic = ["version"]
 
 dependencies = [
+    'numpy',
+    'scipy',
+    'matplotlib',
+    'PyQt5',
+    'pandas',
+    "pynwb",
+    "requests",
+    "harp-python",
 ]
 
 [project.optional-dependencies]
