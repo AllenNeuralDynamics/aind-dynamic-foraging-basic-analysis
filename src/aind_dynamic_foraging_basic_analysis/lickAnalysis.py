@@ -327,16 +327,10 @@ class lickMetrics:
         finishKernel = np.convolve(finish.astype(float), self.kernel)
         finishKernel = np.divide(finishKernel, refKernel)
         finishKernel = finishKernel[
-            int(0.5 * len(self.kernel)) : -int(0.5 * len(self.kernel))
+            int(0.5 * len(self.kernel)):-int(0.5 * len(self.kernel))
         ]
 
         """ calculate mean lick rate """
-        Lgo = self.tblTrials.loc[
-            self.tblTrials["animal_response"] == 0, "goCue_start_time"
-        ].values
-        Rgo = self.tblTrials.loc[
-            self.tblTrials["animal_response"] == 1, "goCue_start_time"
-        ].values
         allGoNoRwd = self.tblTrials.loc[
             (self.tblTrials["animal_response"] != 2)
             & (self.tblTrials["rewarded_historyL"] == 0)
@@ -365,10 +359,14 @@ class lickMetrics:
         )
 
         self.lickMet = {
-            "sessionID": self.sessionID,  # sessions id
-            "blLick": blMean,  # baseline lick rate before start of no lick window
-            "blLickLR": [blMeanL, blMeanR],  # baseline lick rate on each side
-            "respLick": respondMean,  # lick response, calculated as lick rate after go cue without reward
+            "sessionID": self.sessionID,
+            # sessions id
+            "blLick": blMean,
+            # baseline lick rate before start of no lick window
+            "blLickLR": [blMeanL, blMeanR],
+            # baseline lick rate on each side
+            "respLick": respondMean,
+            # lick rate after go cue without reward
             "blLickTrial": rateAlign(
                 self.allLicks, allPreNolick, self.winBl
             ),  # baseline lick across time
@@ -540,7 +538,7 @@ def slideMode(x, binSize, binStep):
 
 
 def rateAlign(x, events, win):
-    """calculate rate of occurance aligned to certain events with fixed window."""
+    """calculate rate of occurance aligned to events with fixed window."""
     x = np.sort(x)
     startInds = np.searchsorted(x, events + win[0])
     stopInds = np.searchsorted(x, events + win[1])
