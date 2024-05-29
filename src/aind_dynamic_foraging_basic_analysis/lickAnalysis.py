@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from aind_ephys_utils import align
 from pynwb import NWBHDF5IO
+import re
+from scipy.stats import norm
+from datetime import datetime
 
 
 def loadnwb(nwb_file):
@@ -280,6 +283,284 @@ def plotLickAnalysis(nwb):
     return fig, sessionID
 
 
+class lickMetrics:
+    """calculate lick quantiles"""
+
+    def __init__(self, nwb):
+        """Input: nwb of behavior data"""
+        self.sessionID = nwb.session_id
+        self.tblTrials = nwb.trials.to_dataframe()
+        self.leftLicks = nwb.acquisition["left_lick_time"].timestamps[:]
+        self.rightLicks = nwb.acquisition["right_lick_time"].timestamps[:]
+        self.allLicks = np.sort(
+            np.concatenate((self.rightLicks, self.leftLicks))
+        )
+        self.lickLat = (
+            self.tblTrials["reward_outcome_time"]
+            - self.tblTrials["goCue_start_time"]
+        )
+        self.lickLatR = self.lickLat[self.tblTrials["animal_response"] == 1]
+        self.lickLatL = self.lickLat[self.tblTrials["animal_response"] == 0]
+        self.thresh = [0.05, 0.5, 1.0]
+        self.kernel = norm.pdf(np.arange(-2, 2.1, 0.5))
+        self.binWidth = 0.2
+        self.binSteps = np.arange(0, 1.5, 0.02)
+        self.lickMet = None
+        self.winGo = [self.thresh[0], 1.0]
+        self.winBl = [-1, 0]
+
+    def calMetrics(self):
+        """calculate lick quantiles"""
+        lickPercentL = [
+            np.sum(self.lickLatL <= threshCurr) / np.shape(self.lickLatL)[0]
+            for threshCurr in self.thresh
+        ]
+        lickPercentR = [
+            np.sum(self.lickLatR <= threshCurr) / np.shape(self.lickLatR)[0]
+            for threshCurr in self.thresh
+        ]
+        """ calculate motivation chage """
+        finish = self.tblTrials["animal_response"] != 2
+        ref = np.ones_like(finish)
+        refKernel = np.convolve(ref, self.kernel)
+
+        finishKernel = np.convolve(finish.astype(float), self.kernel)
+        finishKernel = np.divide(finishKernel, refKernel)
+        finishKernel = finishKernel[
+            int(0.5 * len(self.kernel)) : -int(0.5 * len(self.kernel))
+        ]
+
+        """ calculate mean lick rate """
+        Lgo = self.tblTrials.loc[
+            self.tblTrials["animal_response"] == 0, "goCue_start_time"
+        ].values
+        Rgo = self.tblTrials.loc[
+            self.tblTrials["animal_response"] == 1, "goCue_start_time"
+        ].values
+        allGoNoRwd = self.tblTrials.loc[
+            (self.tblTrials["animal_response"] != 2)
+            & (self.tblTrials["rewarded_historyL"] == 0)
+            & (self.tblTrials["rewarded_historyR"] == 0),
+            "goCue_start_time",
+        ].values
+        allPreNolick = (
+            self.tblTrials.loc[
+                self.tblTrials["animal_response"] != 2, "goCue_start_time"
+            ].values
+            - self.tblTrials.loc[
+                self.tblTrials["animal_response"] != 2, "delay_duration"
+            ].values
+        )
+
+        respondMean = np.mean(rateAlign(self.allLicks, allGoNoRwd, self.winGo))
+        blMean = np.mean(rateAlign(self.allLicks, allPreNolick, self.winBl))
+        blMeanL = np.mean(rateAlign(self.leftLicks, allPreNolick, self.winBl))
+        blMeanR = np.mean(rateAlign(self.rightLicks, allPreNolick, self.winBl))
+        # calcualate mode of lick and 'concentration'
+        Lmajor, LmajorPerc = slideMode(
+            self.lickLatL, self.binWidth, self.binSteps
+        )
+        Rmajor, RmajorPerc = slideMode(
+            self.lickLatR, self.binWidth, self.binSteps
+        )
+
+        self.lickMet = {
+            "sessionID": self.sessionID,  # sessions id
+            "blLick": blMean,  # baseline lick rate before start of no lick window
+            "blLickLR": [blMeanL, blMeanR],  # baseline lick rate on each side
+            "respLick": respondMean,  # lick response, calculated as lick rate after go cue without reward
+            "blLickTrial": rateAlign(
+                self.allLicks, allPreNolick, self.winBl
+            ),  # baseline lick across time
+            "respLickTrial": rateAlign(
+                self.allLicks, allGoNoRwd, self.winGo
+            ),  # resp lick across time
+            "peakRatio": [
+                LmajorPerc,
+                RmajorPerc,
+            ],  # percent of licks in 200ms window that covers the most licks
+            "peakLat": [Lmajor, Rmajor],  # mode of licks in 200ms window
+            "lickCDF": {
+                "thresh": self.thresh,
+                "L": lickPercentL,
+                "R": lickPercentR,
+            },  # percent of licks under threshold
+            "respScore": respondMean - blMean,
+            "consistencyScore": [
+                LmajorPerc - blMeanL * self.binWidth / 1000,
+                RmajorPerc - blMeanR * self.binWidth / 1000,
+            ],
+            "finishRatio": finishKernel,
+        }
+
+    def plot(self):
+        """plot lick metrics"""
+        edges = np.arange(
+            np.min(self.lickLat[self.tblTrials["animal_response"] != 2]),
+            np.max(self.lickLat[self.tblTrials["animal_response"] != 2]),
+            0.02,
+        )
+        fig = plt.figure(figsize=(8, 4))
+        gs = fig.add_gridspec(
+            2,
+            2,
+            width_ratios=[1, 1],
+            height_ratios=[2, 1],
+            wspace=0.5,
+            hspace=0.5,
+        )
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax1.hist(self.lickLatL, bins=edges, alpha=0.5, density=True)
+        ax1t = ax1.twinx()
+        plotCdf(self.lickLatL)
+        ax1t.plot(np.array(self.thresh), self.lickMet["lickCDF"]["L"], "k")
+        Lmajor = self.lickMet["peakLat"][0]
+        LmajorRatio = self.lickMet["peakRatio"][0]
+        ax1t.fill(
+            [
+                Lmajor - 0.5 * self.binWidth,
+                Lmajor + 0.5 * self.binWidth,
+                Lmajor + 0.5 * self.binWidth,
+                Lmajor - 0.5 * self.binWidth,
+            ],
+            [0, 0, 1, 1],
+            "r",
+            alpha=0.2,
+        )
+        tempL = self.lickMet["consistencyScore"][0]
+        ax1t.set_title(f"L {LmajorRatio:.2f} {tempL:.2f}")
+        ax1t.set_ylim(0, 1.1)
+        ax1.plot(
+            [self.winBl[0], 0],
+            np.ones_like(self.winBl) * self.lickMet["blLick"],
+            color=[0.3, 0.3, 0.3],
+            lw=4,
+        )
+        ax1.plot(
+            self.winGo,
+            np.ones_like(self.winBl) * self.lickMet["respLick"],
+            color=[0.3, 0.3, 0.3],
+            lw=4,
+        )
+
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax2.hist(self.lickLatR, bins=edges, alpha=0.5, density=True)
+        ax2t = ax2.twinx()
+        plotCdf(self.lickLatR)
+        ax2t.plot(np.array(self.thresh), self.lickMet["lickCDF"]["R"], "k")
+        Rmajor = self.lickMet["peakLat"][1]
+        RmajorRatio = self.lickMet["peakRatio"][1]
+        ax2t.fill(
+            [
+                Rmajor - 0.5 * self.binWidth,
+                Rmajor + 0.5 * self.binWidth,
+                Rmajor + 0.5 * self.binWidth,
+                Rmajor - 0.5 * self.binWidth,
+            ],
+            [0, 0, 1, 1],
+            "r",
+            alpha=0.2,
+        )
+        tempR = self.lickMet["consistencyScore"][1]
+        ax2t.set_title(f"R {RmajorRatio:.2f} {tempR:.2f}")
+        ax2t.set_ylim(0, 1.1)
+        ax2.plot(
+            [self.winBl[0], 0],
+            np.ones_like(self.winBl) * self.lickMet["blLick"],
+            color=[0.3, 0.3, 0.3],
+            lw=4,
+        )
+        ax2.plot(
+            self.winGo,
+            np.ones_like(self.winBl) * self.lickMet["respLick"],
+            color=[0.3, 0.3, 0.3],
+            lw=4,
+        )
+
+        ax3 = fig.add_subplot(gs[1, :])
+        allGoNoRwd = self.tblTrials.loc[
+            (self.tblTrials["animal_response"] != 2)
+            & (self.tblTrials["rewarded_historyL"] == 0)
+            & (self.tblTrials["rewarded_historyR"] == 0),
+            "goCue_start_time",
+        ].values
+        allGoRwd = self.tblTrials.loc[
+            (self.tblTrials["animal_response"] != 2)
+            & (self.tblTrials["rewarded_historyL"] == 1)
+            | (self.tblTrials["rewarded_historyR"] == 1),
+            "goCue_start_time",
+        ].values
+        allPreNolick = (
+            self.tblTrials.loc[
+                self.tblTrials["animal_response"] != 2, "goCue_start_time"
+            ].values
+            - self.tblTrials.loc[
+                self.tblTrials["animal_response"] != 2, "delay_duration"
+            ].values
+        )
+        rateGoRwd = rateAlign(self.allLicks, allGoRwd, self.winGo)
+
+        ax3.plot(
+            allGoNoRwd, self.lickMet["respLickTrial"], label="Resp", color="r"
+        )
+        ax3.plot(
+            allPreNolick, self.lickMet["blLickTrial"], label="bl", color="grey"
+        )
+        ax3.plot(allGoRwd, rateGoRwd, label="RespRwd", color="b")
+        ax3t = ax3.twinx()
+        ax3t.plot(
+            self.tblTrials["goCue_start_time"],
+            self.lickMet["finishRatio"],
+            color="g",
+            label="finish",
+        )
+        temp = self.lickMet["respScore"]
+        ax3.set_title(f"Resp score {temp:.2f}")
+        ax3.legend()
+        plt.suptitle(self.sessionID)
+        return fig
+
+
+def plotCdf(x, *arg):
+    """plot CDF given input x"""
+    sorted_data = np.sort(x)
+    cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+    plt.plot(sorted_data, cdf, *arg)
+
+
+def slideMode(x, binSize, binStep):
+    """find mode with sliding window"""
+    x = np.sort(x)
+    startInds = np.searchsorted(x, binStep - 0.5 * binSize)
+    stopsInds = np.searchsorted(x, binStep + 0.5 * binSize)
+    modeInd = np.argmax(np.array(stopsInds - startInds))
+    mode = binStep[modeInd]
+    modePerc = np.max(np.array(stopsInds - startInds)) / np.max(x.shape)
+    return mode, modePerc
+
+
+def rateAlign(x, events, win):
+    """calculate rate of occurance aligned to certain events with fixed window."""
+    x = np.sort(x)
+    startInds = np.searchsorted(x, events + win[0])
+    stopInds = np.searchsorted(x, events + win[1])
+    rate = (stopInds - startInds) / (win[1] - win[0])
+    return rate
+
+
+def parseSessionID(file_name):
+    """parse sessionID into animal ID and date and time"""
+    if len(re.split("[_.]", file_name)[0]) == 6:
+        aniID = re.split("[_.]", file_name)[0]
+        date = re.split("[_.]", file_name)[1]
+        dateObj = datetime.strptime(date, "%Y-%m-%d")
+    else:
+        aniID = None
+        dateObj = None
+
+    return aniID, dateObj
+
+
 # example use
 if __name__ == "__main__":
     import os
@@ -294,4 +575,10 @@ if __name__ == "__main__":
     nwb = loadnwb(nwbfile)
     fig, sessionID = plotLickAnalysis(nwb)
     saveDir = os.path.join(data_dir, "tests\\data", sessionID)
+    fig.savefig(saveDir)
+
+    lickSum = lickMetrics(nwb)
+    lickSum.calMetrics()
+    fig = lickSum.plot()
+    saveDir = os.path.join(data_dir, "tests\\data", sessionID + "qc")
     fig.savefig(saveDir)
