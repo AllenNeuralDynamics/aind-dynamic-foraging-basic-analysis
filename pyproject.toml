@@ -23,8 +23,7 @@ dependencies = [
     'pandas',
     "pynwb",
     "aind_ephys_utils",
-    "pathlib",
-    "unittest"
+    "pathlib"
 ]
 
 [project.optional-dependencies]
