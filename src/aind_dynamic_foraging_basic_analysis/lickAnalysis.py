@@ -546,19 +546,6 @@ def rateAlign(x, events, win):
     return rate
 
 
-def parseSessionID(file_name):
-    """parse sessionID into animal ID and date and time"""
-    if len(re.split("[_.]", file_name)[0]) == 6:
-        aniID = re.split("[_.]", file_name)[0]
-        date = re.split("[_.]", file_name)[1]
-        dateObj = datetime.strptime(date, "%Y-%m-%d")
-    else:
-        aniID = None
-        dateObj = None
-
-    return aniID, dateObj
-
-
 # example use
 if __name__ == "__main__":
     import os
