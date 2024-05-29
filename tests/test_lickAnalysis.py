@@ -1,4 +1,4 @@
-"""Example test template."""
+"""Example of how to test the truth of a statement."""
 import unittest
 from aind_dynamic_foraging_basic_analysis.lickAnalysis import (
     plotLickAnalysis,
@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 class testLickPlot(unittest.TestCase):
+    """Example of how to test the truth of a statement."""
     def test_loadnwb_happy_case(self):
         """Example of how to test the truth of a statement."""
         data_dir = Path(os.path.dirname(__file__))
@@ -18,6 +19,7 @@ class testLickPlot(unittest.TestCase):
         )
         nwb = loadnwb(nwbfile)
         fig, sessionID = plotLickAnalysis(nwb)
+        """Example of how to test the truth of a statement."""
         self.assertIsInstance(fig, plt.Figure)
         self.assertIsInstance(sessionID, str)
 

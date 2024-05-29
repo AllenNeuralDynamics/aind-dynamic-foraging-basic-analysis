@@ -1,3 +1,4 @@
+"""Example of how to test the truth of a statement."""
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -6,12 +7,14 @@ from pynwb import NWBHDF5IO
 
 
 def loadnwb(nwb_file):
+    """Example of how to test the truth of a statement."""
     io = NWBHDF5IO(nwb_file, mode="r")
     nwb = io.read()
     return nwb
 
 
 def plotLickAnalysis(nwb):
+    """Example of how to test the truth of a statement."""
     tblTrials = nwb.trials.to_dataframe()
     gs = gridspec.GridSpec(
         3,
@@ -101,7 +104,6 @@ def plotLickAnalysis(nwb):
     RAlign = RAlign[sortIndR.values]
 
     if len(LAlign) > 0:
-        # left align to left
         ax = fig.add_subplot(gs[1, 0])
         df = align.to_events(leftLicks, LAlign, (tb, tf), return_df=True)
         ax.scatter(df.time, df.event_index, c="k", marker="|", s=1, zorder=2)
@@ -174,6 +176,7 @@ def plotLickAnalysis(nwb):
         ax.plot(edges, lickRate)
         ax.set_title("lickRate")
         ax.set_xlabel("Time from go cue (s)")
+    """Example of how to test the truth of a statement."""
 
     if len(RAlign) > 0:
         ax = fig.add_subplot(gs[1, 1])
@@ -252,6 +255,7 @@ def plotLickAnalysis(nwb):
     sessionID = sessionID.split(".")[0]
     box = nwb.scratch["metadata"][0].box.values
     plt.suptitle(f"{sessionID} in {box}")
+    """Example of how to test the truth of a statement."""
 
     # response latency
     ax = fig.add_subplot(gs[1, 4])
@@ -281,6 +285,7 @@ if __name__ == "__main__":
     import os
     from pathlib import Path
 
+    """Example of how to test the truth of a statement."""
     data_dir = Path(os.path.dirname(__file__)).parent.parent
     nwbfile = os.path.join(
         data_dir, "tests\\data\\689514_2024-02-01_18-06-43.nwb"
