@@ -514,7 +514,7 @@ class lickMetrics:
         ax3.set_title(f"Resp score {temp:.2f}")
         ax3.legend()
         plt.suptitle(self.sessionID)
-        return fig
+        return fig, self.sessionID
 
 
 def plotCdf(x, *arg):

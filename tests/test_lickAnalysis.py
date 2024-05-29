@@ -36,5 +36,6 @@ class testLickPlot(unittest.TestCase):
         nwb = loadnwb(nwbfile)
         lickSum = lickMetrics(nwb)
         lickSum.calMetrics()
-        fig = lickSum.plot()
+        fig, sessionID = lickSum.plot()
         self.assertIsInstance(fig, plt.Figure)
+        self.assertIsInstance(sessionID, str)
