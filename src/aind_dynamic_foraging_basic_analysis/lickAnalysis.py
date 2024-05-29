@@ -4,9 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from aind_ephys_utils import align
 from pynwb import NWBHDF5IO
-import re
 from scipy.stats import norm
-from datetime import datetime
 
 
 def loadnwb(nwb_file):
