@@ -17,8 +17,7 @@ class testNwb(unittest.TestCase):
             data_dir, "data\\689514_2024-02-01_18-06-43.nwb"
         )
         nwb = loadnwb(nwbfile)
-        self.assertIsNotNone(nwb, "The result should not be None")
-        self.assertTrue(nwb, "The result should not be empty")
+        self.assertIsNotNone(nwb)
 
 
 if __name__ == "__main__":

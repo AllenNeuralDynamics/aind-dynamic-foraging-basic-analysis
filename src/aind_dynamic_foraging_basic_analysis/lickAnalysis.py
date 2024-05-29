@@ -276,13 +276,6 @@ def plotLickAnalysis(nwb):
     return fig, sessionID
 
 
-def find_file(root_dir, target_file):
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        if target_file in filenames:
-            return os.path.join(dirpath, target_file)
-    return None
-
-
 # example use
 if __name__ == "__main__":
     import os
