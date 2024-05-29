@@ -1,4 +1,4 @@
-"""Example of how to test the truth of a statement."""
+"""Load packages."""
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -8,14 +8,14 @@ from scipy.stats import norm
 
 
 def loadnwb(nwb_file):
-    """Example of how to test the truth of a statement."""
+    """Load nwb."""
     io = NWBHDF5IO(nwb_file, mode="r")
     nwb = io.read()
     return nwb
 
 
 def plotLickAnalysis(nwb):
-    """Example of how to test the truth of a statement."""
+    """Plot lick distributions."""
     tblTrials = nwb.trials.to_dataframe()
     gs = gridspec.GridSpec(
         3,
@@ -177,7 +177,6 @@ def plotLickAnalysis(nwb):
         ax.plot(edges, lickRate)
         ax.set_title("lickRate")
         ax.set_xlabel("Time from go cue (s)")
-    """Example of how to test the truth of a statement."""
 
     if len(RAlign) > 0:
         ax = fig.add_subplot(gs[1, 1])
@@ -256,7 +255,7 @@ def plotLickAnalysis(nwb):
     sessionID = sessionID.split(".")[0]
     box = nwb.scratch["metadata"][0].box.values
     plt.suptitle(f"{sessionID} in {box}")
-    """Example of how to test the truth of a statement."""
+    """Plot lickLat."""
 
     # response latency
     ax = fig.add_subplot(gs[1, 4])
