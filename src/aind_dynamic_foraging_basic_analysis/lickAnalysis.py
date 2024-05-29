@@ -548,7 +548,7 @@ if __name__ == "__main__":
     import os
     from pathlib import Path
 
-    """Example of how to test the truth of a statement."""
+    """Example."""
     data_dir = Path(os.path.dirname(__file__)).parent.parent
     nwbfile = os.path.join(
         data_dir, "tests\\data\\689514_2024-02-01_18-06-43.nwb"
