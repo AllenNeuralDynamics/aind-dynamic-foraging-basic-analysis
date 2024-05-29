@@ -15,7 +15,7 @@ class testLickPlot(unittest.TestCase):
         """Example of how to test the truth of a statement."""
         data_dir = Path(os.path.dirname(__file__))
         nwbfile = os.path.join(
-            data_dir, "data\\689514_2024-02-01_18-06-43.nwb"
+            data_dir, "data/689514_2024-02-01_18-06-43.nwb"
         )
         nwb = loadnwb(nwbfile)
         fig, sessionID = plotLickAnalysis(nwb)
@@ -27,7 +27,7 @@ class testLickPlot(unittest.TestCase):
         """Example of how to test the truth of a statement."""
         data_dir = Path(os.path.dirname(__file__))
         nwbfile = os.path.join(
-            data_dir, "data\\689514_2024-02-01_18-06-43.nwb"
+            data_dir, "data/689514_2024-02-01_18-06-43.nwb"
         )
         nwb = loadnwb(nwbfile)
         self.assertIsNotNone(nwb)
