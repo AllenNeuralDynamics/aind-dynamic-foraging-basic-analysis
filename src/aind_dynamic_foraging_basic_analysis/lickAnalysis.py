@@ -276,9 +276,24 @@ def plotLickAnalysis(nwb):
     return fig, sessionID
 
 
+def find_file(root_dir, target_file):
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        if target_file in filenames:
+            return os.path.join(dirpath, target_file)
+    return None
+
+
 # example use
 if __name__ == "__main__":
-    sessionFile = "689514_2024-02-01_18-06-43.nwb"
+    import os
+    from pathlib import Path
+
+    data_dir = Path(os.path.dirname(__file__)).parent.parent
+    nwbfile = os.path.join(
+        data_dir, "tests\\data\\689514_2024-02-01_18-06-43.nwb"
+    )
     # use of loadnwb depends on data struture
-    nwb = loadnwb(sessionFile)
+    nwb = loadnwb(nwbfile)
     fig, sessionID = plotLickAnalysis(nwb)
+    saveDir = os.path.join(data_dir, "tests\\data", sessionID)
+    fig.savefig(saveDir)
