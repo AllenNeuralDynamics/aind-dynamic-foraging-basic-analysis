@@ -17,10 +17,12 @@ readme = "README.md"
 dynamic = ["version"]
 
 dependencies = [
+    'numpy'
 ]
 
 [project.optional-dependencies]
 dev = [
+    'aind-dynamic-foraging-basic-analysis',
     'black',
     'coverage',
     'flake8',
