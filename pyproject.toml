@@ -29,7 +29,8 @@ dev = [
     'interrogate',
     'isort',
     'Sphinx',
-    'furo'
+    'furo',
+    'pynwb',
 ]
 
 [tool.setuptools.packages.find]
