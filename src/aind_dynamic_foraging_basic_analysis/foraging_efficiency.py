@@ -6,8 +6,8 @@ import numpy as np
 def foraging_efficiency(
     choice_history: Union[List, np.ndarray],
     reward_history: Union[List, np.ndarray],
-    reward_probabilities: Union[List, np.ndarray],
-    random_numbers: Union[List, np.ndarray] = None,
+    reward_probability: Union[List, np.ndarray],
+    random_number: Union[List, np.ndarray] = None,
     baited: bool = True,
 ) -> Tuple[float, float]:
     """Compute foraging efficiency for baited or non-baited 2-arm bandit task.
@@ -33,7 +33,7 @@ def foraging_efficiency(
     For a single session, however, there are chances where the efficiency
     can be larger than 1 because of the randomness of the task (sometimes the mice are really 
     lucky that they get more reward than performing "optimally"). To **partially** alleviate this fluctuation, when the
-    user provides the actual random_numbers that were generated in that session, I calculate the efficiency based on 
+    user provides the actual random_number that were generated in that session, I calculate the efficiency based on 
     simulating the optimal_forager's performance with the same set of random numbers, yielding the foraging_efficiency_actual_random_seed
 
     Parameters
@@ -45,10 +45,10 @@ def foraging_efficiency(
              2. choice_history allows ignored trials, but we'll remove them in the foraging efficiency calculation.
     reward_history : Union[List, np.ndarray]
         Reward history (0 = unrewarded, 1 = rewarded).
-    reward_probabilities : Union[List, np.ndarray]
+    reward_probability : Union[List, np.ndarray]
         Reward probability for both sides. The size should be (2, len(choice_history)).
-    random_numbers : Union[List, np.ndarray], optional
-        The actual random numbers generated in the session (see above). Must be the same shape as reward_probabilities, by default None.
+    random_number : Union[List, np.ndarray], optional
+        The actual random numbers generated in the session (see above). Must be the same shape as reward_probability, by default None.
     baited : bool, optional
         Whether the task is baited or not, by default True.xus
 
@@ -72,25 +72,25 @@ def foraging_efficiency(
     if choice_history.shape != reward_history.shape:
         raise ValueError(f"choice_history and reward_history must have the same shape.")
         
-    if reward_probabilities.shape != (2, n_trials):
-        raise ValueError(f"reward_probabilities must have the shape (2, n_trials)")
+    if reward_probability.shape != (2, n_trials):
+        raise ValueError(f"reward_probability must have the shape (2, n_trials)")
         
-    if random_numbers is not None and random_numbers.shape != reward_probabilities.shape:
-        raise ValueError(f"random_numbers must have the same shape as reward_probabilities.")
+    if random_number is not None and random_number.shape != reward_probability.shape:
+        raise ValueError(f"random_number must have the same shape as reward_probability.")
         
     # Foraging_efficiency is calculated only on finished trials
     ignored = np.isnan(choice_history)
     choice_history = choice_history[~ignored]
     reward_history = reward_history[~ignored]
-    reward_probabilities = reward_probabilities[:, ~ignored]
-    random_numbers = random_numbers[:, ~ignored] if random_numbers is not None else None
+    reward_probability = reward_probability[:, ~ignored]
+    random_number = random_number[:, ~ignored] if random_number is not None else None
     
     # Compute reward of the optimal forager
     reward_optimal, reward_optimal_random_seed = reward_optimal_func(
-        p_Ls=reward_probabilities[0],
-        p_Rs=reward_probabilities[1],
-        random_number_L=random_numbers[0] if random_numbers is not None else None,
-        random_number_R=random_numbers[1] if random_numbers is not None else None,
+        p_Ls=reward_probability[0],
+        p_Rs=reward_probability[1],
+        random_number_L=random_number[0] if random_number is not None else None,
+        random_number_R=random_number[1] if random_number is not None else None,
     )
     reward_actual = reward_history.sum()
     
