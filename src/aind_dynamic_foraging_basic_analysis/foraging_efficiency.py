@@ -3,7 +3,7 @@ from typing import Tuple, List, Literal, Union
 import numpy as np
 
 
-def foraging_efficiency(
+def compute_foraging_efficiency(
     choice_history: Union[List, np.ndarray],
     reward_history: Union[List, np.ndarray],
     reward_probability: Union[List, np.ndarray],
@@ -64,9 +64,11 @@ def foraging_efficiency(
     else:
         reward_optimal_func = _reward_optimal_forager_no_baiting
     
-    # Formatting
+    # Formatting and sanity checks
     choice_history = np.array(choice_history, dtype=float) # Convert None to np.nan, if any
     reward_history = np.array(reward_history, dtype=float)
+    reward_probability = np.array(reward_probability, dtype=float)
+    random_number = np.array(random_number, dtype=float) if random_number is not None else None
     n_trials = len(choice_history)
     
     if choice_history.shape != reward_history.shape:
@@ -98,12 +100,13 @@ def foraging_efficiency(
 
 
 def _reward_optimal_forager_no_baiting(p_Ls, p_Rs, random_number_L, random_number_R):
+    """Compute the expected reward of the optimal forager for the non-baiting task."""
 
     # --- Optimal-aver (use optimal expectation as 100% efficiency) ---
     reward_optimal = np.nanmean(np.max([p_Ls, p_Rs], axis=0)) * len(p_Ls)
 
     if random_number_L is None:
-        return foraging_efficiency, np.nan
+        return compute_foraging_efficiency, np.nan
 
     # --- Optimal-actual (uses the actual random numbers by simulation)
     reward_refills = np.vstack(
@@ -117,6 +120,7 @@ def _reward_optimal_forager_no_baiting(p_Ls, p_Rs, random_number_L, random_numbe
 
 
 def _reward_optimal_forager_baiting(p_Ls, p_Rs, random_number_L, random_number_R):
+    """Compute the expected reward of the optimal forager for the baiting task."""
 
     # --- Optimal-aver (use optimal expectation as 100% efficiency) ---
     p_stars = np.zeros_like(p_Ls)
