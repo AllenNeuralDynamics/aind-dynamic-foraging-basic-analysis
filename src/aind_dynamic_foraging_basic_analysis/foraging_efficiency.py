@@ -16,30 +16,33 @@ def foraging_efficiency(
     complex and unsolved topic especially in the context of reward baiting. I have a presentation for this 
     (https://alleninstitute.sharepoint.com/:p:/s/NeuralDynamics/EejfBIEvFA5DjmfOZV8atWgBx7q68GsKnavkVrfghL9y8g?e=OnR5r4). 
 
-    Simply speaking, foraging eff = actual reward rate of the mouse / reward rate of an ideal observer in the same session.
-    The question is how to define the ideal observer. 
+    Simply speaking, foraging eff = actual reward of the mouse / reward of an optimal_forager in the same session.
+    The question is how to define the optimal_forager. 
 
     1. For the coupled-block-with-baiting task (Jeremiah's 2019 Neuron paper), 
-    I assume the ideal observer knows the underlying reward probability and the baiting dynamics, 
+    I assume the optimal_forager knows the underlying reward probability and the baiting dynamics, 
     and do the optimal choice pattern ("fix-and-sample" in this case, see references on p.24 of my slides). 
 
-    2. For the non-baiting task (Cooper Grossman), I assume the ideal observer knows the underlying probability and 
+    2. For the non-baiting task (Cooper Grossman), I assume the optimal_forager knows the underlying probability and 
     makes the greedy choice, i.e., always choose the better side. 
 
-    This might not be the best way because the ideal observers I assumed is kind of cheating in the sense that 
+    This might not be the best way because the optimal_foragers I assumed is kind of cheating in the sense that 
     they already know the underlying probability, but it sets an upper bound for all realistic agents, 
     at least in an average sense. 
 
     For a single session, however, there are chances where the efficiency
     can be larger than 1 because of the randomness of the task (sometimes the mice are really 
-    lucky that they get more reward than performing "optimally"). To partially alleviate this fluctuation, when the
+    lucky that they get more reward than performing "optimally"). To **partially** alleviate this fluctuation, when the
     user provides the actual random_numbers that were generated in that session, I calculate the efficiency based on 
-    simulating the ideal observer's performance with the same set of random numbers, yielding the foraging_efficiency_actual_random_seed
+    simulating the optimal_forager's performance with the same set of random numbers, yielding the foraging_efficiency_actual_random_seed
 
     Parameters
     ----------
     choice_history : Union[List, np.ndarray]
-        Choice history (0 = left choice, 1 = right choice, None or np.nan = ignored).
+        Choice history (0 = left choice, 1 = right choice, np.nan = ignored). 
+        Notes: 
+             1. choice_history should exclude free water trials.
+             2. choice_history allows ignored trials, but we'll remove them in the foraging efficiency calculation.
     reward_history : Union[List, np.ndarray]
         Reward history (0 = unrewarded, 1 = rewarded).
     reward_probabilities : Union[List, np.ndarray]
@@ -47,21 +50,57 @@ def foraging_efficiency(
     random_numbers : Union[List, np.ndarray], optional
         The actual random numbers generated in the session (see above). Must be the same shape as reward_probabilities, by default None.
     baited : bool, optional
-        Whether the task is baited or not, by default True.
+        Whether the task is baited or not, by default True.xus
 
     Returns
     -------
     Tuple[float, float]
         foraging_efficiency, foraging_efficiency_actual_random_seed
     """
+    
+    # Choose the optimal_forager function based on baiting
+    if baited:
+        reward_optimal_func = _reward_optimal_forager_baiting
+    else:
+        reward_optimal_func = _reward_optimal_forager_no_baiting
+    
+    # Formatting
+    choice_history = np.array(choice_history, dtype=float) # Convert None to np.nan, if any
+    reward_history = np.array(reward_history, dtype=float)
+    n_trials = len(choice_history)
+    
+    if choice_history.shape != reward_history.shape:
+        raise ValueError(f"choice_history and reward_history must have the same shape.")
+        
+    if reward_probabilities.shape != (2, n_trials):
+        raise ValueError(f"reward_probabilities must have the shape (2, n_trials)")
+        
+    if random_numbers is not None and random_numbers.shape != reward_probabilities.shape:
+        raise ValueError(f"random_numbers must have the same shape as reward_probabilities.")
+        
+    # Foraging_efficiency is calculated only on finished trials
+    ignored = np.isnan(choice_history)
+    choice_history = choice_history[~ignored]
+    reward_history = reward_history[~ignored]
+    reward_probabilities = reward_probabilities[:, ~ignored]
+    random_numbers = random_numbers[:, ~ignored] if random_numbers is not None else None
+    
+    # Compute reward of the optimal forager
+    reward_optimal, reward_optimal_random_seed = reward_optimal_func(
+        p_Ls=reward_probabilities[0],
+        p_Rs=reward_probabilities[1],
+        random_number_L=random_numbers[0] if random_numbers is not None else None,
+        random_number_R=random_numbers[1] if random_numbers is not None else None,
+    )
+    reward_actual = reward_history.sum()
+    
+    return reward_actual / reward_optimal, reward_actual / reward_optimal_random_seed
 
 
-# Calculate foraging efficiency (only for 2lp)
-def foraging_eff_no_baiting(reward_rate, p_Ls, p_Rs, random_number_L=None, random_number_R=None):
+def _reward_optimal_forager_no_baiting(p_Ls, p_Rs, random_number_L, random_number_R):
 
     # --- Optimal-aver (use optimal expectation as 100% efficiency) ---
-    foraging_efficiency = reward_rate / \
-        np.nanmean(np.max([p_Ls, p_Rs], axis=0))
+    reward_optimal = np.nanmean(np.max([p_Ls, p_Rs], axis=0)) * len(p_Ls)
 
     if random_number_L is None:
         return foraging_efficiency, np.nan
@@ -71,16 +110,13 @@ def foraging_eff_no_baiting(reward_rate, p_Ls, p_Rs, random_number_L=None, rando
         [p_Ls >= random_number_L, p_Rs >= random_number_R])
     # Greedy choice, assuming the agent knows the groundtruth
     optimal_choices = np.argmax([p_Ls, p_Rs], axis=0)
-    optimal_rewards = reward_refills[0][optimal_choices == 0].sum(
+    reward_optimal_random_seed = reward_refills[0][optimal_choices == 0].sum(
     ) + reward_refills[1][optimal_choices == 1].sum()
-    foraging_efficiency_actual_random_seed = reward_rate / \
-        (optimal_rewards / len(optimal_choices))
 
-    return foraging_efficiency, foraging_efficiency_actual_random_seed
+    return reward_optimal, reward_optimal_random_seed
 
 
-# Calculate foraging efficiency (only for 2lp)
-def foraging_eff_baiting(reward_rate, p_Ls, p_Rs, random_number_L=None, random_number_R=None):
+def _reward_optimal_forager_baiting(p_Ls, p_Rs, random_number_L, random_number_R):
 
     # --- Optimal-aver (use optimal expectation as 100% efficiency) ---
     p_stars = np.zeros_like(p_Ls)
@@ -94,10 +130,10 @@ def foraging_eff_baiting(reward_rate, p_Ls, p_Rs, random_number_L=None, random_n
             p_stars[i] = p_max + \
                 (1-(1-p_min)**(m_star + 1)-p_max**2)/(m_star+1)
 
-    foraging_efficiency = reward_rate / np.nanmean(p_stars)
+    reward_optimal = np.nanmean(p_stars) * len(p_Ls)
 
     if random_number_L is None:
-        return foraging_efficiency, np.nan
+        return reward_optimal, np.nan
 
     # --- Optimal-actual (uses the actual random numbers by simulation)
     block_start_ind_left = np.where(
@@ -109,7 +145,6 @@ def foraging_eff_baiting(reward_rate, p_Ls, p_Rs, random_number_L=None, random_n
 
     reward_refills = [p_Ls >= random_number_L, p_Rs >= random_number_R]
     reward_optimal_random_seed = 0
-    foraging_efficiency_actual_random_seed = np.nan
 
     # Generate optimal choice pattern
     for b_start, b_end in zip(block_start_ind_effective[:-1], block_start_ind_effective[1:]):
@@ -136,8 +171,4 @@ def foraging_eff_baiting(reward_rate, p_Ls, p_Rs, random_number_L=None, random_n
             reward_remain = reward_available.copy()
             reward_remain[this_choice[t]] = 0
 
-        if reward_optimal_random_seed:
-            foraging_efficiency_actual_random_seed = reward_rate / \
-                (reward_optimal_random_seed / len(p_Ls))
-
-    return foraging_efficiency, foraging_efficiency_actual_random_seed
+    return reward_optimal, reward_optimal_random_seed if reward_optimal_random_seed else np.nan
