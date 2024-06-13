@@ -1,8 +1,11 @@
-import unittest
-import os
-import numpy as np
+"""Test foraging efficiency computation"""
 
+import os
+import unittest
+
+import numpy as np
 from pynwb import NWBHDF5IO
+
 from aind_dynamic_foraging_basic_analysis import compute_foraging_efficiency
 
 
@@ -35,8 +38,10 @@ def get_history_from_nwb(nwb_file):
         df_trial.reward_random_number_left[non_autowater].values,
         df_trial.reward_random_number_right[non_autowater].values,
     ]
+    
+    baiting = False if 'without baiting' in nwb.protocol.lower() else True
 
-    return choice_history, reward_history, reward_probability, random_number
+    return choice_history, reward_history, reward_probability, random_number, baiting
 
 
 class TestForagingEfficiency(unittest.TestCase):
@@ -50,9 +55,14 @@ class TestForagingEfficiency(unittest.TestCase):
         },
         {
             "nwb_file": "727456_2024-06-12_11-10-53.nwb",  # uncoupled no baiting example session
-            "foraging_efficiency": 0.5896149584561394,
-            "foraging_efficiency_random_seed": 0.638655462184874,
+            "foraging_efficiency": 0.6946983546617915,
+            "foraging_efficiency_random_seed": 0.7378640776699029,
         },
+        {
+            "nwb_file": "703548_2024-03-01_08-51-32.nwb",  # well trained uncoupled baiting
+            "foraging_efficiency": 0.8048681814442915,
+            "foraging_efficiency_random_seed": 0.8390092879256966,
+        }
     ]
 
     def test_example_sessions(self):
@@ -68,6 +78,7 @@ class TestForagingEfficiency(unittest.TestCase):
                 reward_history,
                 reward_probability,
                 random_number,
+                baiting
             ) = get_history_from_nwb(nwb_file)
             foraging_efficiency, foraging_efficiency_random_seed = (
                 compute_foraging_efficiency(
@@ -75,6 +86,7 @@ class TestForagingEfficiency(unittest.TestCase):
                     reward_history,
                     reward_probability,
                     random_number,
+                    baited=baiting,
                 )
             )
             self.assertAlmostEqual(
@@ -84,6 +96,17 @@ class TestForagingEfficiency(unittest.TestCase):
                 foraging_efficiency_random_seed,
                 correct_answer["foraging_efficiency_random_seed"],
             )
+            
+        # Test returning np.nan if random_number is None
+        for baited in [True, False]:
+            foraging_efficiency, foraging_efficiency_random_seed = compute_foraging_efficiency(
+                choice_history,
+                reward_history,
+                reward_probability,
+                baited=baited,
+            )
+            self.assertTrue(np.isnan(foraging_efficiency_random_seed))
+        
 
     def test_wrong_format(self):
         """Test wrong input format"""
@@ -99,11 +122,20 @@ class TestForagingEfficiency(unittest.TestCase):
                 reward_probability,
                 random_number,
             )
-
-        compute_foraging_efficiency(
-            choice_history, reward_history, reward_probability
-        )  # This should work
-
+        with self.assertRaises(ValueError):
+            compute_foraging_efficiency(
+                choice_history,
+                reward_history[:2],
+                reward_probability,
+                random_number,
+            )
+        with self.assertRaises(ValueError):
+            compute_foraging_efficiency(
+                choice_history,
+                reward_history,
+                reward_probability[1],
+            )
+            
 
 if __name__ == "__main__":
     unittest.main()

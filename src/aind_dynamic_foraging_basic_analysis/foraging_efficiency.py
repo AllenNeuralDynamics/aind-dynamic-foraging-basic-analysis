@@ -1,4 +1,6 @@
-from typing import Tuple, List, Literal, Union
+"""Compute foraging efficiency for baited or non-baited 2-arm bandit task."""
+
+from typing import List, Tuple, Union
 
 import numpy as np
 
@@ -132,7 +134,7 @@ def _reward_optimal_forager_no_baiting(
     reward_optimal = np.nanmean(np.max([p_Ls, p_Rs], axis=0)) * len(p_Ls)
 
     if random_number_L is None:
-        return compute_foraging_efficiency, np.nan
+        return reward_optimal, np.nan
 
     # --- Optimal-actual (uses the actual random numbers by simulation)
     reward_refills = np.vstack(
