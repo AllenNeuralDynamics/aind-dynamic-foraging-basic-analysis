@@ -11,7 +11,6 @@ def get_history_from_nwb(nwb_file):
     nwb = io.read()
     df_trial = nwb.trials.to_dataframe()
 
-    # Exclude autowater
     autowater_offered = df_trial.auto_waterL | df_trial.auto_waterR
     choice_history = df_trial.animal_response.map({0: 0, 1: 1, 2: np.nan}).values
     reward_history = df_trial.rewarded_historyL | df_trial.rewarded_historyR
