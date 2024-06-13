@@ -8,7 +8,7 @@ import numpy as np
 def compute_foraging_efficiency(
     choice_history: Union[List, np.ndarray],
     reward_history: Union[List, np.ndarray],
-    reward_probability: Union[List, np.ndarray],
+    p_reward: Union[List, np.ndarray],
     random_number: Union[List, np.ndarray] = None,
     baited: bool = True,
 ) -> Tuple[float, float]:
@@ -51,7 +51,7 @@ def compute_foraging_efficiency(
              efficiency calculation.
     reward_history : Union[List, np.ndarray]
         Reward history (0 = unrewarded, 1 = rewarded).
-    reward_probability : Union[List, np.ndarray]
+    p_reward : Union[List, np.ndarray]
         Reward probability for both sides. The size should be (2, len(choice_history)).
     random_number : Union[List, np.ndarray], optional
         The actual random numbers generated in the session (see above). Must be the same shape as
@@ -74,30 +74,30 @@ def compute_foraging_efficiency(
     # Formatting and sanity checks
     choice_history = np.array(choice_history, dtype=float)  # Convert None to np.nan, if any
     reward_history = np.array(reward_history, dtype=float)
-    reward_probability = np.array(reward_probability, dtype=float)
+    p_reward = np.array(p_reward, dtype=float)
     random_number = np.array(random_number, dtype=float) if random_number is not None else None
     n_trials = len(choice_history)
 
     if choice_history.shape != reward_history.shape:
         raise ValueError("choice_history and reward_history must have the same shape.")
 
-    if reward_probability.shape != (2, n_trials):
+    if p_reward.shape != (2, n_trials):
         raise ValueError("reward_probability must have the shape (2, n_trials)")
 
-    if random_number is not None and random_number.shape != reward_probability.shape:
+    if random_number is not None and random_number.shape != p_reward.shape:
         raise ValueError("random_number must have the same shape as reward_probability.")
 
     # Foraging_efficiency is calculated only on finished trials
     ignored = np.isnan(choice_history)
     choice_history = choice_history[~ignored]
     reward_history = reward_history[~ignored]
-    reward_probability = reward_probability[:, ~ignored]
+    p_reward = p_reward[:, ~ignored]
     random_number = random_number[:, ~ignored] if random_number is not None else None
 
     # Compute reward of the optimal forager
     reward_optimal, reward_optimal_random_seed = reward_optimal_func(
-        p_Ls=reward_probability[0],
-        p_Rs=reward_probability[1],
+        p_Ls=p_reward[0],
+        p_Rs=p_reward[1],
         random_number_L=(random_number[0] if random_number is not None else None),
         random_number_R=(random_number[1] if random_number is not None else None),
     )
