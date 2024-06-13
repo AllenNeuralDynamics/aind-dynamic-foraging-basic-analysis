@@ -179,25 +179,26 @@ def plot_foraging_session(
         ax_choice_reward.set_yticks([0, 1])
         ax_choice_reward.set_yticklabels(['Left', 'Right'])
         ax_choice_reward.legend(fontsize=6, loc='upper left', bbox_to_anchor=(0.6, 1.3), ncol=3)
-        ax_choice_reward.set_xticks([])
 
         # sns.despine(trim=True, bottom=True, ax=ax_1)
+        ax_choice_reward.spines['top'].set_visible(False)
+        ax_choice_reward.spines['right'].set_visible(False)
+        ax_choice_reward.spines['bottom'].set_visible(False)
+        ax_choice_reward.tick_params(labelbottom=False)
+        ax_choice_reward.xaxis.set_ticks_position('none')
+        
         # sns.despine(trim=True, ax=ax_2)
+        ax_reward_schedule.spines['top'].set_visible(False)
+        ax_reward_schedule.spines['right'].set_visible(False)
+        ax_reward_schedule.spines['bottom'].set_bounds(0, n_trials)
+        
     else:
         ax_choice_reward.set_xticks([0, 1])
         ax_choice_reward.set_xticklabels(['Left', 'Right'])
         ax_choice_reward.invert_yaxis()
         ax_choice_reward.legend(fontsize=6, loc='upper left', bbox_to_anchor=(0, 1.05), ncol=3)
         ax_choice_reward.set_yticks([])
-
-        # sns.despine(trim=True, left=True, ax=ax_1)
-        # sns.despine(trim=True, ax=ax_2)
-
-        # ax_2.set(ylim=(0, 1))
     
-    # ax.set_xlim(0,300)
-
-    # fig.tight_layout()
     ax_reward_schedule.set(xlabel='Trial number')
     ax.remove()
 
