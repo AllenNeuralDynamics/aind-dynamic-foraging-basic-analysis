@@ -6,7 +6,9 @@ import unittest
 import numpy as np
 
 from aind_dynamic_foraging_basic_analysis import compute_foraging_efficiency
-from nwb_io import get_history_from_nwb
+
+from .nwb_io import get_history_from_nwb
+
 
 class TestForagingEfficiency(unittest.TestCase):
     """Test foraging efficiency"""
