@@ -6,7 +6,7 @@ def moving_average(a, n=3) :
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
     
-def plot_session_lightweight(choice_history,
+def plot_foraging_session(choice_history,
                              reward_history_non_autowater,
                              p_reward,
                              autowater_offered_history=None,
