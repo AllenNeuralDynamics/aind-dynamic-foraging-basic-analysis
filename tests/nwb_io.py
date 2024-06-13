@@ -1,8 +1,8 @@
 """Util function for reading NWB files. (for dev only)"""
 
 import numpy as np
-
 from pynwb import NWBHDF5IO
+
 
 def get_history_from_nwb(nwb_file):
     """Get choice and reward history from nwb file"""
