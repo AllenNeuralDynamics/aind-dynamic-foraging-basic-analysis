@@ -61,12 +61,13 @@ class TestForagingEfficiency(unittest.TestCase):
                 correct_answer["foraging_efficiency_random_seed"],
             )
 
-        # Test returning np.nan if random_number is None
+        # Test returning np.nan if random_number and autowater_offered is None
         for baited in [True, False]:
             foraging_efficiency, foraging_efficiency_random_seed = compute_foraging_efficiency(
                 baited=baited,
                 choice_history=choice_history,
                 reward_history=reward_history,
+                autowater_offered=autowater_offered,
                 p_reward=p_reward,
             )
             self.assertTrue(np.isnan(foraging_efficiency_random_seed))
@@ -78,6 +79,7 @@ class TestForagingEfficiency(unittest.TestCase):
         p_reward = [[0.5, 0.5, 0.4], [0.5, 0.5, 0.4]]
         random_number = [[0.1, 0.2], [0.3, 0.4]]
 
+        # Wrong random_number shape
         with self.assertRaises(ValueError):
             compute_foraging_efficiency(
                 baited=True,
@@ -86,20 +88,53 @@ class TestForagingEfficiency(unittest.TestCase):
                 p_reward=p_reward,
                 random_number=random_number,
             )
+            
+        # Wrong reward_history shape
         with self.assertRaises(ValueError):
             compute_foraging_efficiency(
                 baited=True,
                 choice_history=choice_history,
                 reward_history=reward_history[:2],
                 p_reward=p_reward,
-                random_number=random_number,
-
             )
+        
+        # Wrong p_reward shape
         with self.assertRaises(ValueError):
             compute_foraging_efficiency(
                 baited=True,
                 choice_history=choice_history,
-                reward_history=reward_history[:2],
+                reward_history=reward_history,
+                p_reward=p_reward[:1],
+                random_number=None,                
+            )
+            
+        # Wrong choice_history values
+        with self.assertRaises(ValueError):
+            compute_foraging_efficiency(
+                baited=True,
+                choice_history=[0, 1, 2],
+                reward_history=reward_history,
                 p_reward=p_reward,
+                random_number=None,                
+            )
+        
+        # Wrong reward_history values
+        with self.assertRaises(ValueError):
+            compute_foraging_efficiency(
+                baited=True,
+                choice_history=choice_history,
+                reward_history=[0, 1, 2],
+                p_reward=p_reward,
+                random_number=None,                
+            )
+
+        # Wrong autowater_offered shape
+        with self.assertRaises(ValueError):
+            compute_foraging_efficiency(
+                baited=True,
+                choice_history=choice_history,
+                reward_history=reward_history,
+                p_reward=p_reward,
+                autowater_offered=np.array([True, False]),
                 random_number=None,                
             )
