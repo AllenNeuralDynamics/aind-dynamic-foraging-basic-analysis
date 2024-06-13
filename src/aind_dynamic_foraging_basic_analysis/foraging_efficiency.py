@@ -28,8 +28,7 @@ def compute_foraging_efficiency(
     slides).
 
     2. For the non-baiting task (Cooper Grossman), I assume the optimal_forager knows the underlying
-    probability and
-    makes the greedy choice, i.e., always choose the better side.
+    probability and makes the greedy choice, i.e., always choose the better side.
 
     This might not be the best way because the optimal_foragers I assumed is kind of cheating
     in the sense that they already know the underlying probability, but it sets an upper bound for
@@ -58,7 +57,7 @@ def compute_foraging_efficiency(
         The actual random numbers generated in the session (see above). Must be the same shape as
         reward_probability, by default None.
     baited : bool, optional
-        Whether the task is baited or not, by default True.xus
+        Whether the task is baited or not, by default True.
 
     Returns
     -------
