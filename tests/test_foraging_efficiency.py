@@ -9,7 +9,6 @@ import unittest
 import numpy as np
 
 from aind_dynamic_foraging_basic_analysis import compute_foraging_efficiency
-
 from tests.nwb_io import get_history_from_nwb
 
 
@@ -88,7 +87,7 @@ class TestForagingEfficiency(unittest.TestCase):
                 p_reward=p_reward,
                 random_number=random_number,
             )
-            
+
         # Wrong reward_history shape
         with self.assertRaises(ValueError):
             compute_foraging_efficiency(
@@ -97,7 +96,7 @@ class TestForagingEfficiency(unittest.TestCase):
                 reward_history=reward_history[:2],
                 p_reward=p_reward,
             )
-        
+
         # Wrong p_reward shape
         with self.assertRaises(ValueError):
             compute_foraging_efficiency(
@@ -105,9 +104,9 @@ class TestForagingEfficiency(unittest.TestCase):
                 choice_history=choice_history,
                 reward_history=reward_history,
                 p_reward=p_reward[:1],
-                random_number=None,                
+                random_number=None,
             )
-            
+
         # Wrong choice_history values
         with self.assertRaises(ValueError):
             compute_foraging_efficiency(
@@ -115,9 +114,9 @@ class TestForagingEfficiency(unittest.TestCase):
                 choice_history=[0, 1, 2],
                 reward_history=reward_history,
                 p_reward=p_reward,
-                random_number=None,                
+                random_number=None,
             )
-        
+
         # Wrong reward_history values
         with self.assertRaises(ValueError):
             compute_foraging_efficiency(
@@ -125,7 +124,7 @@ class TestForagingEfficiency(unittest.TestCase):
                 choice_history=choice_history,
                 reward_history=[0, 1, 2],
                 p_reward=p_reward,
-                random_number=None,                
+                random_number=None,
             )
 
         # Wrong autowater_offered shape
@@ -136,5 +135,5 @@ class TestForagingEfficiency(unittest.TestCase):
                 reward_history=reward_history,
                 p_reward=p_reward,
                 autowater_offered=np.array([True, False]),
-                random_number=None,                
+                random_number=None,
             )

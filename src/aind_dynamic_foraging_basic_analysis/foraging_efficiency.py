@@ -48,7 +48,7 @@ def compute_foraging_efficiency(
         Whether the task is baited or not.
     choice_history : Union[List, np.ndarray]
         Choice history (0 = left choice, 1 = right choice, np.nan = ignored).
-        Notes: choice_history allows ignored trials or autowater trials, 
+        Notes: choice_history allows ignored trials or autowater trials,
            but we'll remove them in the foraging efficiency calculation.
     reward_history : Union[List, np.ndarray]
         Reward history (0 = unrewarded, 1 = rewarded).
@@ -82,7 +82,7 @@ def compute_foraging_efficiency(
 
     if not np.all(np.isin(choice_history, [0.0, 1.0]) | np.isnan(choice_history)):
         raise ValueError("choice_history must contain only 0, 1, or np.nan.")
-    
+
     if not np.all(np.isin(reward_history, [0.0, 1.0])):
         raise ValueError("reward_history must contain only 0 (False) or 1 (True).")
 
@@ -94,14 +94,14 @@ def compute_foraging_efficiency(
 
     if random_number is not None and random_number.shape != p_reward.shape:
         raise ValueError("random_number must have the same shape as reward_probability.")
-    
+
     if autowater_offered is not None and not autowater_offered.shape == choice_history.shape:
         raise ValueError("autowater_offered must have the same shape as choice_history.")
 
     # Foraging_efficiency is calculated only on finished AND non-autowater trials
     ignored = np.isnan(choice_history)
     valid_trials = (~ignored & ~autowater_offered) if autowater_offered is not None else ~ignored
-    
+
     choice_history = choice_history[valid_trials]
     reward_history = reward_history[valid_trials]
     p_reward = p_reward[:, valid_trials]
