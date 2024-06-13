@@ -17,7 +17,8 @@ readme = "README.md"
 dynamic = ["version"]
 
 dependencies = [
-    'numpy'
+    'numpy',
+    'matplotlib'
 ]
 
 [project.optional-dependencies]
