@@ -6,6 +6,7 @@ import numpy as np
 import os
 
 from aind_dynamic_foraging_basic_analysis import plot_foraging_session
+from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import moving_average
 from tests.nwb_io import get_history_from_nwb
 
 
@@ -13,7 +14,7 @@ class TestPlotSession(unittest.TestCase):
     """Test plot session"""
     
     @classmethod
-    def setUp(cls):
+    def setUpClass(cls):
         nwb_file = os.path.dirname(__file__) + f"/data/697929_2024-02-22_08-38-30.nwb"
         (
             _,
@@ -24,16 +25,22 @@ class TestPlotSession(unittest.TestCase):
             _,
         ) = get_history_from_nwb(nwb_file)
     
-    def test_plot_session(self):        
+    def test_plot_session(self):
+        
+        # Add some fake data for testing
+        fitted_data = np.ones(len(self.choice_history)) * 0.5
+        photostim = [[10, 20, 30], np.array([3, 3, 3]), ['before go cue', 'after iti start', 'after go cue']]
+        valid_range = [0, 400]
+        
         # Plot session
         fig, _ = plot_foraging_session(
             choice_history=self.choice_history,
             reward_history=self.reward_history,
             p_reward=self.p_reward,
             autowater_offered=self.autowater_offered,
-            fitted_data=None, 
-            photostim=None,    # trial, power, s_type
-            valid_range=None,
+            fitted_data=fitted_data, 
+            photostim=photostim,    # trial, power, s_type
+            valid_range=valid_range,
             smooth_factor=5, 
             base_color='y', 
             ax=None, 
@@ -52,7 +59,7 @@ class TestPlotSession(unittest.TestCase):
             choice_history=self.choice_history,
             reward_history=self.reward_history,
             p_reward=self.p_reward,
-            autowater_offered=self.autowater_offered,
+            autowater_offered=None,
             fitted_data=None, 
             photostim=None,    # trial, power, s_type
             valid_range=None,
