@@ -65,16 +65,18 @@ def plot_foraging_session(
     
     if autowater_offered is None:
         rewarded_excluding_autowater = reward_history
-        autowater_collected = np.zeros_like(choice_history)
-        autowater_ignored = np.zeros_like(choice_history)
+        autowater_collected = np.full_like(choice_history, False, dtype=bool)
+        autowater_ignored = np.full_like(choice_history, False, dtype=bool)
+        unrewarded_trials = (
+            ~reward_history & ~ignored
+        )
     else:
         rewarded_excluding_autowater = reward_history & ~autowater_offered
         autowater_collected = autowater_offered & ~ignored
         autowater_ignored = autowater_offered & ignored
-        
-    unrewarded_trials = (
-        ~reward_history & ~autowater_offered & ~ignored
-    )
+        unrewarded_trials = (
+            ~reward_history & ~ignored & ~autowater_offered
+        )
 
     # == Choice trace ==
     # Rewarded trials (real foraging, autowater excluded)
@@ -142,7 +144,11 @@ def plot_foraging_session(
             
     # For each session, if any fitted_data
     if fitted_data is not None:
-        ax_choice_reward.plot(np.arange(0, n_trials), fitted_data[1, :], linewidth=1.5, label='model')
+        x = np.arange(0, n_trials)
+        y = fitted_data
+        ax_choice_reward.plot(*(x, y) if not vertical else [*(y, x)], 
+                              linewidth=1.5, 
+                              label='model')
     
     # == photo stim ==
     if photostim is not None:
