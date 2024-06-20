@@ -1,6 +1,17 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
+from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
+    PhotostimData, ForagingSessionData
+)
+
+PHOTOSTIM_EPOCH_MAPPING = {
+    'after iti start': 'cyan',
+    'before go cue': 'cyan',
+    'after go cue': 'green',
+    'whole trial': 'blue'
+}
+
 def moving_average(a, n=3) :
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
@@ -22,26 +33,18 @@ def plot_foraging_session(
 ):
 
     # Formatting and sanity checks
-    choice_history = np.array(choice_history, dtype=float)  # Convert None to np.nan, if any
-    reward_history = np.array(reward_history, dtype=bool)
-    p_reward = np.array(p_reward, dtype=float)
-    n_trials = len(choice_history)
-
-    if not np.all(np.isin(choice_history, [0.0, 1.0]) | np.isnan(choice_history)):
-        raise ValueError("choice_history must contain only 0, 1, or np.nan.")
-
-    if not np.all(np.isin(reward_history, [0.0, 1.0])):
-        raise ValueError("reward_history must contain only 0 (False) or 1 (True).")
-
-    if choice_history.shape != reward_history.shape:
-        raise ValueError("choice_history and reward_history must have the same shape.")
-
-    if p_reward.shape != (2, n_trials):
-        raise ValueError("reward_probability must have the shape (2, n_trials)")
-
-    if autowater_offered is not None and not autowater_offered.shape == choice_history.shape:
-        raise ValueError("autowater_offered must have the same shape as choice_history.")
-
+    data = ForagingSessionData(
+        choice_history=choice_history,
+        reward_history=reward_history,
+        p_reward=p_reward,
+        autowater_offered=autowater_offered,
+        fitted_data=fitted_data,
+        photostim=PhotostimData(**photostim) if photostim is not None else None,
+    )
+    
+    choice_history = data.choice_history
+    reward_history = data.reward_history
+    p_reward = data.p_reward
     
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(15, 3) if not vertical else (3, 12), dpi=200)
@@ -152,19 +155,18 @@ def plot_foraging_session(
     
     # == photo stim ==
     if photostim is not None:
-        plot_spec_photostim = { 'after iti start': 'cyan',  
-                                'before go cue': 'cyan',
-                                'after go cue': 'green',
-                                'whole trial': 'blue'}
         
-        trial, power, s_type = photostim
+        trial = data.photostim.trial
+        power = data.photostim.power
+        s_type = data.photostim.stim_epoch
+
         x = trial
         y = np.ones_like(trial) + 0.4
         scatter = ax_choice_reward.scatter(
                             *(x, y) if not vertical else [*(y, x)],
                             s=power.astype(float)*2,
-                            edgecolors=[plot_spec_photostim[t] for t in s_type]
-                                if any(s_type) else 'darkcyan',
+                            edgecolors=[PHOTOSTIM_EPOCH_MAPPING[t] for t in s_type]
+                                        if any(s_type) else 'darkcyan',
                             marker='v' if not vertical else '<',
                             facecolors='none',
                             linewidth=0.5,

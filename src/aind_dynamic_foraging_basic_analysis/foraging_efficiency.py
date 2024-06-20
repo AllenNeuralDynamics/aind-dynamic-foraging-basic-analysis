@@ -4,6 +4,8 @@ from typing import List, Tuple, Union
 
 import numpy as np
 
+from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import ForagingSessionData
+
 
 def compute_foraging_efficiency(
     baited: bool,
@@ -74,38 +76,22 @@ def compute_foraging_efficiency(
         reward_optimal_func = _reward_optimal_forager_no_baiting
 
     # Formatting and sanity checks
-    choice_history = np.array(choice_history, dtype=float)  # Convert None to np.nan, if any
-    reward_history = np.array(reward_history, dtype=float)
-    p_reward = np.array(p_reward, dtype=float)
-    random_number = np.array(random_number, dtype=float) if random_number is not None else None
-    n_trials = len(choice_history)
-
-    if not np.all(np.isin(choice_history, [0.0, 1.0]) | np.isnan(choice_history)):
-        raise ValueError("choice_history must contain only 0, 1, or np.nan.")
-
-    if not np.all(np.isin(reward_history, [0.0, 1.0])):
-        raise ValueError("reward_history must contain only 0 (False) or 1 (True).")
-
-    if choice_history.shape != reward_history.shape:
-        raise ValueError("choice_history and reward_history must have the same shape.")
-
-    if p_reward.shape != (2, n_trials):
-        raise ValueError("reward_probability must have the shape (2, n_trials)")
-
-    if random_number is not None and random_number.shape != p_reward.shape:
-        raise ValueError("random_number must have the same shape as reward_probability.")
-
-    if autowater_offered is not None and not autowater_offered.shape == choice_history.shape:
-        raise ValueError("autowater_offered must have the same shape as choice_history.")
-
+    data = ForagingSessionData(
+        choice_history=choice_history,
+        reward_history=reward_history,
+        p_reward=p_reward,
+        random_number=random_number,
+        autowater_offered=autowater_offered,
+    )
+    
     # Foraging_efficiency is calculated only on finished AND non-autowater trials
-    ignored = np.isnan(choice_history)
+    ignored = np.isnan(data.choice_history)
     valid_trials = (~ignored & ~autowater_offered) if autowater_offered is not None else ~ignored
 
-    choice_history = choice_history[valid_trials]
-    reward_history = reward_history[valid_trials]
-    p_reward = p_reward[:, valid_trials]
-    random_number = random_number[:, valid_trials] if random_number is not None else None
+    choice_history = data.choice_history[valid_trials]
+    reward_history = data.reward_history[valid_trials]
+    p_reward = data.p_reward[:, valid_trials]
+    random_number = data.random_number[:, valid_trials] if data.random_number is not None else None
 
     # Compute reward of the optimal forager
     reward_optimal, reward_optimal_random_seed = reward_optimal_func(

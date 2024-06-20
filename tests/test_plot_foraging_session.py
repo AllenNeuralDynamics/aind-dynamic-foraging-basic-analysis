@@ -1,4 +1,8 @@
-"""Test plot foraging session"""
+"""Test plot foraging session
+
+To run the test, execute "python -m unittest tests/test_plot_foraging_session.py".
+
+"""
 
 
 import unittest
@@ -26,10 +30,13 @@ class TestPlotSession(unittest.TestCase):
         ) = get_history_from_nwb(nwb_file)
     
     def test_plot_session(self):
-        
         # Add some fake data for testing
         fitted_data = np.ones(len(self.choice_history)) * 0.5
-        photostim = [[10, 20, 30], np.array([3, 3, 3]), ['before go cue', 'after iti start', 'after go cue']]
+        photostim = {
+            'trial': [10, 20, 30], 
+            'power': np.array([3.0, 3.0, 3.0]), 
+            'stim_epoch': ['before go cue', 'after iti start', 'after go cue'],
+        }
         valid_range = [0, 400]
         
         # Plot session
@@ -74,4 +81,3 @@ class TestPlotSession(unittest.TestCase):
             os.path.dirname(__file__) + "/data/test_plot_session_vertical.png",
             bbox_inches='tight',
         )
-    

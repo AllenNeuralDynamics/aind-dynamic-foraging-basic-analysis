@@ -18,7 +18,8 @@ dynamic = ["version"]
 
 dependencies = [
     'numpy',
-    'matplotlib'
+    'matplotlib',
+    'pydantic'
 ]
 
 [project.optional-dependencies]
