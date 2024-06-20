@@ -54,7 +54,7 @@ def plot_foraging_session(
     else:
         gs = ax._subplotspec.subgridspec(1, 2, width_ratios=[0.2, 1], wspace=0.1)
         ax_choice_reward = ax.get_figure().add_subplot(gs[0, 1])
-        ax_reward_schedule = ax.get_figure().add_subplot(gs[0, 0], sharex=ax_choice_reward)
+        ax_reward_schedule = ax.get_figure().add_subplot(gs[0, 0], sharey=ax_choice_reward)
     
     # == Fetch data ==
     n_trials = len(choice_history)
@@ -173,7 +173,6 @@ def plot_foraging_session(
     ax_reward_schedule.plot(*(xx, ll) if not vertical else [*(ll, xx)],
             color='r', label='p_left', lw=1)
     ax_reward_schedule.legend(fontsize=5, ncol=1, loc='upper left', bbox_to_anchor=(0, 1))
-    ax_reward_schedule.set_ylim([0, 1])
     
     if not vertical:
         ax_choice_reward.set_yticks([0, 1])
@@ -188,18 +187,31 @@ def plot_foraging_session(
         ax_choice_reward.xaxis.set_ticks_position('none')
         
         # sns.despine(trim=True, ax=ax_2)
+        ax_reward_schedule.set_ylim([0, 1])
         ax_reward_schedule.spines['top'].set_visible(False)
         ax_reward_schedule.spines['right'].set_visible(False)
         ax_reward_schedule.spines['bottom'].set_bounds(0, n_trials)
+        ax_reward_schedule.set(xlabel='Trial number')
         
     else:
         ax_choice_reward.set_xticks([0, 1])
         ax_choice_reward.set_xticklabels(['Left', 'Right'])
         ax_choice_reward.invert_yaxis()
         ax_choice_reward.legend(fontsize=6, loc='upper left', bbox_to_anchor=(0, 1.05), ncol=3)
-        ax_choice_reward.set_yticks([])
+        
+        # ax_choice_reward.set_yticks([])
+        ax_choice_reward.spines['top'].set_visible(False)
+        ax_choice_reward.spines['right'].set_visible(False)
+        ax_choice_reward.spines['left'].set_visible(False)
+        ax_choice_reward.tick_params(labelleft=False)
+        ax_choice_reward.yaxis.set_ticks_position('none')
+        
+        ax_reward_schedule.set_xlim([0, 1])
+        ax_reward_schedule.spines['top'].set_visible(False)
+        ax_reward_schedule.spines['right'].set_visible(False)
+        ax_reward_schedule.spines['left'].set_bounds(0, n_trials)
+        ax_reward_schedule.set(ylabel='Trial number')
     
-    ax_reward_schedule.set(xlabel='Trial number')
     ax.remove()
 
     return ax_choice_reward.get_figure(), [ax_choice_reward, ax_reward_schedule]
