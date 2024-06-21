@@ -18,6 +18,7 @@ class TestPlotSession(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """Load example session"""
         nwb_file = os.path.dirname(__file__) + "/data/697929_2024-02-22_08-38-30.nwb"
         (
             _,
@@ -29,6 +30,7 @@ class TestPlotSession(unittest.TestCase):
         ) = get_history_from_nwb(nwb_file)
 
     def test_plot_session(self):
+        """Test plot real session"""
         # Add some fake data for testing
         fitted_data = np.ones(len(self.choice_history)) * 0.5
         valid_range = [0, 400]
@@ -77,6 +79,7 @@ class TestPlotSession(unittest.TestCase):
         )
 
     def test_plot_session_vertical(self):
+        """Test plotting the same session vertically"""
         # Plot session
         fig, _ = plot_foraging_session(
             choice_history=self.choice_history,
@@ -99,6 +102,7 @@ class TestPlotSession(unittest.TestCase):
         )
 
     def test_plot_session_wrong_format(self):
+        """Some wrong input format"""
         with self.assertRaises(ValueError):
             plot_foraging_session(
                 choice_history=[0, 1, np.nan],

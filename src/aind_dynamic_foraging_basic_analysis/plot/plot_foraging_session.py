@@ -1,3 +1,10 @@
+"""Plot foraging session in a standard format.
+This is supposed to be reused in plotting real data or simulation data to ensure 
+a consistent visual representation.
+"""
+
+from typing import List, Tuple, Union
+
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -15,24 +22,61 @@ PHOTOSTIM_EPOCH_MAPPING = {
 
 
 def moving_average(a, n=3):
+    """Compute moving average of a list or array."""
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1:] / n
+    return ret[n - 1 :] / n
 
 
-def plot_foraging_session(
-    choice_history,
-    reward_history,
-    p_reward,
-    autowater_offered=None,
-    fitted_data=None,
-    photostim=None,  # trial, power, s_type
-    valid_range=None,
-    smooth_factor=5,
-    base_color="y",
-    ax=None,
-    vertical=False,
-):
+def plot_foraging_session(  # noqa: C901
+    choice_history: Union[List, np.ndarray],
+    reward_history: Union[List, np.ndarray],
+    p_reward: Union[List, np.ndarray],
+    autowater_offered: Union[List, np.ndarray] = None,
+    fitted_data: Union[List, np.ndarray] = None,
+    photostim: dict = None,
+    valid_range: List = None,
+    smooth_factor: int = 5,
+    base_color: str = "y",
+    ax: plt.Axes = None,
+    vertical: bool = False,
+) -> Tuple[plt.Figure, List[plt.Axes]]:
+    """Plot dynamic foraging session.
+
+    Parameters
+    ----------
+    choice_history : Union[List, np.ndarray]
+        Choice history (0 = left choice, 1 = right choice, np.nan = ignored).
+    reward_history : Union[List, np.ndarray]
+        Reward history (0 = unrewarded, 1 = rewarded).
+    p_reward : Union[List, np.ndarray]
+        Reward probability for both sides. The size should be (2, len(choice_history)).
+    autowater_offered: Union[List, np.ndarray], optional
+        If not None, indicates trials where autowater was offered.
+    fitted_data : Union[List, np.ndarray], optional
+        If not None, overlay the fitted data (e.g. from RL model) on the plot.
+    photostim : Dict, optional
+        If not None, indicates photostimulation trials. It should be a dictionary with the keys:
+            - trial: list of trial numbers
+            - power: list of laser power
+            - stim_epoch: optional, list of stimulation epochs from
+               {"after iti start", "before go cue", "after go cue", "whole trial"}
+    valid_range : List, optional
+        If not None, add two vertical lines to indicate the valid range where animal was engaged.
+    smooth_factor : int, optional
+        Smoothing factor for the choice history, by default 5.
+    base_color : str, optional
+        Base color for the reward probability, by default "yellow".
+    ax : plt.Axes, optional
+        If not None, use the provided axis to plot, by default None.
+    vertical : bool, optional
+        If True, plot the session vertically, by default False.
+
+    Returns
+    -------
+    Tuple[plt.Figure, List[plt.Axes]]
+        fig, [ax_choice_reward, ax_reward_schedule]
+    """
 
     # Formatting and sanity checks
     data = ForagingSessionData(
