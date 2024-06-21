@@ -11,7 +11,7 @@ import os
 
 from aind_dynamic_foraging_basic_analysis import plot_foraging_session
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import moving_average
-from tests.nwb_io import get_history_from_nwb
+from nwb_io import get_history_from_nwb
 
 
 class TestPlotSession(unittest.TestCase):
@@ -32,11 +32,6 @@ class TestPlotSession(unittest.TestCase):
     def test_plot_session(self):
         # Add some fake data for testing
         fitted_data = np.ones(len(self.choice_history)) * 0.5
-        photostim = {
-            'trial': [10, 20, 30], 
-            'power': np.array([3.0, 3.0, 3.0]), 
-            'stim_epoch': ['before go cue', 'after iti start', 'after go cue'],
-        }
         valid_range = [0, 400]
         
         # Plot session
@@ -46,7 +41,11 @@ class TestPlotSession(unittest.TestCase):
             p_reward=self.p_reward,
             autowater_offered=self.autowater_offered,
             fitted_data=fitted_data, 
-            photostim=photostim,    # trial, power, s_type
+            photostim={
+                'trial': [10, 20, 30], 
+                'power': np.array([3.0, 3.0, 3.0]),
+                'stim_epoch': ['before go cue', 'after iti start', 'after go cue'],
+            },   
             valid_range=valid_range,
             smooth_factor=5, 
             base_color='y', 
@@ -81,3 +80,24 @@ class TestPlotSession(unittest.TestCase):
             os.path.dirname(__file__) + "/data/test_plot_session_vertical.png",
             bbox_inches='tight',
         )
+        
+    def test_plot_session_wrong_format(self):
+        with self.assertRaises(ValueError):
+            plot_foraging_session(
+                choice_history=[0, 1, np.nan],
+                reward_history=[0, 1, 1],
+                p_reward=[[0.5, 0.5, 0.4], [0.5, 0.5, 0.4]],
+                fitted_data=[0, 1],  # Wrong length
+            )
+        
+        with self.assertRaises(ValueError):
+            plot_foraging_session(
+                choice_history=[0, 1, np.nan],
+                reward_history=[0, 1, 1],
+                p_reward=[[0.5, 0.5, 0.4], [0.5, 0.5, 0.4]],
+                photostim={'trial': [1, 2, 3], 
+                        'power': [3.0, 3.0]},  # Wrong length
+            )
+        
+if __name__ == '__main__':
+    unittest.main()

@@ -45,6 +45,9 @@ def plot_foraging_session(
     choice_history = data.choice_history
     reward_history = data.reward_history
     p_reward = data.p_reward
+    autowater_offered = data.autowater_offered
+    fitted_data = data.fitted_data
+    photostim = data.photostim
     
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(15, 3) if not vertical else (3, 12), dpi=200)
@@ -159,14 +162,18 @@ def plot_foraging_session(
         trial = data.photostim.trial
         power = data.photostim.power
         s_type = data.photostim.stim_epoch
+        
+        if s_type is not None:
+            edgecolors = [PHOTOSTIM_EPOCH_MAPPING[t] for t in s_type]
+        else:
+            edgecolors = 'darkcyan'
 
         x = trial
         y = np.ones_like(trial) + 0.4
         scatter = ax_choice_reward.scatter(
                             *(x, y) if not vertical else [*(y, x)],
-                            s=power.astype(float)*2,
-                            edgecolors=[PHOTOSTIM_EPOCH_MAPPING[t] for t in s_type]
-                                        if any(s_type) else 'darkcyan',
+                            s=np.array(power)*2,
+                            edgecolors=edgecolors,
                             marker='v' if not vertical else '<',
                             facecolors='none',
                             linewidth=0.5,

@@ -3,9 +3,9 @@ from typing import Optional, Union, Dict, List
 import numpy as np
 
 class PhotostimData(BaseModel):
-    trial: Union[np.ndarray, List[int]]
-    power: Union[np.ndarray, List[float]]
-    stim_epoch: Optional[Union[np.ndarray, List[str]]] = None
+    trial: List[int]
+    power: List[float]
+    stim_epoch: Optional[List[str]] = None
     
     class Config:
         arbitrary_types_allowed = True
@@ -25,8 +25,12 @@ class ForagingSessionData(BaseModel):
 
     @field_validator('choice_history', 'reward_history', 'p_reward', 
                      'random_number', 'autowater_offered', 'fitted_data', mode='before')
-    def convert_to_ndarray(cls, v):
-        return np.array(v) if v is not None else None
+    @classmethod
+    def convert_to_ndarray(cls, v, info):
+        return np.array(
+            v, 
+            dtype='bool' if info.field_name in ['reward_history', 'autowater_offered'] else None,
+        ) if v is not None else None
 
     @model_validator(mode='after')
     def check_all_fields(cls, values):
