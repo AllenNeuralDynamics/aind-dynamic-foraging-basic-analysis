@@ -25,10 +25,10 @@ def moving_average(a, n=3):
     """Compute moving average of a list or array."""
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1 :] / n
+    return ret[n - 1:] / n
 
 
-def plot_foraging_session(
+def plot_foraging_session(  # noqa: C901
     choice_history: Union[List, np.ndarray],
     reward_history: Union[List, np.ndarray],
     p_reward: Union[List, np.ndarray],
@@ -40,7 +40,7 @@ def plot_foraging_session(
     base_color: str = "y",
     ax: plt.Axes = None,
     vertical: bool = False,
-) -> Tuple[plt.Figure, List[plt.Axes]]:  # noqa: C901
+) -> Tuple[plt.Figure, List[plt.Axes]]:
     """Plot dynamic foraging session.
 
     Parameters
