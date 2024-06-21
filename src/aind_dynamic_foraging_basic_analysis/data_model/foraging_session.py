@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator, model_validator
-from typing import Optional, Union, Dict, List
+from typing import Optional, List
 import numpy as np
 
 class PhotostimData(BaseModel):
@@ -12,12 +12,12 @@ class PhotostimData(BaseModel):
 
 
 class ForagingSessionData(BaseModel):
-    choice_history: Union[np.ndarray, list]
-    reward_history: Union[np.ndarray, list]
-    p_reward: Optional[Union[np.ndarray, list]] = None
-    random_number: Optional[Union[np.ndarray, list]] = None
-    autowater_offered: Optional[Union[np.ndarray, list]] = None
-    fitted_data: Optional[Union[np.ndarray, list]] = None
+    choice_history: np.ndarray
+    reward_history: np.ndarray
+    p_reward: Optional[np.ndarray] = None
+    random_number: Optional[np.ndarray] = None
+    autowater_offered: Optional[np.ndarray] = None
+    fitted_data: Optional[np.ndarray] = None
     photostim: Optional[PhotostimData] = None
 
     class Config:
@@ -29,7 +29,9 @@ class ForagingSessionData(BaseModel):
     def convert_to_ndarray(cls, v, info):
         return np.array(
             v, 
-            dtype='bool' if info.field_name in ['reward_history', 'autowater_offered'] else None,
+            dtype='bool' 
+                  if info.field_name in ['reward_history', 'autowater_offered']  # Turn to bool
+                  else None,
         ) if v is not None else None
 
     @model_validator(mode='after')
@@ -44,9 +46,6 @@ class ForagingSessionData(BaseModel):
 
         if not np.all(np.isin(choice_history, [0.0, 1.0]) | np.isnan(choice_history)):
             raise ValueError("choice_history must contain only 0, 1, or np.nan.")
-
-        if not np.all(np.isin(reward_history, [0.0, 1.0])):
-            raise ValueError("reward_history must contain only 0 (False) or 1 (True).")
 
         if choice_history.shape != reward_history.shape:
             raise ValueError("choice_history and reward_history must have the same shape.")

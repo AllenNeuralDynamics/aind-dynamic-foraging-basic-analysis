@@ -4,14 +4,13 @@ To run the test, execute "python -m unittest tests/test_plot_foraging_session.py
 
 """
 
-
 import unittest
 import numpy as np
 import os
 
 from aind_dynamic_foraging_basic_analysis import plot_foraging_session
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import moving_average
-from nwb_io import get_history_from_nwb
+from tests.nwb_io import get_history_from_nwb
 
 
 class TestPlotSession(unittest.TestCase):
@@ -36,8 +35,8 @@ class TestPlotSession(unittest.TestCase):
         
         # Plot session
         fig, _ = plot_foraging_session(
-            choice_history=self.choice_history,
-            reward_history=self.reward_history,
+            choice_history=list(self.choice_history),
+            reward_history=list(self.reward_history),
             p_reward=self.p_reward,
             autowater_offered=self.autowater_offered,
             fitted_data=fitted_data, 
@@ -52,7 +51,25 @@ class TestPlotSession(unittest.TestCase):
             ax=None, 
             vertical=False,
         )
-        
+
+        # Plot session
+        fig, _ = plot_foraging_session(
+            choice_history=list(self.choice_history),
+            reward_history=list(self.reward_history),
+            p_reward=self.p_reward,
+            autowater_offered=self.autowater_offered,
+            fitted_data=fitted_data, 
+            photostim={
+                'trial': [10, 20, 30], 
+                'power': np.array([3.0, 3.0, 3.0]),  # No stim_epoch
+            },   
+            valid_range=valid_range,
+            smooth_factor=5, 
+            base_color='y', 
+            ax=None, 
+            vertical=False,
+        )
+
         # Save fig
         fig.savefig(
             os.path.dirname(__file__) + "/data/test_plot_session.png",
@@ -96,7 +113,17 @@ class TestPlotSession(unittest.TestCase):
                 reward_history=[0, 1, 1],
                 p_reward=[[0.5, 0.5, 0.4], [0.5, 0.5, 0.4]],
                 photostim={'trial': [1, 2, 3], 
-                        'power': [3.0, 3.0]},  # Wrong length
+                           'power': [3.0, 3.0]},  # Wrong length
+            )
+            
+        with self.assertRaises(ValueError):
+            plot_foraging_session(
+                choice_history=[0, 1, np.nan],
+                reward_history=[0, 1, 1],
+                p_reward=[[0.5, 0.5, 0.4], [0.5, 0.5, 0.4]],
+                photostim={'trial': [1, 2, 3], 
+                           'power': [3.0, 3.0, 5.0],
+                           'stim_epoch': ['after iti start']},  # Wrong length
             )
         
 if __name__ == '__main__':

@@ -161,10 +161,10 @@ def plot_foraging_session(
         
         trial = data.photostim.trial
         power = data.photostim.power
-        s_type = data.photostim.stim_epoch
+        stim_epoch = data.photostim.stim_epoch
         
-        if s_type is not None:
-            edgecolors = [PHOTOSTIM_EPOCH_MAPPING[t] for t in s_type]
+        if stim_epoch is not None:
+            edgecolors = [PHOTOSTIM_EPOCH_MAPPING[t] for t in stim_epoch]
         else:
             edgecolors = 'darkcyan'
 
