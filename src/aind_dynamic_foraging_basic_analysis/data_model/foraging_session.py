@@ -65,7 +65,7 @@ class ForagingSessionData(BaseModel):
         )
 
     @model_validator(mode="after")
-    def check_all_fields(cls, values):
+    def check_all_fields(cls, values):  # noqa: C901
         """Check consistency of all fields"""
 
         choice_history = values.choice_history

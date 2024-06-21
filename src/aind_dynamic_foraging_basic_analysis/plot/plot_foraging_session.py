@@ -1,5 +1,5 @@
 """Plot foraging session in a standard format.
-This is supposed to be reused in plotting real data or simulation data to ensure 
+This is supposed to be reused in plotting real data or simulation data to ensure
 a consistent visual representation.
 """
 
@@ -28,7 +28,7 @@ def moving_average(a, n=3):
     return ret[n - 1 :] / n
 
 
-def plot_foraging_session(  # noqa: C901
+def plot_foraging_session(
     choice_history: Union[List, np.ndarray],
     reward_history: Union[List, np.ndarray],
     p_reward: Union[List, np.ndarray],
@@ -40,7 +40,7 @@ def plot_foraging_session(  # noqa: C901
     base_color: str = "y",
     ax: plt.Axes = None,
     vertical: bool = False,
-) -> Tuple[plt.Figure, List[plt.Axes]]:
+) -> Tuple[plt.Figure, List[plt.Axes]]:  # noqa: C901
     """Plot dynamic foraging session.
 
     Parameters
