@@ -4,12 +4,12 @@ To run the test, execute "python -m unittest tests/test_plot_foraging_session.py
 
 """
 
-import unittest
-import numpy as np
 import os
+import unittest
+
+import numpy as np
 
 from aind_dynamic_foraging_basic_analysis import plot_foraging_session
-from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import moving_average
 from tests.nwb_io import get_history_from_nwb
 
 
@@ -18,7 +18,7 @@ class TestPlotSession(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        nwb_file = os.path.dirname(__file__) + f"/data/697929_2024-02-22_08-38-30.nwb"
+        nwb_file = os.path.dirname(__file__) + "/data/697929_2024-02-22_08-38-30.nwb"
         (
             _,
             cls.choice_history,

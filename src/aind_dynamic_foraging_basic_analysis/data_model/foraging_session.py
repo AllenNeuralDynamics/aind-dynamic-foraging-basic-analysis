@@ -1,6 +1,7 @@
-from pydantic import BaseModel, field_validator, model_validator
-from typing import Optional, List
+from typing import List, Optional
+
 import numpy as np
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class PhotostimData(BaseModel):

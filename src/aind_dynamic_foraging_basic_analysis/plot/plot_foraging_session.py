@@ -2,8 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
-    PhotostimData,
     ForagingSessionData,
+    PhotostimData,
 )
 
 PHOTOSTIM_EPOCH_MAPPING = {
@@ -17,7 +17,7 @@ PHOTOSTIM_EPOCH_MAPPING = {
 def moving_average(a, n=3):
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1 :] / n
+    return ret[n - 1:] / n
 
 
 def plot_foraging_session(
@@ -206,7 +206,7 @@ def plot_foraging_session(
 
         x = trial
         y = np.ones_like(trial) + 0.4
-        scatter = ax_choice_reward.scatter(
+        _ = ax_choice_reward.scatter(
             *(x, y) if not vertical else [*(y, x)],
             s=np.array(power) * 2,
             edgecolors=edgecolors,
