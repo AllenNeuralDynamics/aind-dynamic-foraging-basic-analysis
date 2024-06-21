@@ -83,7 +83,7 @@ def compute_foraging_efficiency(
         random_number=random_number,
         autowater_offered=autowater_offered,
     )
-    
+
     # Foraging_efficiency is calculated only on finished AND non-autowater trials
     ignored = np.isnan(data.choice_history)
     valid_trials = (~ignored & ~autowater_offered) if autowater_offered is not None else ~ignored

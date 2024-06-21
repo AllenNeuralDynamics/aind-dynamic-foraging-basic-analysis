@@ -2,11 +2,12 @@ from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional, List
 import numpy as np
 
+
 class PhotostimData(BaseModel):
     trial: List[int]
     power: List[float]
     stim_epoch: Optional[List[str]] = None
-    
+
     class Config:
         arbitrary_types_allowed = True
 
@@ -23,18 +24,31 @@ class ForagingSessionData(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @field_validator('choice_history', 'reward_history', 'p_reward', 
-                     'random_number', 'autowater_offered', 'fitted_data', mode='before')
+    @field_validator(
+        "choice_history",
+        "reward_history",
+        "p_reward",
+        "random_number",
+        "autowater_offered",
+        "fitted_data",
+        mode="before",
+    )
     @classmethod
     def convert_to_ndarray(cls, v, info):
-        return np.array(
-            v, 
-            dtype='bool' 
-                  if info.field_name in ['reward_history', 'autowater_offered']  # Turn to bool
-                  else None,
-        ) if v is not None else None
+        return (
+            np.array(
+                v,
+                dtype=(
+                    "bool"
+                    if info.field_name in ["reward_history", "autowater_offered"]  # Turn to bool
+                    else None
+                ),
+            )
+            if v is not None
+            else None
+        )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_all_fields(cls, values):
         choice_history = values.choice_history
         reward_history = values.reward_history
@@ -70,7 +84,8 @@ class ForagingSessionData(BaseModel):
                 raise ValueError("photostim.trial must have the same length as photostim.power.")
             if photostim.stim_epoch is not None:
                 if len(photostim.stim_epoch) != len(photostim.power):
-                    raise ValueError("photostim.stim_epoch must have the same length as photostim.power.")
+                    raise ValueError(
+                        "photostim.stim_epoch must have the same length as photostim.power."
+                    )
 
         return values
-

@@ -128,5 +128,6 @@ class TestForagingEfficiency(unittest.TestCase):
                 random_number=None,
             )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
