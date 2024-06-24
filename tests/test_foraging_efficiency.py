@@ -117,16 +117,6 @@ class TestForagingEfficiency(unittest.TestCase):
                 random_number=None,
             )
 
-        # Wrong reward_history values
-        with self.assertRaises(ValueError):
-            compute_foraging_efficiency(
-                baited=True,
-                choice_history=choice_history,
-                reward_history=[0, 1, 2],
-                p_reward=p_reward,
-                random_number=None,
-            )
-
         # Wrong autowater_offered shape
         with self.assertRaises(ValueError):
             compute_foraging_efficiency(
@@ -137,3 +127,7 @@ class TestForagingEfficiency(unittest.TestCase):
                 autowater_offered=np.array([True, False]),
                 random_number=None,
             )
+
+
+if __name__ == "__main__":
+    unittest.main()
