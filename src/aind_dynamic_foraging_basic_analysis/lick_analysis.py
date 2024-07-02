@@ -344,7 +344,7 @@ def cal_metrics(data):
         "bl_lick": bl_mean,
         "bl_lick_lr": [bl_mean_l, bl_mean_r],
         "resp_lick": respond_mean,
-        "bl_lick_trial": rate_align(all_licks, all_pre_nolick, win_bl),
+        "bl_lick_trial": rate_align(all_licks, all_pre_nolick, win_bl),  
         "resp_lick_trial": rate_align(all_licks, all_go_no_rwd, win_go),
         "peak_ratio": [l_major_perc, r_major_perc],
         "peak_lat": [l_major, r_major],
