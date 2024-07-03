@@ -18,7 +18,13 @@ dynamic = ["version"]
 
 dependencies = [
     'numpy',
+    'scipy',
     'matplotlib',
+    'pandas',
+    'pynwb',
+    'aind_ephys_utils',
+    'pathlib',
+    'numpy',
     'pydantic'
 ]
 
