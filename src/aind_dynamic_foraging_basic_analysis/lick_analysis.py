@@ -71,11 +71,14 @@ def plot_lick_analysis(nwb):
         - tbl_trials["start_time"]
         - tbl_trials["ITI_duration"]
     )
-    bins = np.arange(
-        np.min(lick_delay),
-        np.max(lick_delay),
-        (np.max(lick_delay) - np.min(lick_delay)) / 20,
-    )
+    if np.max(lick_delay) - np.min(lick_delay) > 0:        
+        bins = np.arange(
+            np.min(lick_delay),
+            np.max(lick_delay),
+            (np.max(lick_delay) - np.min(lick_delay)) / 20,
+        )
+    else:
+        bins = np.arange(0, 1, 0.1)
     ax = fig.add_subplot(gs[0, 5])
     ax.hist(
         lick_delay[tbl_trials["animal_response"] == 1],
