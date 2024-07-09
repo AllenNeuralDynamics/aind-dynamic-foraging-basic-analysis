@@ -19,6 +19,8 @@ def plot_lick_analysis(nwb):
     tbl_trials = nwb.trials.to_dataframe()
     session_id = nwb.session_id
     session_id = session_id.split(".")[0]
+    session_id = nwb.session_id
+    session_id = session_id.split(".")[0]
     gs = gridspec.GridSpec(
         2,
         6,
@@ -506,6 +508,7 @@ def rate_align(x, events, win):
 def plot_ILI(ili, title, subplot_spec, fig):
     """Plot ILI."""
     nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=subplot_spec)
+    nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=subplot_spec)
     bins = np.arange(0, 2500, 20)
     ax1 = fig.add_subplot(nested_gs[0, 0])
     ax2 = fig.add_subplot(nested_gs[1, 0])
@@ -536,6 +539,7 @@ def plot_raster_rate(
     """Plot raster and rate aligned to events"""
     edges = np.arange(tb + 0.5 * bin_size, tf - 0.5 * bin_size, step_size)
     nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=subplot_spec)
+    nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=subplot_spec)
     ax1 = fig.add_subplot(nested_gs[0, 0])
     ax2 = fig.add_subplot(nested_gs[1, 0])
 
@@ -545,6 +549,8 @@ def plot_raster_rate(
     ax1.set_title(title)
     ax1.set_xlim(tb, tf)
 
+    counts_pre = np.searchsorted(np.sort(df.time.values), edges - 0.5 * bin_size)
+    counts_post = np.searchsorted(np.sort(df.time.values), edges + 0.5 * bin_size)
     counts_pre = np.searchsorted(np.sort(df.time.values), edges - 0.5 * bin_size)
     counts_post = np.searchsorted(np.sort(df.time.values), edges + 0.5 * bin_size)
     lick_rate = (counts_post - counts_pre) / (bin_size * len(align_events))
@@ -563,6 +569,7 @@ if __name__ == "__main__":
 
     """Example."""
     data_dir = Path(os.path.dirname(__file__)).parent.parent
+    nwbfile = os.path.join(data_dir, "tests/data/705599_2024-05-31_14-06-54.nwb")
     nwbfile = os.path.join(data_dir, "tests/data/705599_2024-05-31_14-06-54.nwb")
     # use of load_data depends on data structure
     nwb = load_nwb(nwbfile)
