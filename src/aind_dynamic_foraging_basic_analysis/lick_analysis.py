@@ -19,8 +19,6 @@ def plot_lick_analysis(nwb):
     tbl_trials = nwb.trials.to_dataframe()
     session_id = nwb.session_id
     session_id = session_id.split(".")[0]
-    session_id = nwb.session_id
-    session_id = session_id.split(".")[0]
     gs = gridspec.GridSpec(
         2,
         6,
