@@ -1,0 +1,7 @@
+{
+    "description": "The laser on probability",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "e82bfeb4-8cb7-4491-8de2-b2faf79a8cbe",
+    "zarr_dtype": "float"
+}

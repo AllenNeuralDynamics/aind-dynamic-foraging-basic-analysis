@@ -1,0 +1,7 @@
+{
+    "description": "The minimum duration(s) allowed for each ITI",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "501b75ed-47a5-4df7-811f-b4f33909cd8c",
+    "zarr_dtype": "float"
+}

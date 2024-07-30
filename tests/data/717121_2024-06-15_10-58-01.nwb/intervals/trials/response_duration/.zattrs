@@ -1,0 +1,7 @@
+{
+    "description": "The maximum time that the animal must make a choice in order to get a reward",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "acd3b5d3-4fbe-4953-aea8-074ce62ece9e",
+    "zarr_dtype": "float"
+}

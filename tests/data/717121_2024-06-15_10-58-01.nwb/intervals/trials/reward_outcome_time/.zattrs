@@ -1,0 +1,7 @@
+{
+    "description": "The reward outcome time (reward/no reward/no response) Note: This is in fact time when choice is registered.",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "7a6b1deb-4fb8-4449-b1bd-742daae9c666",
+    "zarr_dtype": "float"
+}

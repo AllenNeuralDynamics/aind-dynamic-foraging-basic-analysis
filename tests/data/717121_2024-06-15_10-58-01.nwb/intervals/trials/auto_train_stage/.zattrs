@@ -1,0 +1,7 @@
+{
+    "description": "The current stage of auto training",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "ea528c94-b069-44eb-8f47-6301e46cea95",
+    "zarr_dtype": "str"
+}

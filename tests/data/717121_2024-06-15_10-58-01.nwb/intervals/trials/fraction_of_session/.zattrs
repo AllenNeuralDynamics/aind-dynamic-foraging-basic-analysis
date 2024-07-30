@@ -1,0 +1,7 @@
+{
+    "description": "Turn on/off opto in a fraction of the session (related to session_wide_control)",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "85510cfc-92f9-4ec2-86cc-72ea6f2ba9f5",
+    "zarr_dtype": "float"
+}

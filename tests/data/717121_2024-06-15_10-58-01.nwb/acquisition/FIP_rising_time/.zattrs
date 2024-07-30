@@ -1,0 +1,7 @@
+{
+    "comments": "no comments",
+    "description": "The time of photometry rising edge (from Harp)",
+    "namespace": "core",
+    "neurodata_type": "TimeSeries",
+    "object_id": "5e551606-bb83-43e9-a16d-a7a9d497d953"
+}

@@ -1,0 +1,7 @@
+{
+    "description": "The delay between choice and reward delivery",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "c0d9a924-e299-46f2-8bf9-9574e5a421f5",
+    "zarr_dtype": "float"
+}

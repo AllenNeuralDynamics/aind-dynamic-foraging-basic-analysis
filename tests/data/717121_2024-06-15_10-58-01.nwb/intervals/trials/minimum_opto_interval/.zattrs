@@ -1,0 +1,7 @@
+{
+    "description": "Minimum interval between two optogenetics trials (number of trials)",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "f5ff7a71-434d-4473-9fd3-74771a7a0523",
+    "zarr_dtype": "float"
+}
