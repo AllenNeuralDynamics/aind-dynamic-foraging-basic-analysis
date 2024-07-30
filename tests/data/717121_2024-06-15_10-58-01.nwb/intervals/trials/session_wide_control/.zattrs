@@ -1,0 +1,7 @@
+{
+    "description": "Control the optogenetics session wide (e.g. only turn on opto in half of the session)",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "8e373f3f-cc25-4f99-823a-fda88a441309",
+    "zarr_dtype": "str"
+}

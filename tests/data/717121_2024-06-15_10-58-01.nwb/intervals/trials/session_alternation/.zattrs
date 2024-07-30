@@ -1,0 +1,7 @@
+{
+    "description": "Turn on/off opto in every other session (related to session_wide_control)",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "5835a756-27c4-43d1-b53b-a1d1d0bff83d",
+    "zarr_dtype": "str"
+}

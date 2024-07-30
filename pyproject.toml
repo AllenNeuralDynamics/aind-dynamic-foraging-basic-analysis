@@ -26,6 +26,7 @@ dependencies = [
     'pathlib',
     'numpy',
     'pydantic'
+    'hdmf_zarr'
 ]
 
 [project.optional-dependencies]

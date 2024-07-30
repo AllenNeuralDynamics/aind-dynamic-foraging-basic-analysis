@@ -1,0 +1,7 @@
+{
+    "description": "The response of the animal. 0, left choice; 1, right choice; 2, no response",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "a2a4d6e7-d952-4ddf-9e9f-1456971a686f",
+    "zarr_dtype": "float"
+}

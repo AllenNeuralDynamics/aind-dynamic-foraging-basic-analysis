@@ -1,0 +1,7 @@
+{
+    "description": "no description",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "e58a75ef-2362-4e0c-aa05-b612c8e707ec",
+    "zarr_dtype": "str"
+}

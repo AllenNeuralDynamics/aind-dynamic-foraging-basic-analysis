@@ -1,0 +1,7 @@
+{
+    "description": "The minimum duration(s) allowed for each delay",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "d9e0c3fb-3e1d-4d81-bbfc-e9a92254e338",
+    "zarr_dtype": "float"
+}

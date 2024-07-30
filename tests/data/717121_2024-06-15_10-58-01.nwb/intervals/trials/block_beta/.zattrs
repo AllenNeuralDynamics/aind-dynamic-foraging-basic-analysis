@@ -1,0 +1,7 @@
+{
+    "description": "The beta of exponential distribution to generate the block length",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "57f76129-d6e8-417d-b91b-8080f913a366",
+    "zarr_dtype": "float"
+}
