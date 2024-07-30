@@ -1,17 +1,27 @@
 """Load packages."""
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from aind_ephys_utils import align
 from pynwb import NWBHDF5IO
+from hdmf_zarr import NWBZarrIO
 from scipy.stats import norm
 
 
 def load_nwb(nwb_file):
     """Load NWB file."""
-    io = NWBHDF5IO(nwb_file, mode="r")
-    nwb = io.read()
-    return nwb
+    if os.path.isdir(nwb_file):
+        io = NWBZarrIO(nwb_file, mode="r")
+        nwb = io.read()
+        return nwb
+    elif os.path.isfile(nwb_file):
+        io = NWBHDF5IO(nwb_file, mode="r")
+        nwb = io.read()
+        return nwb
+    else:
+        print("nwb file does not exist.")
+        return None
 
 
 def plot_lick_analysis(nwb):
@@ -290,7 +300,7 @@ def cal_metrics(data):
         ref_kernel = np.convolve(ref, kernel)
         finish_kernel = np.convolve(finish.astype(float), kernel)
         finish_kernel = np.divide(finish_kernel, ref_kernel)
-        finish_kernel = finish_kernel[int(0.5 * len(kernel)):-int(0.5 * len(kernel))]
+        finish_kernel = finish_kernel[int(0.5 * len(kernel)): -int(0.5 * len(kernel))]
         all_go_no_rwd = tbl_trials.loc[
             (tbl_trials["animal_response"] != 2)
             & (tbl_trials["rewarded_historyL"] == 0)
@@ -562,7 +572,6 @@ def plot_raster_rate(
 
 # example use
 if __name__ == "__main__":
-    import os
     from pathlib import Path
 
     """Example."""

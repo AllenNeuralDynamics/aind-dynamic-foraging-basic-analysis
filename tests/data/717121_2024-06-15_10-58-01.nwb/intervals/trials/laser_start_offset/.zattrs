@@ -1,0 +1,7 @@
+{
+    "description": "Laser start is aligned to an event with an offset",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "a291aeae-04a7-43a3-8f0e-96993828b814",
+    "zarr_dtype": "float"
+}

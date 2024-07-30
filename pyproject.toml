@@ -25,7 +25,8 @@ dependencies = [
     'aind_ephys_utils',
     'pathlib',
     'numpy',
-    'pydantic'
+    'pydantic',
+    'hdmf_zarr'
 ]
 
 [project.optional-dependencies]

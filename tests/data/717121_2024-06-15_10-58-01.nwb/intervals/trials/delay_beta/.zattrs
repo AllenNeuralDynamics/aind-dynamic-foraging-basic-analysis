@@ -1,0 +1,7 @@
+{
+    "description": "The beta of exponential distribution to generate the delay duration(s)",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "967448ba-6531-48a6-879e-da84181a5dc4",
+    "zarr_dtype": "float"
+}

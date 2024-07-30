@@ -1,0 +1,7 @@
+{
+    "description": "The random number used to determine the reward of right lick port",
+    "namespace": "hdmf-common",
+    "neurodata_type": "VectorData",
+    "object_id": "ae204857-0779-4dac-951e-7a6a21c9c6a5",
+    "zarr_dtype": "float"
+}

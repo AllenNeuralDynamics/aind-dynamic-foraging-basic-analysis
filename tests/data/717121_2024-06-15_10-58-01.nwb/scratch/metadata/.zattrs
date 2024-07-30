@@ -1,0 +1,29 @@
+{
+    "colnames": [
+        "box",
+        "session_end_time",
+        "session_run_time_in_min",
+        "water_in_session_foraging",
+        "water_in_session_manual",
+        "water_in_session_total",
+        "water_after_session",
+        "water_day_total",
+        "base_weight",
+        "target_weight",
+        "target_weight_ratio",
+        "weight_after",
+        "foraging_efficiency",
+        "foraging_efficiency_with_actual_random_seed",
+        "laser_1_calibration_power",
+        "laser_2_calibration_power",
+        "laser_1_target_areas",
+        "laser_2_target_areas",
+        "commit_ID",
+        "repo_url",
+        "current_branch"
+    ],
+    "description": "Some important session-wise meta data",
+    "namespace": "hdmf-common",
+    "neurodata_type": "DynamicTable",
+    "object_id": "f4fdf508-61c2-4c6e-81ab-7f619e55750a"
+}
