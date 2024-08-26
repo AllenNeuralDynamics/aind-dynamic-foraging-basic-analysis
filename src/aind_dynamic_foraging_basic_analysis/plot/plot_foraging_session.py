@@ -321,10 +321,9 @@ def plot_foraging_session(  # noqa: C901
     return ax_choice_reward.get_figure(), [ax_choice_reward, ax_reward_schedule]
 
 
-def plot_session_scroller(df_events,  # noqa: C901 pragma: no cover
-    ax=None,
-    adjust_time=True,
-    fip_df=None):
+def plot_session_scroller(  # noqa: C901 pragma: no cover
+    df_events, ax=None, adjust_time=True, fip_df=None
+):
     """
     Creates an interactive plot of the session.
     Plots left/right licks/rewards, and go cues
