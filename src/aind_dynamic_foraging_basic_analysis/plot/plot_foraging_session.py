@@ -21,7 +21,7 @@ PHOTOSTIM_EPOCH_MAPPING = {
 }
 
 """
-    Define a dictionary of plotting styles. 
+    Define a dictionary of plotting styles
     This allows rapid regeneration of figures
 """
 STYLE = {"axis_ticks_fontsize": 12, "axis_fontsize": 16}
@@ -31,7 +31,7 @@ def moving_average(a, n=3):
     """Compute moving average of a list or array."""
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1 :] / n
+    return ret[n - 1:] / n
 
 
 def plot_foraging_session(  # noqa: C901
@@ -451,7 +451,7 @@ def plot_session_scroller(df_events, ax=None, adjust_time=True):
         x = ax.get_xlim()
         xmin = x[0]
         xmax = x[1]
-        xStep = (xmax - xmin) / 4
+        xStep = (xmax - xmin) / 4 # noqa
         if event.key == "<" or event.key == "," or event.key == "left":
             xmin -= xStep
             xmax -= xStep
