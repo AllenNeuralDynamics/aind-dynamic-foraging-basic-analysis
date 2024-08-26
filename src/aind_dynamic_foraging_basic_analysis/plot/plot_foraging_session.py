@@ -20,6 +20,11 @@ PHOTOSTIM_EPOCH_MAPPING = {
     "whole trial": "blue",
 }
 
+STYLE = {
+    'axis_ticks_fontsize':12,
+    'axis_fontsize':16
+    }
+
 
 def moving_average(a, n=3):
     """Compute moving average of a list or array."""
@@ -313,3 +318,104 @@ def plot_foraging_session(  # noqa: C901
     ax.remove()
 
     return ax_choice_reward.get_figure(), [ax_choice_reward, ax_reward_schedule]
+
+def plot_session(df_events,ax=None,adjust_time = True):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(15, 3))
+
+    if adjust_time:
+        df_events = df_events.copy()
+        df_events['timestamps'] = df_events['timestamps'] - df_events.iloc[0]['timestamps']
+
+
+    xmin = df_events.iloc[0]['timestamps']
+    xmax = xmin + 20
+    xStep = 5
+    ax.set_xlim(xmin,xmax)
+
+    params = {
+        'left_lick_bottom':0,
+        'left_lick_top':0.25,
+        'right_lick_bottom':.75,
+        'right_lick_top':1,
+        'left_reward_bottom':.25,
+        'left_reward_top':0.5,
+        'right_reward_bottom':.5,
+        'right_reward_top':.75,
+        'go_cue_bottom':0,
+        'go_cue_top':1
+        }  
+    yticks = [
+        (params['left_lick_top']-params['left_lick_bottom'])/2 + params['left_lick_bottom'],
+        (params['right_lick_top']-params['right_lick_bottom'])/2 + params['right_lick_bottom']
+        ]
+    ylabels = ['left licks','right licks'] 
+     
+    left_licks = df_events.query('event == "left_lick_time"')
+    left_times = left_licks.timestamps.values
+    ax.vlines(left_times, 
+        params['left_lick_bottom'],
+        params['left_lick_top'],
+        alpha=1,linewidth=2,color='k') 
+
+    right_licks = df_events.query('event == "right_lick_time"')
+    right_times = right_licks.timestamps.values
+    ax.vlines(right_times, 
+        params['right_lick_bottom'],
+        params['right_lick_top'],
+        alpha=1,linewidth=2,color='k') 
+
+    left_reward_deliverys = df_events.query('event == "left_reward_delivery_time"')
+    left_times = left_reward_deliverys.timestamps.values
+    ax.vlines(left_times, 
+        params['left_reward_bottom'],
+        params['left_reward_top'],
+        alpha=1,linewidth=2,color='r') 
+
+    right_reward_deliverys = df_events.query('event == "right_reward_delivery_time"')
+    right_times = right_reward_deliverys.timestamps.values
+    ax.vlines(right_times, 
+        params['right_reward_bottom'],
+        params['right_reward_top'],
+        alpha=1,linewidth=2,color='r') 
+
+    go_cues = df_events.query('event == "goCue_start_time"')
+    go_cue_times = go_cues.timestamps.values
+    ax.vlines(go_cue_times, 
+        params['go_cue_bottom'],
+        params['go_cue_top'],
+        alpha=.75,linewidth=1,color='b') 
+
+
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ylabels,fontsize=STYLE['axis_ticks_fontsize'])
+    ax.set_xlabel('time (s)',fontsize=STYLE['axis_fontsize'])
+    ax.set_ylim(0,1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.tight_layout()
+
+    def on_key_press(event):
+        x = ax.get_xlim()
+        xmin = x[0]
+        xmax = x[1]
+        xStep = (xmax - xmin)/4
+        if event.key=='<' or event.key==',' or event.key=='left':
+            xmin -= xStep
+            xmax -= xStep
+        elif event.key=='>' or event.key=='.' or event.key=='right':
+            xmin += xStep
+            xmax += xStep
+        elif event.key=='up':
+            xmin -= xStep
+            xmax += xStep
+        elif event.key=='down':
+            xmin += xStep*(2/3)
+            xmax -= xStep*(2/3)
+        ax.set_xlim(xmin,xmax)
+        plt.draw()
+        
+    kpid = fig.canvas.mpl_connect('key_press_event',on_key_press)
+    
+    return fig, ax
+ 
