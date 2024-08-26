@@ -351,7 +351,6 @@ def plot_session_scroller(df_events, ax=None, adjust_time=True):
 
     xmin = df_events.iloc[0]["timestamps"]
     xmax = xmin + 20
-    xStep = 5
     ax.set_xlim(xmin, xmax)
 
     params = {
@@ -451,7 +450,7 @@ def plot_session_scroller(df_events, ax=None, adjust_time=True):
         x = ax.get_xlim()
         xmin = x[0]
         xmax = x[1]
-        xStep = (xmax - xmin) / 4 # noqa: F841 
+        xStep = (xmax - xmin) / 4 
         if event.key == "<" or event.key == "," or event.key == "left":
             xmin -= xStep
             xmax -= xStep
@@ -467,6 +466,6 @@ def plot_session_scroller(df_events, ax=None, adjust_time=True):
         ax.set_xlim(xmin, xmax)
         plt.draw()
 
-    kpid = fig.canvas.mpl_connect("key_press_event", on_key_press)
+    kpid = fig.canvas.mpl_connect("key_press_event", on_key_press) # noqa: F841
 
     return fig, ax
