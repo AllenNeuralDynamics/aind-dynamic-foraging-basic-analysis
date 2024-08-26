@@ -31,7 +31,7 @@ def moving_average(a, n=3):
     """Compute moving average of a list or array."""
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[(n - 1) :] / n
+    return ret[(n - 1):] / n
 
 
 def plot_foraging_session(  # noqa: C901
@@ -321,7 +321,7 @@ def plot_foraging_session(  # noqa: C901
     return ax_choice_reward.get_figure(), [ax_choice_reward, ax_reward_schedule]
 
 
-def plot_session_scroller(df_events, ax=None, adjust_time=True, fip_df=None):  # pragma: no cover
+def plot_session_scroller(df_events, ax=None, adjust_time=True, fip_df=None):  # noqa: C901 
     """
     Creates an interactive plot of the session.
     Plots left/right licks/rewards, and go cues
