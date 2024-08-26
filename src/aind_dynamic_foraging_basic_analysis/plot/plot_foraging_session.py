@@ -31,7 +31,7 @@ def moving_average(a, n=3):
     """Compute moving average of a list or array."""
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1:] / n
+    return ret[(n - 1):] / n
 
 
 def plot_foraging_session(  # noqa: C901
@@ -442,11 +442,10 @@ def plot_session_scroller(df_events, ax=None, adjust_time=True):  # pragma: no c
     ax.spines["right"].set_visible(False)
     plt.tight_layout()
 
-    """
-        Define interaction resonsivity
-    """
-
     def on_key_press(event):
+        """
+        Define interaction resonsivity
+        """
         x = ax.get_xlim()
         xmin = x[0]
         xmax = x[1]
