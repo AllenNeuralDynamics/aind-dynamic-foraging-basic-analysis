@@ -451,7 +451,7 @@ def plot_session_scroller(df_events, ax=None, adjust_time=True):
         x = ax.get_xlim()
         xmin = x[0]
         xmax = x[1]
-        xStep = (xmax - xmin) / 4 # noqa
+        xStep = (xmax - xmin) / 4 # noqa: F841 
         if event.key == "<" or event.key == "," or event.key == "left":
             xmin -= xStep
             xmax -= xStep
