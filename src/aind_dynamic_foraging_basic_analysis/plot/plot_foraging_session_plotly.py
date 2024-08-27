@@ -5,7 +5,9 @@ Jupyter Notebook
 import plotly.graph_objects as go
 
 
-def plot_session_in_time_plotly(df_events, adjust_time=True, fip_df=None):  # noqa: C901 pragma: no cover
+def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
+    df_events, adjust_time=True, fip_df=None
+):
     """A plotly version of plot_foraging_session.plot_session_scroller
 
     Creates a plot of the session in time (not in trial).
