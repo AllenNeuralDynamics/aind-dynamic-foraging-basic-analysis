@@ -89,5 +89,5 @@ line_length = 100
 profile = "black"
 
 [tool.interrogate]
-exclude = ["setup.py", "docs", "build"]
+exclude = ["setup.py", "docs", "build", "code"]
 fail-under = 100
