@@ -8,9 +8,9 @@ def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
     preprocessed (Bool), if True, uses the preprocessed channel
     edge_percentile (float), displays only the (2, 100-2) percentiles of the data
     """
-    if not hasattr(nwb, 'fip_df'):
-        print('You need to compute the fip_df first')
-        print('run `nwb.fip_df = create_fib_df(nwb,tidy=True)`')
+    if not hasattr(nwb, "fip_df"):
+        print("You need to compute the fip_df first")
+        print("run `nwb.fip_df = create_fib_df(nwb,tidy=True)`")
         return
     fig, ax = plt.subplots(3, 2, sharex=True)
     channels = ["G", "R", "Iso"]
