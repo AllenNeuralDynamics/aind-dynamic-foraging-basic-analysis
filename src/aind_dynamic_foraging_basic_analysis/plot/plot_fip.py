@@ -10,7 +10,7 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
 from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 
 
-def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4],censor=True):
+def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censor=True):
     """
     Compare the same FIP channel aligned to multiple event types
     nwb, nwb object for the session
@@ -58,7 +58,7 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4],censor
 
     fig, ax = plt.subplots()
     for alignment in align_dict:
-        etr = fip_psth_inner_compute(nwb, align_dict[alignment], channel, True, tw,censor)
+        etr = fip_psth_inner_compute(nwb, align_dict[alignment], channel, True, tw, censor)
         fip_psth_inner_plot(ax, etr, FIP_COLORS.get(alignment, "k"), alignment)
 
     plt.legend()
@@ -85,21 +85,13 @@ def plot_fip_psth_compare_channels(
         "Iso_1_preprocessed",
         "Iso_2_preprocessed",
     ],
-    censor=True
+    censor=True,
 ):
     """
-    TODO, need to censor by next event
-    todo, annotate licks into bouts, start of bout, etc
-        # Add columns?
-            # lick bout start
-            # lick bout end
-            # rewarded lick bout start?
-        # Rewarded go cue, unrewarded goCue?
-        # or split events?
-        # Or add a new table
-
+    nwb, the nwb object for the session of interest
     align should either be a string of the name of an event type in nwb.df_events,
         or a list of timepoints
+    channels should be a list of channel names (strings)
     EXAMPLE
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
@@ -128,7 +120,7 @@ def plot_fip_psth_compare_channels(
     colors = [FIP_COLORS.get(c, "k") for c in channels]
     for dex, c in enumerate(channels):
         if c in nwb.fip_df["event"].values:
-            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw,censor)
+            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor)
             fip_psth_inner_plot(ax, etr, colors[dex], c)
         else:
             print("No data for channel: {}".format(c))
@@ -157,7 +149,7 @@ def fip_psth_inner_plot(ax, etr, color, label):
     ax.plot(etr.index, etr.data, color, label=label)
 
 
-def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1],censor=True):
+def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True):
     """
     helper function that computes the event triggered response
     nwb, nwb object for the session of interest, should have fip_df attribute
@@ -176,7 +168,7 @@ def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1],c
         t_start=tw[0],
         t_end=tw[1],
         output_sampling_rate=40,
-        censor=censor
+        censor=censor,
     )
 
     if average:
