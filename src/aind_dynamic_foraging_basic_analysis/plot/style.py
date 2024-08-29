@@ -27,4 +27,9 @@ FIP_COLORS = {
     "Iso_1_preprocessed": "gray",
     "Iso_2": "k",
     "Iso_2_preprocessed": "k",
+    "goCue_start_time": "b",
+    "left_lick_time": "m",
+    "right_lick_time": "r",
+    "left_reward_delivery_time": "b",
+    "right_reward_delivery_time": "r",
 }
