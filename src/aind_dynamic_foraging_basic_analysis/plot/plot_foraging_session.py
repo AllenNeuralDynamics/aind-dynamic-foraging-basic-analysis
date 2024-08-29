@@ -23,7 +23,7 @@ def moving_average(a, n=3):
     """Compute moving average of a list or array."""
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[(n - 1) :] / n
+    return ret[(n - 1) :] / n  # noqa: E203
 
 
 def plot_foraging_session(  # noqa: C901
