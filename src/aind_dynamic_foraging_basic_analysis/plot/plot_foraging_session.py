@@ -12,13 +12,18 @@ from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
     ForagingSessionData,
     PhotostimData,
 )
-from aind_dynamic_foraging_basic_analysis.plot.style import STYLE,PHOTOSTIM_EPOCH_MAPPING,FIP_COLORS 
+from aind_dynamic_foraging_basic_analysis.plot.style import (
+    STYLE,
+    PHOTOSTIM_EPOCH_MAPPING,
+    FIP_COLORS,
+)
+
 
 def moving_average(a, n=3):
     """Compute moving average of a list or array."""
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[(n - 1):] / n
+    return ret[(n - 1) :] / n
 
 
 def plot_foraging_session(  # noqa: C901
@@ -403,7 +408,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                     + params[channel + "_bottom"]
                 )
                 ylabels.append(channel)
-                color = FIP_COLORS.get(channel,'k')
+                color = FIP_COLORS.get(channel, "k")
                 ycolors.append(color)
                 C = fip_df.query("event == @channel").copy()
                 C["data"] = C["data"] - C["data"].min()

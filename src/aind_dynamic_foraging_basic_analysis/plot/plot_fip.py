@@ -44,8 +44,6 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4]):
                 return
             else:
                 align_dict[a] = nwb.df_events.query("event == @a")["timestamps"].values
-
-        align_events = alignments
     elif isinstance(alignments, dict):
         align_dict = alignments
     else:
@@ -94,7 +92,8 @@ def plot_fip_psth_compare_channels(
     todo, figure out a modular system for comparing alignments, and channels
     todo, annotate licks into bouts, start of bout, etc
 
-    align should either be a string of the name of an event type in nwb.df_events, or a list of timepoints
+    align should either be a string of the name of an event type in nwb.df_events,
+        or a list of timepoints
     EXAMPLE
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
