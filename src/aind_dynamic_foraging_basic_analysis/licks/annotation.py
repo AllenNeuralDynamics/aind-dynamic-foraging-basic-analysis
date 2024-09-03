@@ -4,7 +4,6 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
 """
     TODO
- 
     annotate lick bouts with reward
         Should check for licks before the last goCue
         set parameter for lick/reward tolerance
