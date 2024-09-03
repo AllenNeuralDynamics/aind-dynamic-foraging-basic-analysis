@@ -1,7 +1,3 @@
-import numpy as np
-
-from aind_dynamic_foraging_data_utils import nwb_utils as nu
-
 """
     Tools for annotation of lick bouts
     df_licks = annotate_lick_bouts(nwb)
@@ -20,6 +16,10 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
     censor should take cross events, instead of just self events
     sync streamlit version with plot bouts
 """
+
+import numpy as np
+
+from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
 
 def annotate_lick_bouts(nwb, bout_threshold=0.7):
