@@ -19,8 +19,6 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censo
     channel, (str) the name of the FIP channel
     tw, time window for the PSTH
 
-    TODO, censor needs to take a list of times, and not just the self event times
-
     EXAMPLE
     *******************
     plot_fip_psth_compare_alignments(nwb,['left_reward_delivery_time',
