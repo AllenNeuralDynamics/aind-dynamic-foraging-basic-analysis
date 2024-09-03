@@ -8,6 +8,7 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
         clean up, auto compute
     plot lick bouts in rotating colors
         clean up, let users toggle
+    notice that there are rewards that come late with respect to licks
     annotate lick bouts with reward (most recent lick, unless the lick was more than .5 seconds, or a gocue happened before)
     annotate possible bad licks?
     annotate cross licks?
@@ -53,6 +54,17 @@ def annotate_rewards(nwb):
     if not hasattr(nwb, 'df_licks'):
         nwb.df_licks = annotate_lick_bouts(nwb)
         
+    if not hasattr(nwb, 'df_events'):
+        print('compute df_events')
+        return
+
+    right_rewards = nwb.df_events.query('event == "right_reward_delivery_time"').copy()
+    left_rewards = nwb.df_events.query('event == "left_reward_delivery_time"').copy()
+    
+    #for dex, row in right_rewards.iterrows():
+    #    t = row.timestamps:
+    #     
+    #nwb.df_licks['event'] == 'left_lick_time'
 
 
 
