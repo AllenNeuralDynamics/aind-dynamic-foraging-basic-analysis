@@ -70,7 +70,7 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censo
     ax.set_xlim(tw)
     ax.axvline(0, color="k", alpha=0.2)
     ax.tick_params(axis="both", labelsize=STYLE["axis_ticks_fontsize"])
-    ax.set_title(nwb.session_id,fontsize=STYLE['axis_fontsize'])
+    ax.set_title(nwb.session_id, fontsize=STYLE['axis_fontsize'])
     plt.tight_layout()
     return fig, ax
 
