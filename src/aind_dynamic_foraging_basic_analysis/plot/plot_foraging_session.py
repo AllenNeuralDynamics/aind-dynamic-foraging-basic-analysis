@@ -352,6 +352,7 @@ def plot_session_scroller(nwb, ax=None, plot_bouts=False):  # noqa: C901 pragma:
     elif plot_bouts:
         print("computing df_licks first")
         nwb.df_licks = a.annotate_lick_bouts(nwb)
+        nwb.df_licks = a.annotate_rewards(nwb)
         df_licks = nwb.df_licks
     else:
         df_licks = None
