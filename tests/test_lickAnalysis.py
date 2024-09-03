@@ -1,4 +1,5 @@
 """ Import all packages."""
+
 import unittest
 from aind_dynamic_foraging_basic_analysis.lick_analysis import (
     plot_lick_analysis,
