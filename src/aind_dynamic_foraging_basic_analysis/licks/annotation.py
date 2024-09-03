@@ -64,7 +64,7 @@ def annotate_lick_bouts(nwb, bout_threshold=0.7):
 def annotate_rewards(nwb):
     """
     Annotates df_licks with which lick triggered each reward
-    nwb, an nwb-lick object with attributes: df_licks, df_events 
+    nwb, an nwb-lick object with attributes: df_licks, df_events
     """
 
     LICK_TO_REWARD_TOLERANCE = 0.25
