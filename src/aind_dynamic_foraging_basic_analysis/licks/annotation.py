@@ -5,15 +5,7 @@
     TODO
     annotate lick bouts with reward
         Should check for licks before the last goCue
-        set parameter for lick/reward tolerance
         make a note that we should ensure a matching lick for non autowater or manual water licks
-    annotate possible bad licks?
-    annotate cross licks?
-    use lick annotations for rewarded and unrewarded lick bout starts
-        make example of how to do this, since you need to build dictionary
-    maybe annotate rewarded and unrewarded go cues
-    Is the PSTH code flexible enough to take different options?
-    censor should take cross events, instead of just self events
     sync streamlit version with plot bouts
 """
 
