@@ -8,6 +8,8 @@ from typing import List, Tuple, Union
 import numpy as np
 from matplotlib import pyplot as plt
 
+from aind_dynamic_foraging_data_utils import nwb_utils as nu
+
 from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
     ForagingSessionData,
     PhotostimData,
@@ -314,7 +316,7 @@ def plot_foraging_session(  # noqa: C901
 
 
 def plot_session_scroller(  # noqa: C901 pragma: no cover
-    df_events, ax=None, adjust_time=True, fip_df=None
+    nwb, ax=None, adjust_time=True, plot_bouts=False
 ):
     """
     Creates an interactive plot of the session.
@@ -343,6 +345,22 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     fip_df = nwb_utils.create_fib_df(nwb_object, tidy=True)
     plot_foraging_session.plot_session_scroller(df_events,fip_df=fip_df)
     """
+
+    if not hasattr(nwb, "df_events"):
+        print("computing df_events first")
+        nwb.df_events = nu.create_events_df(nwb)
+        df_events = nwb.df_events
+    else:
+        df_events = nwb.df_events
+    if hasattr(nwb, "fip_df"):
+        fip_df = nwb.fip_df
+    else:
+        fip_df = None
+    if hasattr(nwb, "df_licks"):
+        df_licks = nwb.df_licks
+    else:
+        df_licks = None
+
     if ax is None:
         if fip_df is None:
             fig, ax = plt.subplots(figsize=(15, 3))
@@ -357,6 +375,10 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         if fip_df is not None:
             fip_df = fip_df.copy()
             fip_df["timestamps"] = fip_df["timestamps"] - start_time
+
+        if df_licks is not None:
+            df_licks = df_licks.copy()
+            df_licks["timestamps"] = df_licks["timestamps"] - start_time
 
     xmin = df_events.iloc[0]["timestamps"]
     xmax = xmin + 20
@@ -417,27 +439,54 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 ax.plot(C.timestamps.values, C.data.values, color)
                 ax.axhline(params[channel + "_bottom"], color="k", linewidth=0.5, alpha=0.25)
 
-    left_licks = df_events.query('event == "left_lick_time"')
-    left_times = left_licks.timestamps.values
-    ax.vlines(
-        left_times,
-        params["left_lick_bottom"],
-        params["left_lick_top"],
-        alpha=1,
-        linewidth=2,
-        color="k",
-    )
+    if (df_licks is None) or (not plot_bouts):
+        left_licks = df_events.query('event == "left_lick_time"')
+        left_times = left_licks.timestamps.values
+        ax.vlines(
+            left_times,
+            params["left_lick_bottom"],
+            params["left_lick_top"],
+            alpha=1,
+            linewidth=2,
+            color="k",
+        )
 
-    right_licks = df_events.query('event == "right_lick_time"')
-    right_times = right_licks.timestamps.values
-    ax.vlines(
-        right_times,
-        params["right_lick_bottom"],
-        params["right_lick_top"],
-        alpha=1,
-        linewidth=2,
-        color="k",
-    )
+        right_licks = df_events.query('event == "right_lick_time"')
+        right_times = right_licks.timestamps.values
+        ax.vlines(
+            right_times,
+            params["right_lick_bottom"],
+            params["right_lick_top"],
+            alpha=1,
+            linewidth=2,
+            color="k",
+        )
+    else:
+        cmap = plt.get_cmap("tab20")
+        bouts = df_licks.bout_number.unique()
+        for b in bouts:
+            bout_left_licks = df_licks.query(
+                '(bout_number == @b)&(event=="left_lick_time")'
+            ).timestamps.values
+            bout_right_licks = df_licks.query(
+                '(bout_number == @b)&(event=="right_lick_time")'
+            ).timestamps.values
+            ax.vlines(
+                bout_left_licks,
+                params["left_lick_bottom"],
+                params["left_lick_top"],
+                alpha=1,
+                linewidth=2,
+                color=cmap(np.mod(b, 20)),
+            )
+            ax.vlines(
+                bout_right_licks,
+                params["right_lick_bottom"],
+                params["right_lick_top"],
+                alpha=1,
+                linewidth=2,
+                color=cmap(np.mod(b, 20)),
+            )
 
     left_reward_deliverys = df_events.query('event == "left_reward_delivery_time"')
     left_times = left_reward_deliverys.timestamps.values

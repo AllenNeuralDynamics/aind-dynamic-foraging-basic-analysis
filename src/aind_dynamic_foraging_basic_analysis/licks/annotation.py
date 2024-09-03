@@ -5,7 +5,9 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
 '''
     TODO
     update plot_session_scroller to take NWB file
+        clean up, auto compute
     plot lick bouts in rotating colors
+        clean up, let users toggle
     annotate lick bouts with reward (most recent lick, unless the lick was more than .5 seconds, or a gocue happened before)
     annotate possible bad licks?
     annotate cross licks?
@@ -42,4 +44,20 @@ def annotate_lick_bouts(nwb, bout_threshold=.7):
     assert num_bout_start == num_bouts, "Number of bouts is incorrect"
 
     return df_licks
+
+def annotate_rewards(nwb):
+    '''
+       TODO, add in 
+    '''
+    
+    if not hasattr(nwb, 'df_licks'):
+        nwb.df_licks = annotate_lick_bouts(nwb)
+        
+
+
+
+
+
+
+
 
