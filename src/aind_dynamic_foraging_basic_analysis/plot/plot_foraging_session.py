@@ -12,19 +12,11 @@ from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
     ForagingSessionData,
     PhotostimData,
 )
-
-PHOTOSTIM_EPOCH_MAPPING = {
-    "after iti start": "cyan",
-    "before go cue": "cyan",
-    "after go cue": "green",
-    "whole trial": "blue",
-}
-
-"""
-    Define a dictionary of plotting styles
-    This allows rapid regeneration of figures
-"""
-STYLE = {"axis_ticks_fontsize": 12, "axis_fontsize": 16}
+from aind_dynamic_foraging_basic_analysis.plot.style import (
+    STYLE,
+    PHOTOSTIM_EPOCH_MAPPING,
+    FIP_COLORS,
+)
 
 
 def moving_average(a, n=3):
@@ -416,14 +408,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                     + params[channel + "_bottom"]
                 )
                 ylabels.append(channel)
-                if "G_1" in channel:
-                    color = "g"
-                elif "G_2" in channel:
-                    color = "darkgreen"
-                elif "R_1" in channel:
-                    color = "r"
-                elif "R_2" in channel:
-                    color = "darkred"
+                color = FIP_COLORS.get(channel, "k")
                 ycolors.append(color)
                 C = fip_df.query("event == @channel").copy()
                 C["data"] = C["data"] - C["data"].min()
