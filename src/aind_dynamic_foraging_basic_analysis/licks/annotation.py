@@ -2,11 +2,6 @@
     Tools for annotation of lick bouts
     df_licks = annotate_lick_bouts(nwb)
     df_licks = annotate_rewards(nwb)
-    TODO
-    annotate lick bouts with reward
-        Should check for licks before the last goCue
-        make a note that we should ensure a matching lick for non autowater or manual water licks
-    sync streamlit version with plot bouts
 """
 
 import numpy as np
