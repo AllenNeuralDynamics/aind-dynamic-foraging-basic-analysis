@@ -20,6 +20,7 @@ dependencies = [
     'numpy',
     'scipy',
     'matplotlib',
+    'plotly',
     'pandas',
     'pynwb',
     'aind_ephys_utils',
@@ -64,6 +65,7 @@ exclude = '''
     | _build
     | build
     | dist
+    | code
   )/
   | .gitignore
 )
@@ -87,5 +89,5 @@ line_length = 100
 profile = "black"
 
 [tool.interrogate]
-exclude = ["setup.py", "docs", "build"]
+exclude = ["setup.py", "docs", "build", "code"]
 fail-under = 100
