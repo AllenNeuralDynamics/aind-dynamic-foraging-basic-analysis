@@ -59,9 +59,10 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censo
     align_label = "Time (s)"
 
     fig, ax = plt.subplots()
+
     for alignment in align_dict:
         etr = fip_psth_inner_compute(nwb, align_dict[alignment], channel, True, tw, censor)
-        fip_psth_inner_plot(ax, etr, FIP_COLORS.get(alignment, "k"), alignment)
+        fip_psth_inner_plot(ax, etr, FIP_COLORS.get(alignment, ""), alignment)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -119,7 +120,7 @@ def plot_fip_psth_compare_channels(
 
     fig, ax = plt.subplots()
 
-    colors = [FIP_COLORS.get(c, "k") for c in channels]
+    colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
         if c in nwb.fip_df["event"].values:
             etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor)
@@ -147,8 +148,11 @@ def fip_psth_inner_plot(ax, etr, color, label):
     color, the line color to plot
     label, the label for the etr
     """
+    if color == "":
+        cmap = plt.get_cmap("tab20")
+        color = cmap(np.random.randint(20))
     ax.fill_between(etr.index, etr.data - etr["sem"], etr.data + etr["sem"], color=color, alpha=0.2)
-    ax.plot(etr.index, etr.data, color, label=label)
+    ax.plot(etr.index, etr.data, color=color, label=label)
 
 
 def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True):
