@@ -1,12 +1,11 @@
 import numpy as np
-import pandas as pd
 
 from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
 """
     TODO
-    
-    annotate lick bouts with reward (most recent lick, unless the lick was more than .5 seconds, or a gocue happened before)
+ 
+    annotate lick bouts with reward
         Should check for licks before the last goCue
         set parameter for lick/reward tolerance
         make a note that we should ensure a matching lick for non autowater or manual water licks
@@ -15,7 +14,7 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
     use lick annotations for rewarded and unrewarded lick bout starts
         make example of how to do this, since you need to build dictionary
     maybe annotate rewarded and unrewarded go cues
-    Is the PSTH code flexible enough to take different options?  
+    Is the PSTH code flexible enough to take different options?
     censor should take cross events, instead of just self events
     sync streamlit version with plot bouts
 """
@@ -51,7 +50,7 @@ def annotate_lick_bouts(nwb, bout_threshold=0.7):
 
 def annotate_rewards(nwb):
     """
-    Annotates df_licks with which lick triggered each reward, and whether the lick bout triggered a reward
+    Annotates df_licks with which lick triggered each reward
     """
 
     LICK_TO_REWARD_TOLERANCE = 0.25
