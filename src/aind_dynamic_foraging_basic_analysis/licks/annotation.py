@@ -3,6 +3,9 @@ import numpy as np
 from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
 """
+    Tools for annotation of lick bouts
+    df_licks = annotate_lick_bouts(nwb)
+    df_licks = annotate_rewards(nwb)
     TODO
     annotate lick bouts with reward
         Should check for licks before the last goCue
@@ -20,6 +23,17 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
 
 def annotate_lick_bouts(nwb, bout_threshold=0.7):
+    '''
+        returns a dataframe of lick times with annotations
+            pre_ili, the elapsed time since the last lick (on either side)
+            post_ili, the time until the next lick (on either side)
+            bout_start (bool), whether this was the start of a lick bout
+            bout_end (bool), whether this was the end of a lick bout)
+            bout_number (int), what lick bout this was a part of
+
+        nwb, an nwb-like object with attributes: df_events
+        bout_threshold is the ILI that determines bout segmentation
+    '''
 
     if not hasattr(nwb, "df_events"):
         nwb.df_events = nu.create_events_df(nwb)
@@ -50,6 +64,7 @@ def annotate_lick_bouts(nwb, bout_threshold=0.7):
 def annotate_rewards(nwb):
     """
     Annotates df_licks with which lick triggered each reward
+    nwb, an nwb-lick object with attributes: df_licks, df_events 
     """
 
     LICK_TO_REWARD_TOLERANCE = 0.25
