@@ -18,7 +18,7 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censo
         whose keys are event types and values are a list of timepoints
     channel, (str) the name of the FIP channel
     tw, time window for the PSTH
-    
+
     TODO, censor needs to take a list of times, and not just the self event times
 
     EXAMPLE

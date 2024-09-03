@@ -315,9 +315,7 @@ def plot_foraging_session(  # noqa: C901
     return ax_choice_reward.get_figure(), [ax_choice_reward, ax_reward_schedule]
 
 
-def plot_session_scroller(  # noqa: C901 pragma: no cover
-    nwb, ax=None, plot_bouts=False
-):
+def plot_session_scroller(nwb, ax=None, plot_bouts=False):  # noqa: C901 pragma: no cover
     """
     Creates an interactive plot of the session.
     Plots left/right licks/rewards, and go cues
@@ -328,10 +326,10 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     pressing "down arrow" zooms in, in time
 
     nwb, an nwb like object that contains attributes: df_events, session_id
-        and optionally contains attributes fip_df, df_licks    
+        and optionally contains attributes fip_df, df_licks
 
     ax is a pyplot figure axis. If None, a new figure is created
-    
+
     plot_bouts (bool), if True, plot licks colored by segmented lick bouts
 
     EXAMPLES:
@@ -352,7 +350,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     if hasattr(nwb, "df_licks") & plot_bouts:
         df_licks = nwb.df_licks
     elif plot_bouts:
-        print('computing df_licks first')
+        print("computing df_licks first")
         nwb.df_licks = a.annotate_lick_bouts(nwb)
         df_licks = nwb.df_licks
     else:
@@ -423,7 +421,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 ax.plot(C.timestamps.values, C.data.values, color)
                 ax.axhline(params[channel + "_bottom"], color="k", linewidth=0.5, alpha=0.25)
 
-    if (df_licks is None):
+    if df_licks is None:
         left_licks = df_events.query('event == "left_lick_time"')
         left_times = left_licks.timestamps.values
         ax.vlines(
@@ -471,11 +469,16 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 linewidth=2,
                 color=cmap(np.mod(b, 20)),
             )
-        left_rewarded_licks = df_licks.query('(event == "left_lick_time")&(rewarded)').timestamps.values
-        ax.plot(left_rewarded_licks,[params['left_lick_top']]*len(left_rewarded_licks), 'ro') 
-        right_rewarded_licks = df_licks.query('(event == "right_lick_time")&(rewarded)').timestamps.values
-        ax.plot(right_rewarded_licks,[params['right_lick_bottom']]*len(right_rewarded_licks), 'ro') 
-
+        left_rewarded_licks = df_licks.query(
+            '(event == "left_lick_time")&(rewarded)'
+        ).timestamps.values
+        ax.plot(left_rewarded_licks, [params["left_lick_top"]] * len(left_rewarded_licks), "ro")
+        right_rewarded_licks = df_licks.query(
+            '(event == "right_lick_time")&(rewarded)'
+        ).timestamps.values
+        ax.plot(
+            right_rewarded_licks, [params["right_lick_bottom"]] * len(right_rewarded_licks), "ro"
+        )
 
     left_reward_deliverys = df_events.query('event == "left_reward_delivery_time"')
     left_times = left_reward_deliverys.timestamps.values

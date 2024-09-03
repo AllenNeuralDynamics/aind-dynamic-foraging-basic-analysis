@@ -1,4 +1,5 @@
 """Load packages."""
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -300,7 +301,7 @@ def cal_metrics(data):
         ref_kernel = np.convolve(ref, kernel)
         finish_kernel = np.convolve(finish.astype(float), kernel)
         finish_kernel = np.divide(finish_kernel, ref_kernel)
-        finish_kernel = finish_kernel[int(0.5 * len(kernel)): -int(0.5 * len(kernel))]
+        finish_kernel = finish_kernel[int(0.5 * len(kernel)) : -int(0.5 * len(kernel))]
         all_go_no_rwd = tbl_trials.loc[
             (tbl_trials["animal_response"] != 2)
             & (tbl_trials["rewarded_historyL"] == 0)

@@ -51,10 +51,10 @@ def annotate_lick_bouts(nwb, bout_threshold=0.7):
 
 def annotate_rewards(nwb):
     """
-        Annotates df_licks with which lick triggered each reward, and whether the lick bout triggered a reward
+    Annotates df_licks with which lick triggered each reward, and whether the lick bout triggered a reward
     """
 
-    LICK_TO_REWARD_TOLERANCE = .25
+    LICK_TO_REWARD_TOLERANCE = 0.25
 
     # ensure we have df_licks
     if not hasattr(nwb, "df_licks"):
@@ -79,8 +79,8 @@ def annotate_rewards(nwb):
             & (df_licks.timestamps > (row.timestamps - LICK_TO_REWARD_TOLERANCE))
             & (df_licks.event == "right_lick_time")
         )[0]
-        if len(this_reward_lick_times) >0:
-            df_licks.at[this_reward_lick_times[-1], 'rewarded'] = True
+        if len(this_reward_lick_times) > 0:
+            df_licks.at[this_reward_lick_times[-1], "rewarded"] = True
         # TODO, should check for licks that happened before the last go cue
         # TODO, if we can't find a matching lick, should ensure this is manual or auto water
 
@@ -92,15 +92,19 @@ def annotate_rewards(nwb):
             & (df_licks.timestamps > (row.timestamps - LICK_TO_REWARD_TOLERANCE))
             & (df_licks.event == "left_lick_time")
         )[0]
-        if len(this_reward_lick_times) >0:
-            df_licks.at[this_reward_lick_times[-1], 'rewarded'] = True
+        if len(this_reward_lick_times) > 0:
+            df_licks.at[this_reward_lick_times[-1], "rewarded"] = True
 
     # Annotate lick bouts as rewarded or unrewarded
-    x = df_licks.groupby('bout_number').any('rewarded').rename(columns={'rewarded':'bout_rewarded'})['bout_rewarded']
-    df_licks['bout_rewarded'] = False
-    temp = df_licks.reset_index().set_index('bout_number').copy()
+    x = (
+        df_licks.groupby("bout_number")
+        .any("rewarded")
+        .rename(columns={"rewarded": "bout_rewarded"})["bout_rewarded"]
+    )
+    df_licks["bout_rewarded"] = False
+    temp = df_licks.reset_index().set_index("bout_number").copy()
     temp.update(x)
-    temp = temp.reset_index().set_index('index')
-    df_licks['bout_rewarded'] = temp['bout_rewarded']
+    temp = temp.reset_index().set_index("index")
+    df_licks["bout_rewarded"] = temp["bout_rewarded"]
 
     return df_licks
