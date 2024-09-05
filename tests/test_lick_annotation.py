@@ -29,13 +29,13 @@ class TestLickAnnotation(unittest.TestCase):
 
         # Generate some simple data
         nwb = EmptyNWB()
-        times = [1, 1.2, 1.4, 5, 5.2, 10]
+        times = [1, 1.2, 1.4, 5, 5.2, 10,20,20.2,20.4]
         df = pd.DataFrame(
             {
                 "timestamps": times,
                 "data": [1.0] * len(times),
-                "event": ["left_lick_time"] * len(times),
-                "trial": [1] * len(times),
+                "event": ["left_lick_time"] * 6 + ['right_lick_time']*3,
+                "trial": [1] * 6+[2] * 3,
             }
         )
 
