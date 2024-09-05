@@ -6,7 +6,6 @@ To run the test, execute "python -m unittest tests/test_lick_annotation.py".
 
 import unittest
 
-import numpy as np
 import pandas as pd
 
 import aind_dynamic_foraging_basic_analysis.licks.annotation as a
