@@ -12,6 +12,10 @@ import aind_dynamic_foraging_basic_analysis.licks.annotation as a
 
 
 class EmptyNWB:
+    """
+    Just an empty class for saving attributes to
+    """
+
     pass
 
 
@@ -23,6 +27,7 @@ class TestLickAnnotation(unittest.TestCase):
         Test annotating licks
         """
 
+        # Generate some simple data
         nwb = EmptyNWB()
         times = [1, 1.2, 1.4, 5, 5.2, 10]
         df = pd.DataFrame(
@@ -33,6 +38,8 @@ class TestLickAnnotation(unittest.TestCase):
                 "trial": [1] * len(times),
             }
         )
+
+        # Ensure the annotations run
         nwb.df_events = df
         nwb.df_licks = a.annotate_lick_bouts(nwb)
         nwb.df_licks = a.annotate_rewards(nwb)
