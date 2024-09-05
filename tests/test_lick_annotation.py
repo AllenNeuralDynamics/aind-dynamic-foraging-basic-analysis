@@ -32,19 +32,23 @@ class TestLickAnnotation(unittest.TestCase):
         times = [1, 1.2, 1.4, 5, 5.2, 10, 20, 20.2, 20.4]
         df = pd.DataFrame(
             {
-                "timestamps": times + [1.1, 20.1],
-                "data": [1.0] * (len(times) + 2),
+                "timestamps": times + [1.1, 20.1,30, 40],
+                "data": [1.0] * (len(times) + 4),
                 "event": ["left_lick_time"] * 6
                 + ["right_lick_time"] * 3
+                + ["left_reward_delivery_time", "right_reward_delivery_time"]
                 + ["left_reward_delivery_time", "right_reward_delivery_time"],
-                "trial": [1] * 6 + [2] * 3 + [1, 2],
+                "trial": [1] * 6 + [2] * 3 + [1, 2,3,4],
             }
         )
         df = df.sort_values(by="timestamps")
 
         # Ensure the annotations run
+        assert a.annotate_lick_bouts(nwb) is None
+        assert a.annotate_rewards(nwb) is None
         nwb.df_events = df
         nwb.df_licks = a.annotate_lick_bouts(nwb)
+        del nwb.df_licks
         nwb.df_licks = a.annotate_rewards(nwb)
 
 
