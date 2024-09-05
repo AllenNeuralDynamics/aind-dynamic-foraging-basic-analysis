@@ -8,16 +8,11 @@ from typing import List, Tuple, Union
 import numpy as np
 from matplotlib import pyplot as plt
 
-from aind_dynamic_foraging_basic_analysis.licks import annotation as a
 from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
     ForagingSessionData,
     PhotostimData,
 )
-from aind_dynamic_foraging_basic_analysis.plot.style import (
-    STYLE,
-    PHOTOSTIM_EPOCH_MAPPING,
-    FIP_COLORS,
-)
+from aind_dynamic_foraging_basic_analysis.plot.style import PHOTOSTIM_EPOCH_MAPPING
 
 
 def moving_average(a, n=3):

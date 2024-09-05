@@ -3,8 +3,6 @@ This is supposed to be reused in plotting real data or simulation data to ensure
 a consistent visual representation.
 """
 
-from typing import List, Tuple, Union
-
 import numpy as np
 from matplotlib import pyplot as plt
 
