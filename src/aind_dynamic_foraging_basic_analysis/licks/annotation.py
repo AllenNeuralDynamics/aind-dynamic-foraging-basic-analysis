@@ -6,24 +6,23 @@
 
 import numpy as np
 
-from aind_dynamic_foraging_data_utils import nwb_utils as nu
-
 
 def annotate_lick_bouts(nwb, bout_threshold=0.7):
-    '''
-        returns a dataframe of lick times with annotations
-            pre_ili, the elapsed time since the last lick (on either side)
-            post_ili, the time until the next lick (on either side)
-            bout_start (bool), whether this was the start of a lick bout
-            bout_end (bool), whether this was the end of a lick bout)
-            bout_number (int), what lick bout this was a part of
+    """
+    returns a dataframe of lick times with annotations
+        pre_ili, the elapsed time since the last lick (on either side)
+        post_ili, the time until the next lick (on either side)
+        bout_start (bool), whether this was the start of a lick bout
+        bout_end (bool), whether this was the end of a lick bout)
+        bout_number (int), what lick bout this was a part of
 
-        nwb, an nwb-like object with attributes: df_events
-        bout_threshold is the ILI that determines bout segmentation
-    '''
+    nwb, an nwb-like object with attributes: df_events
+    bout_threshold is the ILI that determines bout segmentation
+    """
 
     if not hasattr(nwb, "df_events"):
-        nwb.df_events = nu.create_events_df(nwb)
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
     df_licks = nwb.df_events.query('event in ["right_lick_time","left_lick_time"]').copy()
     df_licks.reset_index(drop=True, inplace=True)
 
@@ -56,14 +55,14 @@ def annotate_rewards(nwb):
 
     LICK_TO_REWARD_TOLERANCE = 0.25
 
+    if not hasattr(nwb, "df_events"):
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
+
     # ensure we have df_licks
     if not hasattr(nwb, "df_licks"):
+        print("annotating lick bouts")
         nwb.df_licks = annotate_lick_bouts(nwb)
-
-    # ensure we have df_events
-    if not hasattr(nwb, "df_events"):
-        print("compute df_events")
-        return
 
     # make a copy of df licks
     df_licks = nwb.df_licks.copy()
