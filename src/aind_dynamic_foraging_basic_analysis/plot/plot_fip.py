@@ -54,12 +54,17 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censo
         )
         return
 
+    censor_times = []
+    for key in align_dict:
+        censor_times.append(align_dict[key])
+    censor_times = np.sort(np.concatenate(censor_times))
+
     align_label = "Time (s)"
 
     fig, ax = plt.subplots()
 
     for alignment in align_dict:
-        etr = fip_psth_inner_compute(nwb, align_dict[alignment], channel, True, tw, censor)
+        etr = fip_psth_inner_compute(nwb, align_dict[alignment], channel, True, tw, censor,censor_times)
         fip_psth_inner_plot(ax, etr, FIP_COLORS.get(alignment, ""), alignment)
 
     plt.legend()
@@ -155,7 +160,7 @@ def fip_psth_inner_plot(ax, etr, color, label):
     ax.plot(etr.index, etr.data, color=color, label=label)
 
 
-def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True):
+def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True,censor_times=None):
     """
     helper function that computes the event triggered response
     nwb, nwb object for the session of interest, should have fip_df attribute
@@ -175,6 +180,7 @@ def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1], 
         t_end=tw[1],
         output_sampling_rate=40,
         censor=censor,
+        censor_times=censor_times
     )
 
     if average:
