@@ -32,13 +32,13 @@ class TestLickAnnotation(unittest.TestCase):
         times = [1, 1.2, 1.4, 5, 5.2, 10, 20, 20.2, 20.4]
         df = pd.DataFrame(
             {
-                "timestamps": times + [1.1, 20.1,30, 40],
+                "timestamps": times + [1.1, 20.1, 30, 40],
                 "data": [1.0] * (len(times) + 4),
                 "event": ["left_lick_time"] * 6
                 + ["right_lick_time"] * 3
                 + ["left_reward_delivery_time", "right_reward_delivery_time"]
                 + ["left_reward_delivery_time", "right_reward_delivery_time"],
-                "trial": [1] * 6 + [2] * 3 + [1, 2,3,4],
+                "trial": [1] * 6 + [2] * 3 + [1, 2, 3, 4],
             }
         )
         df = df.sort_values(by="timestamps")
