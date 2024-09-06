@@ -10,7 +10,7 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
 from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 
 
-def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4]):
+def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censor=True):
     """
     Compare the same FIP channel aligned to multiple event types
     nwb, nwb object for the session
@@ -54,12 +54,20 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4]):
         )
         return
 
+    censor_times = []
+    for key in align_dict:
+        censor_times.append(align_dict[key])
+    censor_times = np.sort(np.concatenate(censor_times))
+
     align_label = "Time (s)"
 
     fig, ax = plt.subplots()
+
     for alignment in align_dict:
-        etr = fip_psth_inner_compute(nwb, align_dict[alignment], channel, True, tw)
-        fip_psth_inner_plot(ax, etr, FIP_COLORS.get(alignment, "k"), alignment)
+        etr = fip_psth_inner_compute(
+            nwb, align_dict[alignment], channel, True, tw, censor, censor_times
+        )
+        fip_psth_inner_plot(ax, etr, FIP_COLORS.get(alignment, ""), alignment)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -69,6 +77,7 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4]):
     ax.set_xlim(tw)
     ax.axvline(0, color="k", alpha=0.2)
     ax.tick_params(axis="both", labelsize=STYLE["axis_ticks_fontsize"])
+    ax.set_title(nwb.session_id, fontsize=STYLE["axis_fontsize"])
     plt.tight_layout()
     return fig, ax
 
@@ -85,15 +94,13 @@ def plot_fip_psth_compare_channels(
         "Iso_1_preprocessed",
         "Iso_2_preprocessed",
     ],
+    censor=True,
 ):
     """
-    TODO, need to censor by next event
-    todo, clean up plots
-    todo, figure out a modular system for comparing alignments, and channels
-    todo, annotate licks into bouts, start of bout, etc
-
+    nwb, the nwb object for the session of interest
     align should either be a string of the name of an event type in nwb.df_events,
         or a list of timepoints
+    channels should be a list of channel names (strings)
     EXAMPLE
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
@@ -119,10 +126,10 @@ def plot_fip_psth_compare_channels(
 
     fig, ax = plt.subplots()
 
-    colors = [FIP_COLORS.get(c, "k") for c in channels]
+    colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
         if c in nwb.fip_df["event"].values:
-            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw)
+            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor)
             fip_psth_inner_plot(ax, etr, colors[dex], c)
         else:
             print("No data for channel: {}".format(c))
@@ -135,6 +142,7 @@ def plot_fip_psth_compare_channels(
     ax.set_xlim(tw)
     ax.axvline(0, color="k", alpha=0.2)
     ax.tick_params(axis="both", labelsize=STYLE["axis_ticks_fontsize"])
+    ax.set_title(nwb.session_id)
     plt.tight_layout()
     return fig, ax
 
@@ -147,11 +155,16 @@ def fip_psth_inner_plot(ax, etr, color, label):
     color, the line color to plot
     label, the label for the etr
     """
+    if color == "":
+        cmap = plt.get_cmap("tab20")
+        color = cmap(np.random.randint(20))
     ax.fill_between(etr.index, etr.data - etr["sem"], etr.data + etr["sem"], color=color, alpha=0.2)
-    ax.plot(etr.index, etr.data, color, label=label)
+    ax.plot(etr.index, etr.data, color=color, label=label)
 
 
-def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1]):
+def fip_psth_inner_compute(
+    nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True, censor_times=None
+):
     """
     helper function that computes the event triggered response
     nwb, nwb object for the session of interest, should have fip_df attribute
@@ -170,6 +183,8 @@ def fip_psth_inner_compute(nwb, align_timepoints, channel, average, tw=[-1, 1]):
         t_start=tw[0],
         t_end=tw[1],
         output_sampling_rate=40,
+        censor=censor,
+        censor_times=censor_times,
     )
 
     if average:

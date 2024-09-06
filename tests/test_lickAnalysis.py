@@ -1,7 +1,7 @@
 """ Import all packages."""
 
 import unittest
-from aind_dynamic_foraging_basic_analysis.lick_analysis import (
+from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import (
     plot_lick_analysis,
     load_nwb,
     cal_metrics,
