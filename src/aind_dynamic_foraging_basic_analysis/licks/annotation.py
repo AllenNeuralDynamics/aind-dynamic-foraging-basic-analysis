@@ -2,6 +2,7 @@
     Tools for annotation of lick bouts
     df_licks = annotate_lick_bouts(nwb)
     df_licks = annotate_rewards(nwb)
+    df_licks = annotate_cue_response(nwb)
 """
 
 import numpy as np
@@ -105,5 +106,54 @@ def annotate_rewards(nwb):
     temp.update(x)
     temp = temp.reset_index().set_index("index")
     df_licks["bout_rewarded"] = temp["bout_rewarded"]
+
+    return df_licks
+
+
+def annotate_cue_response(nwb):
+    """
+    Annotates df_licks with which lick was immediately after a go cue
+    nwb, an nwb-lick object with attributes: df_licks, df_events
+    """
+
+    CUE_TO_LICK_TOLERANCE = 1
+
+    if not hasattr(nwb, "df_events"):
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
+
+    # ensure we have df_licks
+    if not hasattr(nwb, "df_licks"):
+        print("annotating lick bouts")
+        nwb.df_licks = annotate_lick_bouts(nwb)
+
+    # make a copy of df licks
+    df_licks = nwb.df_licks.copy()
+
+    # set default to false
+    df_licks["cue_response"] = False
+
+    # Iterate go cues, and find most recent lick within tolerance
+    cues = nwb.df_events.query('event == "goCue_start_time"').copy()
+    for index, row in cues.iterrows():
+        this_lick_times = np.where(
+            (df_licks.timestamps > row.timestamps)
+            & (df_licks.timestamps <= (row.timestamps + CUE_TO_LICK_TOLERANCE))
+            & ((df_licks.event == "right_lick_time") | (df_licks.event == "left_lick_time"))
+        )[0]
+        if len(this_lick_times) > 0:
+            df_licks.at[this_lick_times[0], "cue_response"] = True
+
+    # Annotate lick bouts as cue_responsive, or unresponsive
+    x = (
+        df_licks.groupby("bout_number")
+        .any("cue_response")
+        .rename(columns={"cue_response": "bout_cue_response"})["bout_cue_response"]
+    )
+    df_licks["bout_cue_response"] = False
+    temp = df_licks.reset_index().set_index("bout_number").copy()
+    temp.update(x)
+    temp = temp.reset_index().set_index("index")
+    df_licks["bout_cue_response"] = temp["bout_cue_response"]
 
     return df_licks
