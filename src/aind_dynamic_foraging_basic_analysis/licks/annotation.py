@@ -3,6 +3,7 @@
     df_licks = annotate_lick_bouts(nwb)
     df_licks = annotate_rewards(nwb)
     df_licks = annotate_cue_response(nwb)
+    df_licks = annotate_intertrial_choices(nwb)
 """
 
 import numpy as np
@@ -198,7 +199,7 @@ def annotate_intertrial_choices(nwb):
         'cannot be both a cue response and intertrial choice'
     return df_licks
 
-
+    # TODO, need to check that cue was before session start
 
 
 
