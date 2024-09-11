@@ -7,6 +7,8 @@
 
 import numpy as np
 
+LICK_TO_REWARD_TOLERANCE = 0.25
+CUE_TO_LICK_TOLERANCE = 1
 
 def annotate_lick_bouts(nwb, bout_threshold=0.7):
     """
@@ -53,8 +55,6 @@ def annotate_rewards(nwb):
     Annotates df_licks with which lick triggered each reward
     nwb, an nwb-lick object with attributes: df_licks, df_events
     """
-
-    LICK_TO_REWARD_TOLERANCE = 0.25
 
     if not hasattr(nwb, "df_events"):
         print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
@@ -116,8 +116,6 @@ def annotate_cue_response(nwb):
     nwb, an nwb-lick object with attributes: df_licks, df_events
     """
 
-    CUE_TO_LICK_TOLERANCE = 1
-
     if not hasattr(nwb, "df_events"):
         print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
         return
@@ -157,3 +155,51 @@ def annotate_cue_response(nwb):
     df_licks["bout_cue_response"] = temp["bout_cue_response"]
 
     return df_licks
+
+def annotate_intertrial_choices(nwb):
+
+    if not hasattr(nwb, "df_events"):
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
+
+    # ensure we have df_licks
+    if not hasattr(nwb, "df_licks"):
+        print("annotating lick bouts")
+        nwb.df_licks = annotate_lick_bouts(nwb)
+
+    df_licks = nwb.df_licks.copy()
+    intertrial_choice = []
+    for index, row in df_licks.iterrows():
+        if not row.bout_start:
+            intertrial_choice.append(False)
+            continue
+        elif (not row.cue_response) & (row.pre_ili < CUE_TO_LICK_TOLERANCE):
+            intertrial_choice.append(True)
+        else:
+            intertrial_choice.append(False)
+    df_licks['intertrial_choice'] = intertrial_choice
+               
+    # Annotate lick bouts as intertrial_choice_bout 
+    x = (
+        df_licks.groupby("bout_number")
+        .any("intertrial_choice")
+        .rename(columns={"intertrial_choice": "bout_intertrial_choice"})["bout_intertrial_choice"]
+    )
+    df_licks["bout_intertrial_choice"] = False
+    temp = df_licks.reset_index().set_index("bout_number").copy()
+    temp.update(x)
+    temp = temp.reset_index().set_index("index")
+    df_licks["bout_intertrial_choice"] = temp["bout_intertrial_choice"]
+      
+    # QC checks
+    assert (df_licks['cue_response'] & df_licks['intertrial_choice']).sum() == 0, \
+        'cannot be both a cue response and intertrial choice'
+    assert (df_licks['bout_cue_response'] & df_licks['bout_intertrial_choice']).sum() == 0, \
+        'cannot be both a cue response and intertrial choice'
+    return df_licks
+
+
+
+
+
+ 
