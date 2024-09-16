@@ -14,7 +14,7 @@ from aind_dynamic_foraging_basic_analysis.plot.style import (
 )
 
 
-def plot_session_scroller(nwb, ax=None, plot_bouts=False):  # noqa: C901 pragma: no cover
+def plot_session_scroller(nwb, ax=None, plot_bouts=False,processing='bright'):  # noqa: C901 pragma: no cover
     """
     Creates an interactive plot of the session.
     Plots left/right licks/rewards, and go cues
@@ -77,14 +77,30 @@ def plot_session_scroller(nwb, ax=None, plot_bouts=False):  # noqa: C901 pragma:
         "right_reward_top": 0.75,
         "go_cue_bottom": 0,
         "go_cue_top": 1,
-        "G_1_preprocessed_bottom": 1,
-        "G_1_preprocessed_top": 2,
-        "G_2_preprocessed_bottom": 2,
-        "G_2_preprocessed_top": 3,
-        "R_1_preprocessed_bottom": 3,
-        "R_1_preprocessed_top": 4,
-        "R_2_preprocessed_bottom": 4,
-        "R_2_preprocessed_top": 5,
+        "G_1_dff-bright_bottom": 1,
+        "G_1_dff-bright_top": 2,
+        "G_2_dff-bright_bottom": 2,
+        "G_2_dff-bright_top": 3,
+        "R_1_dff-bright_bottom": 3,
+        "R_1_dff-bright_top": 4,
+        "R_2_dff-bright_bottom": 4,
+        "R_2_dff-bright_top": 5,
+        "G_1_dff-poly_bottom": 1,
+        "G_1_dff-poly_top": 2,
+        "G_2_dff-poly_bottom": 2,
+        "G_2_dff-poly_top": 3,
+        "R_1_dff-poly_bottom": 3,
+        "R_1_dff-poly_top": 4,
+        "R_2_dff-poly_bottom": 4,
+        "R_2_dff-poly_top": 5,
+        "G_1_dff-exp_bottom": 1,
+        "G_1_dff-exp_top": 2,
+        "G_2_dff-exp_bottom": 2,
+        "G_2_dff-exp_top": 3,
+        "R_1_dff-exp_bottom": 3,
+        "R_1_dff-exp_top": 4,
+        "R_2_dff-exp_bottom": 4,
+        "R_2_dff-exp_top": 5
     }
     yticks = [
         (params["left_lick_top"] - params["left_lick_bottom"]) / 2 + params["left_lick_bottom"],
@@ -99,10 +115,10 @@ def plot_session_scroller(nwb, ax=None, plot_bouts=False):  # noqa: C901 pragma:
 
     if fip_df is not None:
         fip_channels = [
-            "G_2_preprocessed",
-            "G_1_preprocessed",
-            "R_2_preprocessed",
-            "R_1_preprocessed",
+            "G_2_dff-{}".format(processing),
+            "G_1_dff-{}".format(processing),
+            "R_2_dff-{}".format(processing),
+            "R_1_dff-{}".format(processing),
         ]
         present_channels = fip_df["event"].unique()
         for index, channel in enumerate(fip_channels):
@@ -226,6 +242,7 @@ def plot_session_scroller(nwb, ax=None, plot_bouts=False):  # noqa: C901 pragma:
         ax.set_ylim(0, 5)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.set_title(nwb.session_id+', {}'.format(processing))
     plt.tight_layout()
 
     def on_key_press(event):
