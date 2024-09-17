@@ -14,7 +14,9 @@ from aind_dynamic_foraging_basic_analysis.plot.style import (
 )
 
 
-def plot_session_scroller(nwb, ax=None, plot_bouts=False,processing='bright'):  # noqa: C901 pragma: no cover
+def plot_session_scroller(
+    nwb, ax=None, plot_bouts=False, processing="bright"
+):  # noqa: C901 pragma: no cover
     """
     Creates an interactive plot of the session.
     Plots left/right licks/rewards, and go cues
@@ -100,7 +102,7 @@ def plot_session_scroller(nwb, ax=None, plot_bouts=False,processing='bright'):  
         "R_1_dff-exp_bottom": 3,
         "R_1_dff-exp_top": 4,
         "R_2_dff-exp_bottom": 4,
-        "R_2_dff-exp_top": 5
+        "R_2_dff-exp_top": 5,
     }
     yticks = [
         (params["left_lick_top"] - params["left_lick_bottom"]) / 2 + params["left_lick_bottom"],
@@ -124,15 +126,42 @@ def plot_session_scroller(nwb, ax=None, plot_bouts=False,processing='bright'):  
         for index, channel in enumerate(fip_channels):
             if channel in present_channels:
                 yticks.append(
-                    (params[channel + "_top"] - params[channel + "_bottom"]) / 2
+                    (params[channel + "_top"] - params[channel + "_bottom"]) * 1
                     + params[channel + "_bottom"]
                 )
                 ylabels.append(channel)
                 color = FIP_COLORS.get(channel, "k")
                 ycolors.append(color)
                 C = fip_df.query("event == @channel").copy()
-                C["data"] = C["data"] - C["data"].min()
-                C["data"] = C["data"].values / C["data"].max()
+                d_min = C["data"].min()
+                d_max = C["data"].max()
+                d_range = d_max - d_min
+                t1 = 0.25
+                t2 = 0.5
+                t3 = 0.75
+                p1 = d_min + t1 * d_range
+                p2 = d_min + t2 * d_range
+                p3 = d_min + t3 * d_range
+                yticks.append(
+                    params[channel + "_bottom"]
+                    + (params[channel + "_top"] - params[channel + "_bottom"]) * t1
+                )
+                yticks.append(
+                    params[channel + "_bottom"]
+                    + (params[channel + "_top"] - params[channel + "_bottom"]) * t2
+                )
+                yticks.append(
+                    params[channel + "_bottom"]
+                    + (params[channel + "_top"] - params[channel + "_bottom"]) * t3
+                )
+                ylabels.append(str(round(p1, 3)))
+                ylabels.append(str(round(p2, 3)))
+                ylabels.append(str(round(p3, 3)))
+                ycolors.append("darkgray")
+                ycolors.append("darkgray")
+                ycolors.append("darkgray")
+                C["data"] = C["data"] - d_min
+                C["data"] = C["data"].values / (d_max - d_min)
                 C["data"] += params[channel + "_bottom"]
                 ax.plot(C.timestamps.values, C.data.values, color)
                 ax.axhline(params[channel + "_bottom"], color="k", linewidth=0.5, alpha=0.25)
@@ -242,7 +271,10 @@ def plot_session_scroller(nwb, ax=None, plot_bouts=False,processing='bright'):  
         ax.set_ylim(0, 5)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.set_title(nwb.session_id+', {}'.format(processing))
+    if fip_df is not None:
+        ax.set_title(nwb.session_id + ", FIP processing: {}".format(processing))
+    else:
+        ax.set_title(nwb.session_id)
     plt.tight_layout()
 
     def on_key_press(event):
