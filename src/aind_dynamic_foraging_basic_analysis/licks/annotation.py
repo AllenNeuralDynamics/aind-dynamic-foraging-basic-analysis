@@ -1,14 +1,30 @@
 """
     Tools for annotation of lick bouts
+    df_licks = annotate_licks(nwb)
     df_licks = annotate_lick_bouts(nwb)
     df_licks = annotate_rewards(nwb)
     df_licks = annotate_cue_response(nwb)
+    df_licks = annotate_intertrial_choices(nwb)
+    df_licks = annotate_switches(nwb)
 """
 
 import numpy as np
 
+LICK_TO_REWARD_TOLERANCE = 0.25
+BOUT_THRESHOLD = 0.7
+CUE_TO_LICK_TOLERANCE = 1
 
-def annotate_lick_bouts(nwb, bout_threshold=0.7):
+
+def annotate_licks(nwb):
+    nwb.df_licks = annotate_lick_bouts(nwb)
+    nwb.df_licks = annotate_rewards(nwb)
+    nwb.df_licks = annotate_cue_response(nwb)
+    nwb.df_licks = annotate_intertrial_choices(nwb)
+    nwb.df_licks = annotate_switches(nwb)
+    return nwb.df_licks
+
+
+def annotate_lick_bouts(nwb):
     """
     returns a dataframe of lick times with annotations
         pre_ili, the elapsed time since the last lick (on either side)
@@ -18,7 +34,6 @@ def annotate_lick_bouts(nwb, bout_threshold=0.7):
         bout_number (int), what lick bout this was a part of
 
     nwb, an nwb-like object with attributes: df_events
-    bout_threshold is the ILI that determines bout segmentation
     """
 
     if not hasattr(nwb, "df_events"):
@@ -32,8 +47,8 @@ def annotate_lick_bouts(nwb, bout_threshold=0.7):
     df_licks["post_ili"] = np.concatenate([np.diff(df_licks.timestamps.values), [np.nan]])
 
     # Assign licks into bouts
-    df_licks["bout_start"] = df_licks["pre_ili"] > bout_threshold
-    df_licks["bout_end"] = df_licks["post_ili"] > bout_threshold
+    df_licks["bout_start"] = df_licks["pre_ili"] > BOUT_THRESHOLD
+    df_licks["bout_end"] = df_licks["post_ili"] > BOUT_THRESHOLD
     df_licks.loc[df_licks["pre_ili"].isnull(), "bout_start"] = True
     df_licks.loc[df_licks["post_ili"].isnull(), "bout_end"] = True
     df_licks["bout_number"] = np.cumsum(df_licks["bout_start"])
@@ -53,8 +68,6 @@ def annotate_rewards(nwb):
     Annotates df_licks with which lick triggered each reward
     nwb, an nwb-lick object with attributes: df_licks, df_events
     """
-
-    LICK_TO_REWARD_TOLERANCE = 0.25
 
     if not hasattr(nwb, "df_events"):
         print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
@@ -116,8 +129,6 @@ def annotate_cue_response(nwb):
     nwb, an nwb-lick object with attributes: df_licks, df_events
     """
 
-    CUE_TO_LICK_TOLERANCE = 1
-
     if not hasattr(nwb, "df_events"):
         print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
         return
@@ -155,5 +166,104 @@ def annotate_cue_response(nwb):
     temp.update(x)
     temp = temp.reset_index().set_index("index")
     df_licks["bout_cue_response"] = temp["bout_cue_response"]
+
+    return df_licks
+
+
+def annotate_intertrial_choices(nwb):
+    """
+    annotate licks and lick bouts as intertrial choices if they are not cue_responsive
+    """
+    # Add lick_bout annotation, and cue_response if not already added
+    if not hasattr(nwb, "df_licks"):
+        nwb.df_licks = annotate_lick_bouts(nwb)
+        nwb.df_licks = annotate_cue_response(nwb)
+    if "cue_response" not in nwb.df_licks:
+        nwb.df_licks = annotate_cue_response(nwb)
+
+    # Make a copy
+    df_licks = nwb.df_licks.copy()
+
+    # Define intertrial choices
+    df_licks["intertrial_choice"] = df_licks["bout_start"] & ~df_licks["cue_response"]
+
+    # Annotate lick bouts as intertrial_choice
+    x = (
+        df_licks.groupby("bout_number")
+        .any("intertrial_choice")
+        .rename(columns={"intertrial_choice": "bout_intertrial_choice"})["bout_intertrial_choice"]
+    )
+    df_licks["bout_intertrial_choice"] = False
+    temp = df_licks.reset_index().set_index("bout_number").copy()
+    temp.update(x)
+    temp = temp.reset_index().set_index("index")
+    df_licks["bout_intertrial_choice"] = temp["bout_intertrial_choice"]
+
+    return df_licks
+
+
+def annotate_switches(nwb):
+    """
+    cue_switch: this cue_choice differs from the previous cue_choice
+    iti_switch: this intertrial_choice differs from the previous choice (iti or cue)
+    """
+    # Add lick_bout annotation, and cue_response if not already added
+    if not hasattr(nwb, "df_licks"):
+        nwb.df_licks = annotate_lick_bouts(nwb)
+        nwb.df_licks = annotate_cue_response(nwb)
+        nwb.df_licks = annotate_intertrial_choices(nwb)
+    if "cue_response" not in nwb.df_licks:
+        nwb.df_licks = annotate_cue_response(nwb)
+        nwb.df_licks = annotate_intertrial_choices(nwb)
+    if "intertrial_choice" not in nwb.df_licks:
+        nwb.df_licks = annotate_intertrial_choices(nwb)
+
+    # Make a copy
+    df_licks = nwb.df_licks.copy()
+
+    # Compute cue_switch labels
+    df_cue_bouts = df_licks.query("bout_start").query("cue_response").copy()
+    df_cue_bouts["cue_switch"] = (
+        df_cue_bouts["event"].shift(1, fill_value=df_cue_bouts.iloc[0]["event"])
+        != df_cue_bouts["event"]
+    )
+
+    # Compute iti_switch labels
+    df_bouts = df_licks.query("bout_start").copy()
+    df_bouts["iti_switch"] = df_bouts["intertrial_choice"] & (
+        df_bouts["event"].shift(1, fill_value=df_bouts.iloc[0]["event"]) != df_bouts["event"]
+    )
+
+    # Add columns to df_licks
+    df_licks = df_licks.join(df_cue_bouts["cue_switch"], how="left")
+    df_licks = df_licks.join(df_bouts["iti_switch"], how="left")
+
+    # Fill NaNs as False
+    df_licks["cue_switch"] = df_licks["cue_switch"] == True
+    df_licks["iti_switch"] = df_licks["iti_switch"] == True
+
+    # Annotate lick bouts as cue_switch
+    x = (
+        df_licks.groupby("bout_number")
+        .any("cue_switch")
+        .rename(columns={"cue_switch": "bout_cue_switch"})["bout_cue_switch"]
+    )
+    df_licks["bout_cue_switch"] = False
+    temp = df_licks.reset_index().set_index("bout_number").copy()
+    temp.update(x)
+    temp = temp.reset_index().set_index("index")
+    df_licks["bout_cue_switch"] = temp["bout_cue_switch"]
+
+    # Annotate lick bouts as iti_switch
+    x = (
+        df_licks.groupby("bout_number")
+        .any("iti_switch")
+        .rename(columns={"iti_switch": "bout_iti_switch"})["bout_iti_switch"]
+    )
+    df_licks["bout_iti_switch"] = False
+    temp = df_licks.reset_index().set_index("bout_number").copy()
+    temp.update(x)
+    temp = temp.reset_index().set_index("index")
+    df_licks["bout_iti_switch"] = temp["bout_iti_switch"]
 
     return df_licks
