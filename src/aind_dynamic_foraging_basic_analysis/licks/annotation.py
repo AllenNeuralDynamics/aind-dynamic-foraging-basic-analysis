@@ -23,6 +23,7 @@ CUE_TO_LICK_TOLERANCE = 1
 def annotate_licks(nwb):
     """
     Adds all annotations
+    nwb is an object that has df_events as an attribute
     """
     nwb.df_licks = annotate_lick_bouts(nwb)
     nwb.df_licks = annotate_rewards(nwb)
@@ -41,7 +42,7 @@ def annotate_lick_bouts(nwb):
         bout_end (bool), whether this was the end of a lick bout)
         bout_number (int), what lick bout this was a part of
 
-    nwb, an nwb-like object with attributes: df_events
+    nwb, an object with attributes: df_events
     """
 
     if not hasattr(nwb, "df_events"):
@@ -74,7 +75,9 @@ def annotate_lick_bouts(nwb):
 def annotate_rewards(nwb):
     """
     Annotates df_licks with which lick triggered each reward
-    nwb, an nwb-lick object with attributes: df_licks, df_events
+        rewarded (bool) did this lick trigger a reward
+        bout_rewarded (bool) did this lick bout trigger a reward
+    nwb, an object with attributes: df_licks, df_events
     """
 
     if not hasattr(nwb, "df_events"):
@@ -134,7 +137,9 @@ def annotate_rewards(nwb):
 def annotate_cue_response(nwb):
     """
     Annotates df_licks with which lick was immediately after a go cue
-    nwb, an nwb-lick object with attributes: df_licks, df_events
+        cue_response (bool) was this lick immediately after a go cue
+        bout_cue_response (bool) was this licking bout immediately after a go cue
+    nwb, an object with attributes: df_licks, df_events
     """
 
     if not hasattr(nwb, "df_events"):
@@ -181,6 +186,8 @@ def annotate_cue_response(nwb):
 def annotate_intertrial_choices(nwb):
     """
     annotate licks and lick bouts as intertrial choices if they are not cue_responsive
+        intertrial_choice (bool) was this lick the start of a non-cue-responsive bout
+        bout_intertrial_choice (bool) was this bout non-cue-responsive?
     """
     # Add lick_bout annotation, and cue_response if not already added
     if not hasattr(nwb, "df_licks"):
