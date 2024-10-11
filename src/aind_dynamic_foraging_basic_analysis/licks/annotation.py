@@ -10,12 +10,20 @@
 
 import numpy as np
 
+# Maximum time between a lick and a reward delivery to assign that reward to the lick
 LICK_TO_REWARD_TOLERANCE = 0.25
+
+# Maximum time between licks to label them as one bout
 BOUT_THRESHOLD = 0.7
+
+# Maximum time between go cue and first lick to label the lick as cue responsive
 CUE_TO_LICK_TOLERANCE = 1
 
 
 def annotate_licks(nwb):
+    """
+    Adds all annotations
+    """
     nwb.df_licks = annotate_lick_bouts(nwb)
     nwb.df_licks = annotate_rewards(nwb)
     nwb.df_licks = annotate_cue_response(nwb)
