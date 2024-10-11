@@ -254,8 +254,8 @@ def annotate_switches(nwb):
     df_licks = df_licks.join(df_bouts["iti_switch"], how="left")
 
     # Fill NaNs as False
-    df_licks["cue_switch"] = df_licks["cue_switch"] == True
-    df_licks["iti_switch"] = df_licks["iti_switch"] == True
+    df_licks["cue_switch"] = df_licks["cue_switch"] == True  # noqa: E712
+    df_licks["iti_switch"] = df_licks["iti_switch"] == True  # noqa: E712
 
     # Annotate lick bouts as cue_switch
     x = (

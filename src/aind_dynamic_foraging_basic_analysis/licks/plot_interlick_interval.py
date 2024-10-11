@@ -36,7 +36,6 @@ def plot_interlick_interval(licks_df, key="pre_ili", categories=None, nbins=80, 
 
     if categories is not None:
         licks_df = licks_df.dropna(subset=[categories]).copy()
-        density = False
     if key == "pre_ili":
         xlabel = "interlick interval (s)"
         yscale = 4
@@ -61,7 +60,7 @@ def plot_interlick_interval(licks_df, key="pre_ili", categories=None, nbins=80, 
         colors = {"left_lick_time": "b", "right_lick_time": "r"}
         for index, g in enumerate(groups):
             df = licks_df.query(categories + " == @g")
-            if (type(g) == bool) or (type(g) == np.bool_):
+            if isinstance(g, bool) or isinstance(g, np.bool_):
                 if g:
                     label = categories
                 else:

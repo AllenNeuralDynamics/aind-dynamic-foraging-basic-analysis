@@ -3,7 +3,15 @@
 """
 
 # General plotting style
-STYLE = {"axis_ticks_fontsize": 12, "axis_fontsize": 16, "data_color_all": 'blue', 'data_alpha':1,'axline_color':'k','axline_linestyle':'-', 'axline_alpha':.5}
+STYLE = {
+    "axis_ticks_fontsize": 12,
+    "axis_fontsize": 16,
+    "data_color_all": "blue",
+    "data_alpha": 1,
+    "axline_color": "k",
+    "axline_linestyle": "-",
+    "axline_alpha": 0.5,
+}
 
 # Colorscheme for photostim
 PHOTOSTIM_EPOCH_MAPPING = {
