@@ -19,6 +19,8 @@ BOUT_THRESHOLD = 0.7
 # Maximum time between go cue and first lick to label the lick as cue responsive
 CUE_TO_LICK_TOLERANCE = 1
 
+# Maximum time after the last go cue for a bout to start and be considered within the session
+CUE_TO_SESSION_END_TOLERANCE = CUE_TO_LICK_TOLERANCE
 
 def annotate_licks(nwb):
     """
@@ -30,6 +32,7 @@ def annotate_licks(nwb):
     nwb.df_licks = annotate_cue_response(nwb)
     nwb.df_licks = annotate_intertrial_choices(nwb)
     nwb.df_licks = annotate_switches(nwb)
+    nwb.df_licks = annotate_within_session(nwb)
     return nwb.df_licks
 
 
@@ -285,5 +288,34 @@ def annotate_switches(nwb):
     temp.update(x)
     temp = temp.reset_index().set_index("index")
     df_licks["bout_iti_switch"] = temp["bout_iti_switch"]
+
+    return df_licks
+
+
+def annotate_within_session(nwb):
+    """
+    within_session: this lick happened after the first go cue, or < CUE_TO_SESSION_END_TOLERANCE after the last go cue
+    """
+
+    if not hasattr(nwb, "df_events"):
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
+
+    # ensure we have df_licks
+    if not hasattr(nwb, "df_licks"):
+        print("annotating lick bouts")
+        nwb.df_licks = annotate_lick_bouts(nwb)
+
+    # make a copy of df licks
+    df_licks = nwb.df_licks.copy()
+
+    # Test for no go cues
+    goCues = nwb.df_events.query('event == "goCue_start_time"')
+    if len(goCues) == 0:
+        df_licks['within_session'] = False
+    else:
+        start_time = goCues.iloc[0]['timestamps'] 
+        end_time = goCues.iloc[-1]['timestamps'] + CUE_TO_SESSION_END_TOLERANCE
+        df_licks['within_session'] = (start_time <= df_licks['timestamps']) & (df_licks['timestamps'] < end_time)
 
     return df_licks
