@@ -74,5 +74,6 @@ class TestLickAnnotation(unittest.TestCase):
         nwb.df_licks = a.annotate_cue_response(nwb)
         nwb.df_licks = a.annotate_switches(nwb)
 
+
 if __name__ == "__main__":
     unittest.main()
