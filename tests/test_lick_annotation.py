@@ -54,6 +54,8 @@ class TestLickAnnotation(unittest.TestCase):
         nwb.df_licks = a.annotate_rewards(nwb)
         del nwb.df_licks
         nwb.df_licks = a.annotate_cue_response(nwb)
+        del nwb.df_licks
+        nwb.df_licks = a.annotate_licks(nwb)
 
 
 if __name__ == "__main__":
