@@ -295,7 +295,8 @@ def annotate_switches(nwb):
 
 def annotate_within_session(nwb):
     """
-    within_session: this lick happened after the first go cue, or < CUE_TO_SESSION_END_TOLERANCE after the last go cue
+    within_session: this lick happened after the first go cue,
+        or < CUE_TO_SESSION_END_TOLERANCE after the last go cue
     """
 
     if not hasattr(nwb, "df_events"):
