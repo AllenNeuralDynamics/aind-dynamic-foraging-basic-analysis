@@ -190,9 +190,11 @@ def annotate_intertrial_choices(nwb):
         bout_intertrial_choice (bool) was this bout non-cue-responsive?
     """
     # Add lick_bout annotation, and cue_response if not already added
+    if not hasattr(nwb, "df_events"):
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
     if not hasattr(nwb, "df_licks"):
         nwb.df_licks = annotate_lick_bouts(nwb)
-        nwb.df_licks = annotate_cue_response(nwb)
     if "cue_response" not in nwb.df_licks:
         nwb.df_licks = annotate_cue_response(nwb)
 
@@ -223,13 +225,13 @@ def annotate_switches(nwb):
     iti_switch: this intertrial_choice differs from the previous choice (iti or cue)
     """
     # Add lick_bout annotation, and cue_response if not already added
+    if not hasattr(nwb, "df_events"):
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
     if not hasattr(nwb, "df_licks"):
         nwb.df_licks = annotate_lick_bouts(nwb)
-        nwb.df_licks = annotate_cue_response(nwb)
-        nwb.df_licks = annotate_intertrial_choices(nwb)
     if "cue_response" not in nwb.df_licks:
         nwb.df_licks = annotate_cue_response(nwb)
-        nwb.df_licks = annotate_intertrial_choices(nwb)
     if "intertrial_choice" not in nwb.df_licks:
         nwb.df_licks = annotate_intertrial_choices(nwb)
 

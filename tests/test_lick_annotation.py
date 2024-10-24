@@ -48,6 +48,9 @@ class TestLickAnnotation(unittest.TestCase):
         assert a.annotate_lick_bouts(nwb) is None
         assert a.annotate_rewards(nwb) is None
         assert a.annotate_cue_response(nwb) is None
+        assert a.annotate_intertrial_choices(nwb) is None
+        assert a.annotate_switches(nwb) is None
+
         nwb.df_events = df
         nwb.df_licks = a.annotate_lick_bouts(nwb)
         del nwb.df_licks
@@ -56,7 +59,20 @@ class TestLickAnnotation(unittest.TestCase):
         nwb.df_licks = a.annotate_cue_response(nwb)
         del nwb.df_licks
         nwb.df_licks = a.annotate_licks(nwb)
-
+        del nwb.df_licks
+        nwb.df_licks = a.annotate_intertrial_choices(nwb)
+        del nwb.df_licks
+        nwb.df_licks = a.annotate_lick_bouts(nwb)
+        nwb.df_licks = a.annotate_intertrial_choices(nwb)
+        del nwb.df_licks
+        nwb.df_licks = a.annotate_switches(nwb)
+        del nwb.df_licks
+        nwb.df_licks = a.annotate_lick_bouts(nwb)
+        nwb.df_licks = a.annotate_switches(nwb)
+        del nwb.df_licks
+        nwb.df_licks = a.annotate_lick_bouts(nwb)
+        nwb.df_licks = a.annotate_cue_response(nwb)
+        nwb.df_licks = a.annotate_switches(nwb)
 
 if __name__ == "__main__":
     unittest.main()
