@@ -246,7 +246,7 @@ def annotate_switches(nwb):
             != df_cue_bouts["event"]
         )
     else:
-        df_cue_bouts['cue_switch'] = []
+        df_cue_bouts["cue_switch"] = []
 
     # Compute iti_switch labels
     df_bouts = df_licks.query("bout_start").copy()
