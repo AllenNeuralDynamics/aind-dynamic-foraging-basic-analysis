@@ -22,6 +22,7 @@ CUE_TO_LICK_TOLERANCE = 1
 # Maximum time after the last go cue for a bout to start and be considered within the session
 CUE_TO_SESSION_END_TOLERANCE = CUE_TO_LICK_TOLERANCE
 
+
 def annotate_licks(nwb):
     """
     Adds all annotations
@@ -312,10 +313,12 @@ def annotate_within_session(nwb):
     # Test for no go cues
     goCues = nwb.df_events.query('event == "goCue_start_time"')
     if len(goCues) == 0:
-        df_licks['within_session'] = False
+        df_licks["within_session"] = False
     else:
-        start_time = goCues.iloc[0]['timestamps'] 
-        end_time = goCues.iloc[-1]['timestamps'] + CUE_TO_SESSION_END_TOLERANCE
-        df_licks['within_session'] = (start_time <= df_licks['timestamps']) & (df_licks['timestamps'] < end_time)
+        start_time = goCues.iloc[0]["timestamps"]
+        end_time = goCues.iloc[-1]["timestamps"] + CUE_TO_SESSION_END_TOLERANCE
+        df_licks["within_session"] = (start_time <= df_licks["timestamps"]) & (
+            df_licks["timestamps"] < end_time
+        )
 
     return df_licks

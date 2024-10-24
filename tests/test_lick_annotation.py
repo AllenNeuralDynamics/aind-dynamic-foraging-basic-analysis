@@ -340,15 +340,15 @@ class TestLickAnnotation(unittest.TestCase):
         assert np.all(nwb.df_licks["iti_switch"] == expected_iti_switch)
 
     def test_within_session_annotation(self):
-        '''
-            Test annotation of within session labels
-        '''
+        """
+        Test annotation of within session labels
+        """
         nwb = EmptyNWB()
         times = [0.1, 1.1, 1.2, 10]
-        expected_within_session = [False, True, True,False]
-        events = ['left_lick_time']*len(times)
+        expected_within_session = [False, True, True, False]
+        events = ["left_lick_time"] * len(times)
         cue_times = [1]
-        events += ['goCue_start_time']*len(cue_times)
+        events += ["goCue_start_time"] * len(cue_times)
         df = pd.DataFrame(
             {
                 "timestamps": times + cue_times,
@@ -365,13 +365,13 @@ class TestLickAnnotation(unittest.TestCase):
         assert np.all(nwb.df_licks["within_session"] == expected_within_session)
 
     def test_within_session_annotation_1(self):
-        '''
-            Test annotation of within session labels with no go cues
-        '''
+        """
+        Test annotation of within session labels with no go cues
+        """
         nwb = EmptyNWB()
         times = [0.1, 1.1, 1.2, 10]
-        expected_within_session = [False, False, False,False]
-        events = ['left_lick_time']*len(times)
+        expected_within_session = [False, False, False, False]
+        events = ["left_lick_time"] * len(times)
         cue_times = []
         df = pd.DataFrame(
             {
@@ -387,6 +387,7 @@ class TestLickAnnotation(unittest.TestCase):
         nwb.df_events = df
         nwb.df_licks = a.annotate_licks(nwb)
         assert np.all(nwb.df_licks["within_session"] == expected_within_session)
+
 
 if __name__ == "__main__":
     unittest.main()
