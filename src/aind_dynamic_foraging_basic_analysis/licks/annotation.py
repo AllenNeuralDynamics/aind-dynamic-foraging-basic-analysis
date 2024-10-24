@@ -105,7 +105,6 @@ def annotate_rewards(nwb):
         )[0]
         if len(this_reward_lick_times) > 0:
             df_licks.at[this_reward_lick_times[-1], "rewarded"] = True
-        # TODO, should check for licks that happened before the last go cue
         # TODO, if we can't find a matching lick, should ensure this is manual or auto water
 
     # Iterate left rewards, and find most recent lick within tolerance
@@ -164,6 +163,7 @@ def annotate_cue_response(nwb):
             (df_licks.timestamps > row.timestamps)
             & (df_licks.timestamps <= (row.timestamps + CUE_TO_LICK_TOLERANCE))
             & ((df_licks.event == "right_lick_time") | (df_licks.event == "left_lick_time"))
+            & (df_licks.bout_start)
         )[0]
         if len(this_lick_times) > 0:
             df_licks.at[this_lick_times[0], "cue_response"] = True
@@ -240,10 +240,13 @@ def annotate_switches(nwb):
 
     # Compute cue_switch labels
     df_cue_bouts = df_licks.query("bout_start").query("cue_response").copy()
-    df_cue_bouts["cue_switch"] = (
-        df_cue_bouts["event"].shift(1, fill_value=df_cue_bouts.iloc[0]["event"])
-        != df_cue_bouts["event"]
-    )
+    if len(df_cue_bouts) > 0:
+        df_cue_bouts["cue_switch"] = (
+            df_cue_bouts["event"].shift(1, fill_value=df_cue_bouts.iloc[0]["event"])
+            != df_cue_bouts["event"]
+        )
+    else:
+        df_cue_bouts['cue_switch'] = []
 
     # Compute iti_switch labels
     df_bouts = df_licks.query("bout_start").copy()
