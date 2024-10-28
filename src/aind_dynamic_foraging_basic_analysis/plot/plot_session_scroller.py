@@ -52,8 +52,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         df_licks = nwb.df_licks
     elif plot_bouts:
         print("computing df_licks first")
-        nwb.df_licks = a.annotate_lick_bouts(nwb)
-        nwb.df_licks = a.annotate_rewards(nwb)
+        nwb.df_licks = a.annotate_licks(nwb)
         df_licks = nwb.df_licks
     else:
         df_licks = None
@@ -214,15 +213,51 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 linewidth=2,
                 color=cmap(np.mod(b, 20)),
             )
+
+        # plot licks that trigger left rewards
         left_rewarded_licks = df_licks.query(
             '(event == "left_lick_time")&(rewarded)'
         ).timestamps.values
-        ax.plot(left_rewarded_licks, [params["left_lick_top"]] * len(left_rewarded_licks), "ro")
+        ax.plot(
+            left_rewarded_licks,
+            [params["left_lick_top"]] * len(left_rewarded_licks),
+            "ro",
+            label="rewarded lick",
+        )
+
+        # Plot licks that trigger right rewards
         right_rewarded_licks = df_licks.query(
             '(event == "right_lick_time")&(rewarded)'
         ).timestamps.values
         ax.plot(
             right_rewarded_licks, [params["right_lick_bottom"]] * len(right_rewarded_licks), "ro"
+        )
+
+        # plot cue responsive licks
+        left_cue_licks = df_licks.query(
+            '(event == "left_lick_time")&(cue_response)'
+        ).timestamps.values
+        ax.plot(
+            left_cue_licks,
+            [
+                params["left_lick_bottom"]
+                + (params["left_lick_top"] - params["left_lick_bottom"]) / 2
+            ]
+            * len(left_cue_licks),
+            "bD",
+            label="cue responsive lick",
+        )
+        right_cue_licks = df_licks.query(
+            '(event == "right_lick_time")&(cue_response)'
+        ).timestamps.values
+        ax.plot(
+            right_cue_licks,
+            [
+                params["right_lick_bottom"]
+                + (params["right_lick_top"] - params["right_lick_bottom"]) / 2
+            ]
+            * len(right_cue_licks),
+            "bD",
         )
 
     left_reward_deliverys = df_events.query('event == "left_reward_delivery_time"')
@@ -234,6 +269,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         alpha=1,
         linewidth=2,
         color="r",
+        label="reward times",
     )
 
     right_reward_deliverys = df_events.query('event == "right_reward_delivery_time"')
@@ -256,9 +292,11 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         alpha=0.75,
         linewidth=1,
         color="b",
+        label="go cue",
     )
 
     # Clean up plot
+    ax.legend(framealpha=1, loc="lower left", reverse=True)
     ax.set_yticks(yticks)
     ax.set_yticklabels(ylabels, fontsize=STYLE["axis_ticks_fontsize"])
 
