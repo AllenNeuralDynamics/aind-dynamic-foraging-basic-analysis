@@ -54,8 +54,31 @@ def compute_all_trial_metrics(nwb):
         df["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
+    # Rolling reward probability for best option
+    df["IDEAL_OBSERVER_REWARD_PROB"] = df[["reward_probabilityR", "reward_probabilityL"]].max(
+        axis=1
+    )
+    df["ideal_observer_reward_rate"] = (
+        df["IDEAL_OBSERVER_REWARD_PROB"]
+        .rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True)
+        .mean()
+    )
+
+
+    # Rolling reward probability for best option with baiting
+    if 'bait_left' in df:
+        df["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"] = [
+            1 if (x[0] or x[1]) else x[2]
+            for x in zip(df["bait_left"], df["bait_right"], df["IDEAL_OBSERVER_REWARD_PROB"])
+        ]
+        df["ideal_observer_reward_rate_with_baiting"] = (
+            df["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"]
+            .rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True)
+            .mean()
+        )
+
     # Clean up temp columns
-    drop_cols = ["RESPONDED", "RESPONSE_REWARD", "WENT_RIGHT"]
+    drop_cols = ["RESPONDED", "RESPONSE_REWARD", "WENT_RIGHT", "IDEAL_OBSERVER_REWARD_PROB"]
     df = df.drop(columns=drop_cols)
 
     return df

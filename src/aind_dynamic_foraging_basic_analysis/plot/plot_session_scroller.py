@@ -38,6 +38,11 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     plot_bouts (bool), if True, plot licks colored by segmented lick bouts
 
+    processing (str) processing method for FIP data to plot
+
+    metrics (list of strings), list of metrics to plot. Must be either 'pR','pL' or
+        columns in nwb.df_trials
+
     EXAMPLES:
     plot_foraging_session.plot_session_scroller(nwb)
     plot_foraging_session.plot_session_scroller(nwb, plot_bouts=True)
