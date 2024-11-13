@@ -286,6 +286,12 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             "bD",
         )
 
+        # Plot baiting
+        bait_right = df_trials.query("bait_right")["goCue_start_time_in_session"].values
+        bait_left = df_trials.query("bait_left")["goCue_start_time_in_session"].values
+        ax.plot(bait_right, [params["go_cue_top"] - 0.05] * len(bait_right), "ms", label="baited")
+        ax.plot(bait_left, [params["go_cue_bottom"] + 0.05] * len(bait_left), "ms")
+
     left_reward_deliverys = df_events.query('event == "left_reward_delivery_time"')
     left_times = left_reward_deliverys.timestamps.values
     ax.vlines(
@@ -322,7 +328,6 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     )
 
     # plot metrics
-    # TODO, plot baiting
     ax.axhline(params["metrics_bottom"], color="k", linewidth=0.5, alpha=0.25)
     go_cue_times_doubled = np.repeat(go_cue_times, 2)[1:]
     if "pR" in metrics:
