@@ -56,10 +56,16 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         df_licks = nwb.df_licks
     else:
         df_licks = None
+    if not hasattr(nwb, "df_trials"):
+        print("computing df_trials")
+        nwb.df_trials = nu.create_df_trials(nwb)
+        df_trials = nwb.df_trials
+    else:
+        df_trials = nwb.df_trials
 
     if ax is None:
         if fip_df is None:
-            fig, ax = plt.subplots(figsize=(15, 3))
+            fig, ax = plt.subplots(figsize=(15, 4))
         else:
             fig, ax = plt.subplots(figsize=(15, 8))
 
@@ -78,30 +84,32 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "right_reward_top": 0.75,
         "go_cue_bottom": 0,
         "go_cue_top": 1,
-        "G_1_dff-bright_bottom": 1,
-        "G_1_dff-bright_top": 2,
-        "G_2_dff-bright_bottom": 2,
-        "G_2_dff-bright_top": 3,
-        "R_1_dff-bright_bottom": 3,
-        "R_1_dff-bright_top": 4,
-        "R_2_dff-bright_bottom": 4,
-        "R_2_dff-bright_top": 5,
-        "G_1_dff-poly_bottom": 1,
-        "G_1_dff-poly_top": 2,
-        "G_2_dff-poly_bottom": 2,
-        "G_2_dff-poly_top": 3,
-        "R_1_dff-poly_bottom": 3,
-        "R_1_dff-poly_top": 4,
-        "R_2_dff-poly_bottom": 4,
-        "R_2_dff-poly_top": 5,
-        "G_1_dff-exp_bottom": 1,
-        "G_1_dff-exp_top": 2,
-        "G_2_dff-exp_bottom": 2,
-        "G_2_dff-exp_top": 3,
-        "R_1_dff-exp_bottom": 3,
-        "R_1_dff-exp_top": 4,
-        "R_2_dff-exp_bottom": 4,
-        "R_2_dff-exp_top": 5,
+        "metrics_bottom": 1,
+        "metrics_top":2,
+        "G_1_dff-bright_bottom": 2,
+        "G_1_dff-bright_top": 3,
+        "G_2_dff-bright_bottom": 3,
+        "G_2_dff-bright_top": 4,
+        "R_1_dff-bright_bottom": 4,
+        "R_1_dff-bright_top": 5,
+        "R_2_dff-bright_bottom": 5,
+        "R_2_dff-bright_top": 6,
+        "G_1_dff-poly_bottom": 2,
+        "G_1_dff-poly_top": 3,
+        "G_2_dff-poly_bottom": 3,
+        "G_2_dff-poly_top": 4,
+        "R_1_dff-poly_bottom": 4,
+        "R_1_dff-poly_top": 5,
+        "R_2_dff-poly_bottom": 5,
+        "R_2_dff-poly_top": 6,
+        "G_1_dff-exp_bottom": 2,
+        "G_1_dff-exp_top": 3,
+        "G_2_dff-exp_bottom": 3,
+        "G_2_dff-exp_top": 4,
+        "R_1_dff-exp_bottom": 4,
+        "R_1_dff-exp_top": 5,
+        "R_2_dff-exp_bottom": 5,
+        "R_2_dff-exp_top": 6,
     }
     yticks = [
         (params["left_lick_top"] - params["left_lick_bottom"]) / 2 + params["left_lick_bottom"],
@@ -160,10 +168,11 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 ycolors.append("darkgray")
                 ycolors.append("darkgray")
                 C["data"] = C["data"] - d_min
-                C["data"] = C["data"].values / (d_max - d_min)
+                C["data"] = C["data"].values / (d_max - d_min) 
                 C["data"] += params[channel + "_bottom"]
                 ax.plot(C.timestamps.values, C.data.values, color)
                 ax.axhline(params[channel + "_bottom"], color="k", linewidth=0.5, alpha=0.25)
+
 
     if df_licks is None:
         left_licks = df_events.query('event == "left_lick_time"')
@@ -295,6 +304,22 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         label="go cue",
     )
 
+    # plot metrics
+    ax.axhline(params["metrics_bottom"], color="k", linewidth=0.5, alpha=.25)
+    pR = params['metrics_bottom'] + df_trials['reward_probabilityR']
+    pL = params['metrics_bottom'] + df_trials['reward_probabilityL']
+    go_cue_times_doubled = np.repeat(go_cue_times,2)[1:]
+    pR = np.repeat(pR,2)[:-1]
+    pL = np.repeat(pL,2)[:-1]
+    #ax.plot(go_cue_times_doubled, pR, color='r')
+    #ax.plot(go_cue_times_doubled, pL, color='b')
+    
+    metrics = ['response_rate']
+    for metric in metrics:
+        if metric in df_trials:
+            values = df_trials[metric] + params['metrics_bottom']
+            ax.plot(go_cue_times, values,label=metric)
+
     # Clean up plot
     ax.legend(framealpha=1, loc="lower left", reverse=True)
     ax.set_yticks(yticks)
@@ -304,9 +329,9 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         tick.set_color(color)
     ax.set_xlabel("time (s)", fontsize=STYLE["axis_fontsize"])
     if fip_df is None:
-        ax.set_ylim(0, 1)
+        ax.set_ylim(0, 2)
     else:
-        ax.set_ylim(0, 5)
+        ax.set_ylim(0, 6)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     if fip_df is not None:
