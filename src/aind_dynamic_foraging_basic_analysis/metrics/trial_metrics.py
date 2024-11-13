@@ -1,3 +1,9 @@
+"""
+    Tools for computing trial by trial metrics
+    df_trials = compute_all_trial_metrics(nwb)
+
+"""
+
 import numpy as np
 
 # TODO, we might want to make these parameters metric specific
