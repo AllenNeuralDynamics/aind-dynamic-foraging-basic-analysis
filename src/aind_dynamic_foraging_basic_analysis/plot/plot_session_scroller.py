@@ -15,7 +15,12 @@ from aind_dynamic_foraging_basic_analysis.plot.style import (
 
 
 def plot_session_scroller(  # noqa: C901 pragma: no cover
-    nwb, ax=None, fig=None, plot_bouts=False, processing="bright"
+    nwb,
+    ax=None,
+    fig=None,
+    plot_bouts=False,
+    processing="bright",
+    metrics=["pR", "pL", "response_rate"],
 ):
     """
     Creates an interactive plot of the session.
@@ -85,7 +90,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "go_cue_bottom": 0,
         "go_cue_top": 1,
         "metrics_bottom": 1,
-        "metrics_top":2,
+        "metrics_top": 2,
         "G_1_dff-bright_bottom": 2,
         "G_1_dff-bright_top": 3,
         "G_2_dff-bright_bottom": 3,
@@ -168,11 +173,10 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 ycolors.append("darkgray")
                 ycolors.append("darkgray")
                 C["data"] = C["data"] - d_min
-                C["data"] = C["data"].values / (d_max - d_min) 
+                C["data"] = C["data"].values / (d_max - d_min)
                 C["data"] += params[channel + "_bottom"]
                 ax.plot(C.timestamps.values, C.data.values, color)
                 ax.axhline(params[channel + "_bottom"], color="k", linewidth=0.5, alpha=0.25)
-
 
     if df_licks is None:
         left_licks = df_events.query('event == "left_lick_time"')
@@ -305,20 +309,25 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     )
 
     # plot metrics
-    ax.axhline(params["metrics_bottom"], color="k", linewidth=0.5, alpha=.25)
-    pR = params['metrics_bottom'] + df_trials['reward_probabilityR']
-    pL = params['metrics_bottom'] + df_trials['reward_probabilityL']
-    go_cue_times_doubled = np.repeat(go_cue_times,2)[1:]
-    pR = np.repeat(pR,2)[:-1]
-    pL = np.repeat(pL,2)[:-1]
-    #ax.plot(go_cue_times_doubled, pR, color='r')
-    #ax.plot(go_cue_times_doubled, pL, color='b')
-    
-    metrics = ['response_rate']
+    # TODO, plot baiting
+    ax.axhline(params["metrics_bottom"], color="k", linewidth=0.5, alpha=0.25)
+    go_cue_times_doubled = np.repeat(go_cue_times, 2)[1:]
+    if "pR" in metrics:
+        pR = params["metrics_bottom"] + df_trials["reward_probabilityR"]
+        pR = np.repeat(pR, 2)[:-1]
+        ax.plot(go_cue_times_doubled, pR, color="r")
+    if "pL" in metrics:
+        pL = params["metrics_bottom"] + df_trials["reward_probabilityL"]
+        pL = np.repeat(pL, 2)[:-1]
+        ax.plot(go_cue_times_doubled, pL, color="b")
+
+    # plot metrics if they are available
     for metric in metrics:
         if metric in df_trials:
-            values = df_trials[metric] + params['metrics_bottom']
-            ax.plot(go_cue_times, values,label=metric)
+            values = df_trials[metric] + params["metrics_bottom"]
+            ax.plot(go_cue_times, values, label=metric)
+        else:
+            print('Metric "{}" not available in df_trials'.format(metric))
 
     # Clean up plot
     ax.legend(framealpha=1, loc="lower left", reverse=True)

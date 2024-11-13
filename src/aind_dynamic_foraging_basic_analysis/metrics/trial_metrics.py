@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
 
-WIN_DUR = 10
+# TODO, we might want to make these parameters metric specific
+WIN_DUR = 15
+MIN_EVENTS = 2
 
 
 def compute_all_trial_metrics(nwb):
@@ -21,11 +23,13 @@ def compute_all_trial_metrics(nwb):
 
     df["RESPONDED"] = [x in [0, 1] for x in df["animal_response"].values]
     # Rolling fraction of goCues with a response
-    df["response_rate"] = df["RESPONDED"].rolling(WIN_DUR, min_periods=1, center=True).mean()
+    df["response_rate"] = (
+        df["RESPONDED"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    )
 
     # Rolling fraction of goCues with a response
     df["gocue_reward_rate"] = (
-        df["earned_reward"].rolling(WIN_DUR, min_periods=1, center=True).mean()
+        df["earned_reward"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Rolling fraction of responses with a response
@@ -33,7 +37,7 @@ def compute_all_trial_metrics(nwb):
         x[0] if x[1] else np.nan for x in zip(df["earned_reward"], df["RESPONDED"])
     ]
     df["response_reward_rate"] = (
-        df["RESPONSE_REWARD"].rolling(WIN_DUR, min_periods=1, center=True).mean()
+        df["RESPONSE_REWARD"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Clean up temp columns
