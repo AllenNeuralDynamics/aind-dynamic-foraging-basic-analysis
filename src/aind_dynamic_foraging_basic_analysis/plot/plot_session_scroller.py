@@ -123,9 +123,22 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         + params["left_reward_bottom"],
         (params["right_reward_top"] - params["right_reward_bottom"]) / 2
         + params["right_reward_bottom"],
+        (params["metrics_top"] - params["metrics_bottom"]) * 0.25 + params["metrics_bottom"],
+        (params["metrics_top"] - params["metrics_bottom"]) * 0.50 + params["metrics_bottom"],
+        (params["metrics_top"] - params["metrics_bottom"]) * 0.75 + params["metrics_bottom"],
+        params["metrics_top"],
     ]
-    ylabels = ["left licks", "right licks", "left reward", "right reward"]
-    ycolors = ["k", "k", "r", "r"]
+    ylabels = [
+        "left licks",
+        "right licks",
+        "left reward",
+        "right reward",
+        "0.25",
+        "0.50",
+        "0.75",
+        "metrics",
+    ]
+    ycolors = ["k", "k", "r", "r", "darkgray", "darkgray", "darkgray", "k"]
 
     if fip_df is not None:
         fip_channels = [
@@ -315,18 +328,18 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     if "pR" in metrics:
         pR = params["metrics_bottom"] + df_trials["reward_probabilityR"]
         pR = np.repeat(pR, 2)[:-1]
-        ax.plot(go_cue_times_doubled, pR, color="r")
+        ax.plot(go_cue_times_doubled, pR, color="r", label="pR")
     if "pL" in metrics:
         pL = params["metrics_bottom"] + df_trials["reward_probabilityL"]
         pL = np.repeat(pL, 2)[:-1]
-        ax.plot(go_cue_times_doubled, pL, color="b")
+        ax.plot(go_cue_times_doubled, pL, color="b", label="pL")
 
     # plot metrics if they are available
     for metric in metrics:
         if metric in df_trials:
             values = df_trials[metric] + params["metrics_bottom"]
             ax.plot(go_cue_times, values, label=metric)
-        else:
+        elif metric not in ["pL", "pR"]:
             print('Metric "{}" not available in df_trials'.format(metric))
 
     # Clean up plot
