@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 # TODO, we might want to make these parameters metric specific
 WIN_DUR = 15
