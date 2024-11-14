@@ -64,9 +64,8 @@ def compute_all_trial_metrics(nwb):
         .mean()
     )
 
-
     # Rolling reward probability for best option with baiting
-    if 'bait_left' in df:
+    if "bait_left" in df:
         df["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"] = [
             1 if (x[0] or x[1]) else x[2]
             for x in zip(df["bait_left"], df["bait_right"], df["IDEAL_OBSERVER_REWARD_PROB"])
@@ -77,8 +76,26 @@ def compute_all_trial_metrics(nwb):
             .mean()
         )
 
+    # TODO, add from process_nwb
+    # trial duration (stop-time - start-time) (start/stop time, or gocue to gocue?)
+    # n_licks_left (# of left licks in response window)
+    # n_licks_left_total (# of left licks from goCue to next go cue)
+    # Same for Right, same for all
+    # intertrial choices (boolean)
+    # number of intertrial choices
+    # number of intertrial switches 
+    # response switch or repeat
+    
+
+
     # Clean up temp columns
-    drop_cols = ["RESPONDED", "RESPONSE_REWARD", "WENT_RIGHT", "IDEAL_OBSERVER_REWARD_PROB"]
+    drop_cols = [
+        "RESPONDED",
+        "RESPONSE_REWARD",
+        "WENT_RIGHT",
+        "IDEAL_OBSERVER_REWARD_PROB",
+        "IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING",
+    ]
     df = df.drop(columns=drop_cols)
 
     return df
