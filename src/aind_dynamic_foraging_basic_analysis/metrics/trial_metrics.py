@@ -87,10 +87,8 @@ def compute_all_trial_metrics(nwb):
     # Same for Right, same for all
     # intertrial choices (boolean)
     # number of intertrial choices
-    # number of intertrial switches 
+    # number of intertrial switches
     # response switch or repeat
-    
-
 
     # Clean up temp columns
     drop_cols = [
@@ -106,80 +104,105 @@ def compute_all_trial_metrics(nwb):
 
 
 def compute_bias(nwb):
+
+    # Parameters for computing bias
     n_trials_back = 5
     max_window = 200
     cv = 1
     compute_every = 10
-    BIAS_LIMIT = 10 
+    BIAS_LIMIT = 10
 
+    # Make sure trials table has been computed
     if not hasattr(nwb, "df_trials"):
         print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
         return
 
+    # extract choice and reward
     df = nwb.df_trials.copy()
-    df['choice'] = [np.nan if x ==2 else x for x in df['animal_response']] 
-    df['reward'] = [any(x) for x in zip(df['earned_reward'],df['extra_reward'])]
-    compute_on = np.arange(compute_every, len(df), compute_every)
+    df["choice"] = [np.nan if x == 2 else x for x in df["animal_response"]]
+    df["reward"] = [any(x) for x in zip(df["earned_reward"], df["extra_reward"])]
+
+    # Set up lists to store results
     bias = []
     ci_lower = []
     ci_upper = []
     C = []
+
+    # Iterate over trials and compute
+    compute_on = np.arange(compute_every, len(df), compute_every)
     for i in compute_on:
-        print(i)
-        start = np.max([0,i-max_window])
+        # Determine interval to compute on
+        start = np.max([0, i - max_window])
         end = i
-        choice = df.loc[start:end]['choice'].values 
-        reward = df.loc[start:end]['reward'].values
+
+        # extract choice and reward
+        choice = df.loc[start:end]["choice"].values
+        reward = df.loc[start:end]["reward"].values
+
+        # Determine if we have valid data to fit model
         unique = np.unique(choice[~np.isnan(choice)])
         if len(unique) == 0:
+            # no choices, report bias confidence as (-inf, +inf)
             bias.append(np.nan)
             ci_lower.append(-BIAS_LIMIT)
             ci_upper.append(BIAS_LIMIT)
             C.append(np.nan)
         elif len(unique) == 2:
-            try:
-                out = model.fit_logistic_regression(choice, reward, n_trial_back = n_trials_back, cv = cv)
-                bias.append(out['df_beta'].loc['bias']['bootstrap_mean'].values[0])
-                ci_lower.append(out['df_beta'].loc['bias']['bootstrap_CI_lower'].values[0])
-                ci_upper.append(out['df_beta'].loc['bias']['bootstrap_CI_upper'].values[0])
-                C.append(out['C'])
-            except Exception as e:
-                bias.append(np.nan)
-                ci_lower.append(-BIAS_LIMIT)
-                ci_upper.append(BIAS_LIMIT)        
-                C.append(np.nan)   
+            # Fit model
+            out = model.fit_logistic_regression(choice, reward, n_trial_back=n_trials_back, cv=cv)
+            bias.append(out["df_beta"].loc["bias"]["bootstrap_mean"].values[0])
+            ci_lower.append(out["df_beta"].loc["bias"]["bootstrap_CI_lower"].values[0])
+            ci_upper.append(out["df_beta"].loc["bias"]["bootstrap_CI_upper"].values[0])
+            C.append(out["C"])
         elif unique[0] == 0:
+            # only left choices, report bias confidence as (-inf, 0)
             bias.append(-1)
             ci_lower.append(-BIAS_LIMIT)
-            ci_upper.append(0)  
-            C.append(np.nan)             
+            ci_upper.append(0)
+            C.append(np.nan)
         elif unique[0] == 1:
+            # only right choices, report bias confidence as (0, +inf)
             bias.append(+1)
             ci_lower.append(0)
-            ci_upper.append(BIAS_LIMIT)              
+            ci_upper.append(BIAS_LIMIT)
             C.append(np.nan)
+
+    # Pack results into a dataframe
     df = pd.DataFrame()
-    df['trial'] = compute_on
-    df['bias'] = bias
-    df['ci_lower'] = ci_lower
-    df['ci_upper'] = ci_upper
-    df['C'] = C 
+    df["trial"] = compute_on
+    df["bias"] = bias
+    df["ci_lower"] = ci_lower
+    df["ci_upper"] = ci_upper
+    df["C"] = C
+
     return df
+
 
 def plot_bias(df):
     plt.figure()
-    plt.plot(df['trial'], df['bias'], 'b-', linewidth=2)
-    plt.fill_between(df['trial'], df['ci_lower'],df['ci_upper'],color='b',alpha=.25)
-    plt.axhline(0, color='k', alpha=.5)
-    plt.ylim(-1,1)
-    plt.ylabel('bias')
-    plt.xlabel('trial #')
+
+    # Plot bias and confidence interval
+    plt.plot(df["trial"], df["bias"], "b-", linewidth=2)
+    plt.fill_between(df["trial"], df["ci_lower"], df["ci_upper"], color="b", alpha=0.25)
+
+    # Clean up plot
+    plt.axhline(0, color="k", alpha=0.5)
+    plt.ylim(-1, 1)
+    plt.ylabel("bias")
+    plt.xlabel("trial #")
     ax = plt.gca()
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
 
 def add_bias(nwb):
+    # Compute bias
     df = compute_bias(nwb)
-    df = pd.merge(nwb.df_trials, df[['trial','bias']], how='left',on=['trial'])
-    df['bias'] = df['bias'].bfill().ffill()
+
+    # merge onto trials dataframe
+    df = pd.merge(nwb.df_trials, df[["trial", "bias"]], how="left", on=["trial"])
+
+    # fill in bias on non-computed trials
+    df["bias"] = df["bias"].bfill().ffill()
+
     return df
