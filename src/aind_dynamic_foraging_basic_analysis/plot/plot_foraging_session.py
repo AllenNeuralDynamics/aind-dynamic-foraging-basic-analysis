@@ -22,6 +22,18 @@ def moving_average(a, n=3):
     return ret[(n - 1) :] / n  # noqa: E203
 
 
+def plot_foraging_session_nwb(nwb):
+    '''
+        Wrapper function that extracts fields
+    '''
+    plot_foraging_session(
+        [np.nan if x ==2 else x for x in nwb.df_trials['animal_response'].values],
+        nwb.df_trials['earned_reward'].values,
+        [nwb.df_trials['reward_probabilityR'], nwb.df_trials['reward_probabilityL']],
+        bias = nwb.df_trials['bias'].values
+    )
+    
+
 def plot_foraging_session(  # noqa: C901
     choice_history: Union[List, np.ndarray],
     reward_history: Union[List, np.ndarray],
@@ -34,6 +46,7 @@ def plot_foraging_session(  # noqa: C901
     base_color: str = "y",
     ax: plt.Axes = None,
     vertical: bool = False,
+    bias: Union[List, np.ndarray] = None,
 ) -> Tuple[plt.Figure, List[plt.Axes]]:
     """Plot dynamic foraging session.
 
@@ -183,6 +196,7 @@ def plot_foraging_session(  # noqa: C901
             label="Autowater ignored",
         )
 
+
     # Base probability
     xx = np.arange(0, n_trials) + 1
     yy = p_reward_fraction
@@ -192,6 +206,7 @@ def plot_foraging_session(  # noqa: C901
         label="Base rew. prob.",
         lw=1.5,
     )
+
 
     # Smoothed choice history
     y = moving_average(choice_history, smooth_factor) / (
@@ -216,6 +231,16 @@ def plot_foraging_session(  # noqa: C901
             color="m",
             alpha=1,
             label="Finished (smooth = %g)" % smooth_factor,
+        )
+
+    # Bias
+    if bias is not None:
+        bias = (np.array(bias)+1)/(2)
+        ax_choice_reward.plot(
+            xx,
+            bias,
+            color='g',
+            lw=1.5
         )
 
     # add valid ranage
@@ -305,5 +330,6 @@ def plot_foraging_session(  # noqa: C901
         ax_reward_schedule.set(ylabel="Trial number")
 
     ax.remove()
-
+    plt.tight_layout()
+    
     return ax_choice_reward.get_figure(), [ax_choice_reward, ax_reward_schedule]
