@@ -177,30 +177,79 @@ def plot_foraging_session(  # noqa: C901
     # Rewarded trials (real foraging, autowater excluded)
     xx = np.nonzero(rewarded_excluding_autowater)[0] + 1
     yy = 0.5 + (choice_history[rewarded_excluding_autowater] - 0.5) * 1.4
-    ax_choice_reward.plot(
-        *(xx, yy) if not vertical else [*(yy, xx)],
-        "|" if not vertical else "_",
-        color="black",
-        markersize=10,
-        markeredgewidth=2,
-        label="Rewarded choices",
-    )
+    yy_temp = choice_history[rewarded_excluding_autowater]
+    yy_right = yy_temp[yy_temp > 0.5] + 0.05
+    xx_right = xx[yy_temp > 0.5]
+    yy_left = yy_temp[yy_temp < 0.5] - 0.05
+    xx_left = xx[yy_temp < 0.5]
+    if not vertical:
+        ax_choice_reward.vlines(
+            xx_right,
+            yy_right,
+            yy_right + 0.1,
+            alpha=1,
+            linewidth=1,
+            color="black",
+            label="Rewarded choices",
+        )
+        ax_choice_reward.vlines(
+            xx_left,
+            yy_left - 0.1,
+            yy_left,
+            alpha=1,
+            linewidth=1,
+            color="black",
+            label="Rewarded choices",
+        )
+    else:
+        ax_choice_reward.plot(
+            *(xx, yy) if not vertical else [*(yy, xx)],
+            "|" if not vertical else "_",
+            color="black",
+            markersize=10,
+            markeredgewidth=2,
+            label="Rewarded choices",
+        )
 
     # Unrewarded trials (real foraging; not ignored or autowater trials)
     xx = np.nonzero(unrewarded_trials)[0] + 1
     yy = 0.5 + (choice_history[unrewarded_trials] - 0.5) * 1.4
-    ax_choice_reward.plot(
-        *(xx, yy) if not vertical else [*(yy, xx)],
-        "|" if not vertical else "_",
-        color="gray",
-        markersize=6,
-        markeredgewidth=1,
-        label="Unrewarded choices",
-    )
+    yy_temp = choice_history[unrewarded_trials]
+    yy_right = yy_temp[yy_temp > 0.5]
+    xx_right = xx[yy_temp > 0.5]
+    yy_left = yy_temp[yy_temp < 0.5]
+    xx_left = xx[yy_temp < 0.5]
+    if not vertical:
+        ax_choice_reward.vlines(
+            xx_right,
+            yy_right + 0.05,
+            yy_right + 0.1,
+            alpha=1,
+            linewidth=1,
+            color="gray",
+            label="Unrewarded choices",
+        )
+        ax_choice_reward.vlines(
+            xx_left,
+            yy_left - 0.1,
+            yy_left - 0.05,
+            alpha=1,
+            linewidth=1,
+            color="gray",
+        )
+    else:
+        ax_choice_reward.plot(
+            *(xx, yy) if not vertical else [*(yy, xx)],
+            "|" if not vertical else "_",
+            color="gray",
+            markersize=6,
+            markeredgewidth=1,
+            label="Unrewarded choices",
+        )
 
     # Ignored trials
     xx = np.nonzero(ignored & ~autowater_ignored)[0] + 1
-    yy = [1.1] * sum(ignored & ~autowater_ignored)
+    yy = [1.2] * sum(ignored & ~autowater_ignored)
     ax_choice_reward.plot(
         *(xx, yy) if not vertical else [*(yy, xx)],
         "x",
@@ -334,18 +383,17 @@ def plot_foraging_session(  # noqa: C901
     ax_reward_schedule.legend(fontsize=5, ncol=1, loc="upper left", bbox_to_anchor=(0, 1))
 
     if not vertical:
-        ax_choice_reward.set_yticks([0, 1])
-        ax_choice_reward.set_yticklabels(["Left", "Right"])
+        ax_choice_reward.set_yticks([0, 1, 1.2])
+        ax_choice_reward.set_yticklabels(["Left", "Right", "Ignored"])
         ax_choice_reward.legend(fontsize=6, loc="upper left", bbox_to_anchor=(0.4, 1.3), ncol=3)
 
-        # sns.despine(trim=True, bottom=True, ax=ax_1)
         ax_choice_reward.spines["top"].set_visible(False)
         ax_choice_reward.spines["right"].set_visible(False)
         ax_choice_reward.spines["bottom"].set_visible(False)
         ax_choice_reward.tick_params(labelbottom=False)
         ax_choice_reward.xaxis.set_ticks_position("none")
+        ax_choice_reward.set_ylim([-0.15, 1.25])
 
-        # sns.despine(trim=True, ax=ax_2)
         ax_reward_schedule.set_ylim([0, 1])
         ax_reward_schedule.spines["top"].set_visible(False)
         ax_reward_schedule.spines["right"].set_visible(False)
