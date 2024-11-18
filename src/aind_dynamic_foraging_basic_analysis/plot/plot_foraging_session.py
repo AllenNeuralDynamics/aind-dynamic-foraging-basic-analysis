@@ -26,17 +26,28 @@ def plot_foraging_session_nwb(nwb, **kwargs):
     """
     Wrapper function that extracts fields
     """
-    # TODO, should check for nwb.df_trials (and return)
-    # TODO, should check for bias (and not pass it in)
-    fig, axes = plot_foraging_session(
-        [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
-        nwb.df_trials["earned_reward"].values,
-        [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
-        bias=nwb.df_trials["bias"].values,
-        bias_lower=nwb.df_trials["bias_ci_lower"].values,
-        bias_upper=nwb.df_trials["bias_ci_upper"].values,
-        **kwargs,
-    )
+
+    if not hasattr(nwb, "df_trials"):
+        print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
+        return
+
+    if "bias" not in nwb.df_trials:
+        fig, axes = plot_foraging_session(
+            [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
+            nwb.df_trials["earned_reward"].values,
+            [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
+            **kwargs,
+        )
+    else:
+        fig, axes = plot_foraging_session(
+            [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
+            nwb.df_trials["earned_reward"].values,
+            [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
+            bias=nwb.df_trials["bias"].values,
+            bias_lower=nwb.df_trials["bias_ci_lower"].values,
+            bias_upper=nwb.df_trials["bias_ci_upper"].values,
+            **kwargs,
+        )
 
     # Add some text info
     # TODO, waiting for AIND metadata to get integrated before adding this info:
@@ -262,7 +273,7 @@ def plot_foraging_session(  # noqa: C901
             )
 
     # Bias
-    if "bias" in plot_list:
+    if ("bias" in plot_list) and (bias is not None):
         bias = (np.array(bias) + 1) / (2)
         bias_lower = (np.array(bias_lower) + 1) / (2)
         bias_upper = (np.array(bias_upper) + 1) / (2)
