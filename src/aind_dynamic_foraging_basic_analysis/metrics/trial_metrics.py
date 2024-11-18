@@ -104,6 +104,13 @@ def compute_trial_metrics(nwb):
 
 
 def compute_bias(nwb):
+    '''
+        Computes side bias by fitting a logistic regression model 
+        returns trials table with the following columns:
+        bias, the side bias
+        bias_ci_lower, the lower confidence interval on the bias
+        bias_ci_upper, the uppwer confidence interval on the bias
+    '''
 
     # Parameters for computing bias
     n_trials_back = 5
