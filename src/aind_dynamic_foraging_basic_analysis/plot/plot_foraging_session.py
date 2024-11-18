@@ -26,14 +26,32 @@ def plot_foraging_session_nwb(nwb, **kwargs):
     """
     Wrapper function that extracts fields
     """
-    plot_foraging_session(
+    fig, axes = plot_foraging_session(
         [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
         nwb.df_trials["earned_reward"].values,
-        [nwb.df_trials["reward_probabilityR"], nwb.df_trials["reward_probabilityL"]],
+        [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
         bias=nwb.df_trials["bias"].values,
         bias_lower=nwb.df_trials["bias_ci_lower"].values,
         bias_upper=nwb.df_trials["bias_ci_upper"].values,
         **kwargs,
+    )
+
+    # Add some text info
+    # TODO, waiting for AIND metadata to get integrated before adding this info:
+    # {df_session.metadata.rig.iloc[0]}, {df_session.metadata.user_name.iloc[0]}\n'
+    # f'FORAGING finished {df_session.session_stats.finished_trials.iloc[0]} '
+    # f'ignored {df_session.session_stats.ignored_trials.iloc[0]} + '
+    # f'AUTOWATER collected {df_session.session_stats.autowater_collected.iloc[0]} '
+    # f'ignored {df_session.session_stats.autowater_ignored.iloc[0]}\n'
+    # f'FORAGING finished rate {df_session.session_stats.finished_rate.iloc[0]:.2%}, '
+    axes[0].text(
+        0,
+        1.05,
+        f"{nwb.session_id}\n"
+        f'Total trials {len(nwb.df_trials)}, ignored {np.sum(nwb.df_trials["animal_response"]==2)},'
+        f' left {np.sum(nwb.df_trials["animal_response"] == 0)}, right {np.sum(nwb.df_trials["animal_response"] == 1)}',
+        fontsize=8,
+        transform=axes[0].transAxes,
     )
 
 
@@ -249,6 +267,7 @@ def plot_foraging_session(  # noqa: C901
         bias_upper[bias_upper > 1] = 1
         ax_choice_reward.plot(xx, bias, color="g", lw=1.5, label="bias")
         ax_choice_reward.fill_between(xx, bias_lower, bias_upper, color="g", alpha=0.25)
+        ax_choice_reward.plot(xx, [0.5] * len(xx), color="g", linestyle="--", alpha=0.2, lw=1)
 
     # add valid ranage
     if valid_range is not None:
@@ -301,7 +320,7 @@ def plot_foraging_session(  # noqa: C901
     if not vertical:
         ax_choice_reward.set_yticks([0, 1])
         ax_choice_reward.set_yticklabels(["Left", "Right"])
-        ax_choice_reward.legend(fontsize=6, loc="upper left", bbox_to_anchor=(0, 1.25), ncol=5)
+        ax_choice_reward.legend(fontsize=6, loc="upper left", bbox_to_anchor=(0.4, 1.3), ncol=3)
 
         # sns.despine(trim=True, bottom=True, ax=ax_1)
         ax_choice_reward.spines["top"].set_visible(False)

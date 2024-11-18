@@ -338,11 +338,11 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     if "pR" in metrics:
         pR = params["metrics_bottom"] + df_trials["reward_probabilityR"]
         pR = np.repeat(pR, 2)[:-1]
-        ax.plot(go_cue_times_doubled, pR, color="r", label="pR")
+        ax.plot(go_cue_times_doubled, pR, color="b", label="pR")
     if "pL" in metrics:
         pL = params["metrics_bottom"] + df_trials["reward_probabilityL"]
         pL = np.repeat(pL, 2)[:-1]
-        ax.plot(go_cue_times_doubled, pL, color="b", label="pL")
+        ax.plot(go_cue_times_doubled, pL, color="r", label="pL")
 
     # plot metrics if they are available
     for metric in metrics:
