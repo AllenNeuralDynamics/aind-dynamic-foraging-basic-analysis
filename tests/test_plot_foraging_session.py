@@ -57,6 +57,8 @@ class TestPlotSession(unittest.TestCase):
         df["earned_reward"] = rewards
         df["reward_probabilityL"] = pL
         df["reward_probabilityR"] = pR
+        df["auto_waterL"] = [0] * 6
+        df["auto_waterR"] = [0] * 6
         nwb.df_trials = df
         nwb.session_id = "test"
         pfs.plot_foraging_session_nwb(nwb)
