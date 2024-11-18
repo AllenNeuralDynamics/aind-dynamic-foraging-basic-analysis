@@ -48,6 +48,7 @@ def plot_foraging_session_nwb(nwb, **kwargs):
             bias=nwb.df_trials["bias"].values,
             bias_lower=nwb.df_trials["bias_ci_lower"].values,
             bias_upper=nwb.df_trials["bias_ci_upper"].values,
+            autowater_offered=nwb.df_trials[["auto_waterL", "auto_waterR"]].any(axis=1),
             **kwargs,
         )
 
@@ -199,7 +200,6 @@ def plot_foraging_session(  # noqa: C901
             alpha=1,
             linewidth=1,
             color="black",
-            label="Rewarded choices",
         )
     else:
         ax_choice_reward.plot(
@@ -264,18 +264,44 @@ def plot_foraging_session(  # noqa: C901
         # Autowater offered and collected
         xx = np.nonzero(autowater_collected)[0] + 1
         yy = 0.5 + (choice_history[autowater_collected] - 0.5) * 1.4
-        ax_choice_reward.plot(
-            *(xx, yy) if not vertical else [*(yy, xx)],
-            "|" if not vertical else "_",
-            color="royalblue",
-            markersize=10,
-            markeredgewidth=2,
-            label="Autowater collected",
-        )
+
+        yy_temp = choice_history[autowater_collected]
+        yy_right = yy_temp[yy_temp > 0.5] + 0.05
+        xx_right = xx[yy_temp > 0.5]
+        yy_left = yy_temp[yy_temp < 0.5] - 0.05
+        xx_left = xx[yy_temp < 0.5]
+
+        if not vertical:
+            ax_choice_reward.vlines(
+                xx_right,
+                yy_right,
+                yy_right + 0.1,
+                alpha=1,
+                linewidth=1,
+                color="royalblue",
+                label="Autowater collected",
+            )
+            ax_choice_reward.vlines(
+                xx_left,
+                yy_left - 0.1,
+                yy_left,
+                alpha=1,
+                linewidth=1,
+                color="royalblue",
+            )
+        else:
+            ax_choice_reward.plot(
+                *(xx, yy) if not vertical else [*(yy, xx)],
+                "|" if not vertical else "_",
+                color="royalblue",
+                markersize=10,
+                markeredgewidth=2,
+                label="Autowater collected",
+            )
 
         # Also highlight the autowater offered but still ignored
         xx = np.nonzero(autowater_ignored)[0] + 1
-        yy = [1.1] * sum(autowater_ignored)
+        yy = [1.2] * sum(autowater_ignored)
         ax_choice_reward.plot(
             *(xx, yy) if not vertical else [*(yy, xx)],
             "x",
