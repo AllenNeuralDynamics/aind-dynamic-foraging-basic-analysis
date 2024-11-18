@@ -7,7 +7,6 @@
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
 import aind_dynamic_foraging_models.logistic_regression.model as model
 
