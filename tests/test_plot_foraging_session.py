@@ -8,10 +8,18 @@ import os
 import unittest
 
 import numpy as np
+import pandas as pd
 
 from aind_dynamic_foraging_basic_analysis import plot_foraging_session
+import aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session as pfs
 from tests.nwb_io import get_history_from_nwb
 
+class EmptyNWB:
+    """
+    Just an empty class for saving attributes to
+    """
+
+    pass
 
 class TestPlotSession(unittest.TestCase):
     """Test plot session"""
@@ -28,6 +36,31 @@ class TestPlotSession(unittest.TestCase):
             cls.autowater_offered,
             _,
         ) = get_history_from_nwb(nwb_file)
+
+    def test_nwb_wrapper(self):
+        # Test we have df_trials
+        nwb = EmptyNWB()
+        pfs.plot_foraging_session_nwb(nwb)
+
+        # Test without bias column
+        choices = np.array([0,0,1,1,2,2])
+        rewards = np.array([True, False, True, False, False, False])
+        pL = [0.1]*6
+        pR = [0.8]*6
+        df = pd.DataFrame()
+        df['animal_response'] = choices
+        df['earned_reward'] = rewards
+        df['reward_probabilityL'] = pL
+        df['reward_probabilityR'] = pR
+        nwb.df_trials = df
+        nwb.session_id ='test'
+        pfs.plot_foraging_session_nwb(nwb)
+    
+        # Test with bias column
+        nwb.df_trials['bias'] = np.array([0,0,.1,.1,.05,.05])
+        nwb.df_trials['bias_ci_lower'] = np.array([0]*6)       
+        nwb.df_trials['bias_ci_upper'] = np.array([.2]*6)              
+        pfs.plot_foraging_session_nwb(nwb)
 
     def test_plot_session(self):
         """Test plot real session"""
