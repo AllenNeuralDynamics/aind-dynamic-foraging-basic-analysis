@@ -150,7 +150,9 @@ def compute_bias(nwb):
             C.append(np.nan)
         elif len(unique) == 2:
             # Fit model
-            out = model.fit_logistic_regression(choice, reward, n_trial_back=n_trials_back, cv=cv)
+            out = model.fit_logistic_regression(
+                choice, reward, n_trial_back=n_trials_back, cv=cv, fit_exponential=False
+            )
             bias.append(out["df_beta"].loc["bias"]["bootstrap_mean"].values[0])
             ci_lower.append(out["df_beta"].loc["bias"]["bootstrap_CI_lower"].values[0])
             ci_upper.append(out["df_beta"].loc["bias"]["bootstrap_CI_upper"].values[0])
