@@ -31,51 +31,55 @@ def compute_trial_metrics(nwb):
         print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
         return
 
-    df = nwb.df_trials.copy()
+    df_trials = nwb.df_trials.copy()
 
-    df["RESPONDED"] = [x in [0, 1] for x in df["animal_response"].values]
+    df_trials["RESPONDED"] = [x in [0, 1] for x in df_trials["animal_response"].values]
     # Rolling fraction of goCues with a response
-    df["response_rate"] = (
-        df["RESPONDED"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["response_rate"] = (
+        df_trials["RESPONDED"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Rolling fraction of goCues with a response
-    df["gocue_reward_rate"] = (
-        df["earned_reward"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["gocue_reward_rate"] = (
+        df_trials["earned_reward"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Rolling fraction of responses with a response
-    df["RESPONSE_REWARD"] = [
-        x[0] if x[1] else np.nan for x in zip(df["earned_reward"], df["RESPONDED"])
+    df_trials["RESPONSE_REWARD"] = [
+        x[0] if x[1] else np.nan for x in zip(df_trials["earned_reward"], df_trials["RESPONDED"])
     ]
-    df["response_reward_rate"] = (
-        df["RESPONSE_REWARD"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["response_reward_rate"] = (
+        df_trials["RESPONSE_REWARD"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Rolling fraction of choosing right
-    df["WENT_RIGHT"] = [x if x in [0, 1] else np.nan for x in df["animal_response"]]
-    df["choose_right_rate"] = (
-        df["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["WENT_RIGHT"] = [x if x in [0, 1] else np.nan for x in df_trials["animal_response"]]
+    df_trials["choose_right_rate"] = (
+        df_trials["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Rolling reward probability for best option
-    df["IDEAL_OBSERVER_REWARD_PROB"] = df[["reward_probabilityR", "reward_probabilityL"]].max(
-        axis=1
-    )
-    df["ideal_observer_reward_rate"] = (
-        df["IDEAL_OBSERVER_REWARD_PROB"]
+    df_trials["IDEAL_OBSERVER_REWARD_PROB"] = df_trials[
+        ["reward_probabilityR", "reward_probabilityL"]
+    ].max(axis=1)
+    df_trials["ideal_observer_reward_rate"] = (
+        df_trials["IDEAL_OBSERVER_REWARD_PROB"]
         .rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True)
         .mean()
     )
 
     # Rolling reward probability for best option with baiting
-    if "bait_left" in df:
-        df["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"] = [
+    if "bait_left" in df_trials:
+        df_trials["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"] = [
             1 if (x[0] or x[1]) else x[2]
-            for x in zip(df["bait_left"], df["bait_right"], df["IDEAL_OBSERVER_REWARD_PROB"])
+            for x in zip(
+                df_trials["bait_left"],
+                df_trials["bait_right"],
+                df_trials["IDEAL_OBSERVER_REWARD_PROB"],
+            )
         ]
-        df["ideal_observer_reward_rate_with_baiting"] = (
-            df["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"]
+        df_trials["ideal_observer_reward_rate_with_baiting"] = (
+            df_trials["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"]
             .rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True)
             .mean()
         )
@@ -98,9 +102,9 @@ def compute_trial_metrics(nwb):
         "IDEAL_OBSERVER_REWARD_PROB",
         "IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING",
     ]
-    df = df.drop(columns=drop_cols)
+    df_trials = df_trials.drop(columns=drop_cols)
 
-    return df
+    return df_trials
 
 
 def compute_bias(nwb):
@@ -125,9 +129,11 @@ def compute_bias(nwb):
         return
 
     # extract choice and reward
-    df = nwb.df_trials.copy()
-    df["choice"] = [np.nan if x == 2 else x for x in df["animal_response"]]
-    df["reward"] = [any(x) for x in zip(df["earned_reward"], df["extra_reward"])]
+    df_trials = nwb.df_trials.copy()
+    df_trials["choice"] = [np.nan if x == 2 else x for x in df_trials["animal_response"]]
+    df_trials["reward"] = [
+        any(x) for x in zip(df_trials["earned_reward"], df_trials["extra_reward"])
+    ]
 
     # Set up lists to store results
     bias = []
@@ -136,15 +142,15 @@ def compute_bias(nwb):
     C = []
 
     # Iterate over trials and compute
-    compute_on = np.arange(compute_every, len(df), compute_every)
+    compute_on = np.arange(compute_every, len(df_trials), compute_every)
     for i in compute_on:
         # Determine interval to compute on
         start = np.max([0, i - max_window])
         end = i
 
         # extract choice and reward
-        choice = df.loc[start:end]["choice"].values
-        reward = df.loc[start:end]["reward"].values
+        choice = df_trials.loc[start:end]["choice"].values
+        reward = df_trials.loc[start:end]["reward"].values
 
         # Determine if we have valid data to fit model
         unique = np.unique(choice[~np.isnan(choice)])
