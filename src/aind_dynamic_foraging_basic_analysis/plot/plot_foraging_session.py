@@ -39,6 +39,8 @@ def plot_foraging_session_nwb(nwb, **kwargs):
             **kwargs,
         )
     else:
+        if "plot_list" not in kwargs:
+            kwargs["plot_list"] = ["choice", "finished", "reward_prob", "bias"]
         fig, axes = plot_foraging_session(
             [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
             nwb.df_trials["earned_reward"].values,
@@ -46,7 +48,6 @@ def plot_foraging_session_nwb(nwb, **kwargs):
             bias=nwb.df_trials["bias"].values,
             bias_lower=nwb.df_trials["bias_ci_lower"].values,
             bias_upper=nwb.df_trials["bias_ci_upper"].values,
-            plot_list=["bias"],
             **kwargs,
         )
 
