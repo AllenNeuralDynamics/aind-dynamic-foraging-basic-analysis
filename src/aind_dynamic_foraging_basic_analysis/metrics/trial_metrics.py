@@ -1,6 +1,7 @@
 """
     Tools for computing trial by trial metrics
-    df_trials = compute_all_trial_metrics(nwb)
+    df_trials = compute_trial_metrics(nwb)
+    df_trials = compute_bias(nwb)
 
 """
 
@@ -15,9 +16,9 @@ WIN_DUR = 15
 MIN_EVENTS = 2
 
 
-def compute_all_trial_metrics(nwb):
+def compute_trial_metrics(nwb):
     """
-    Computes all trial by trial metrics
+    Computes trial by trial metrics
 
     response_rate,          fraction of trials with a response
     gocue_reward_rate,      fraction of trials with a reward
@@ -175,9 +176,21 @@ def compute_bias(nwb):
     df["ci_upper"] = ci_upper
     df["C"] = C
 
-    return df
+    # merge onto trials dataframe
+    df_trials = pd.merge(
+        nwb.df_trials.drop(columns=["bias"], errors="ignore"),
+        df[["trial", "bias"]],
+        how="left",
+        on=["trial"],
+    )
+
+    # fill in bias on non-computed trials
+    df_trials["bias"] = df_trials["bias"].bfill().ffill()
+
+    return df_trials
 
 
+# TODO, remove this. Just for debugging
 def plot_bias(df):
     plt.figure()
 
@@ -193,16 +206,3 @@ def plot_bias(df):
     ax = plt.gca()
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-
-
-def add_bias(nwb):
-    # Compute bias
-    df = compute_bias(nwb)
-
-    # merge onto trials dataframe
-    df = pd.merge(nwb.df_trials, df[["trial", "bias"]], how="left", on=["trial"])
-
-    # fill in bias on non-computed trials
-    df["bias"] = df["bias"].bfill().ffill()
-
-    return df
