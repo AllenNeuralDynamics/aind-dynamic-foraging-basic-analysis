@@ -174,37 +174,21 @@ def compute_bias(nwb):
     df = pd.DataFrame()
     df["trial"] = compute_on
     df["bias"] = bias
-    df["ci_lower"] = ci_lower
-    df["ci_upper"] = ci_upper
-    df["C"] = C
+    df["bias_ci_lower"] = ci_lower
+    df["bias_ci_upper"] = ci_upper
+    df["bias_C"] = C
 
     # merge onto trials dataframe
     df_trials = pd.merge(
-        nwb.df_trials.drop(columns=["bias"], errors="ignore"),
-        df[["trial", "bias"]],
+        nwb.df_trials.drop(columns=["bias", "bias_ci_lower", "bias_ci_upper"], errors="ignore"),
+        df[["trial", "bias", "bias_ci_lower", "bias_ci_upper"]],
         how="left",
         on=["trial"],
     )
 
     # fill in bias on non-computed trials
     df_trials["bias"] = df_trials["bias"].bfill().ffill()
+    df_trials["bias_ci_lower"] = df_trials["bias_ci_lower"].bfill().ffill()
+    df_trials["bias_ci_upper"] = df_trials["bias_ci_upper"].bfill().ffill()
 
     return df_trials
-
-
-# TODO, remove this. Just for debugging
-def plot_bias(df):
-    plt.figure()
-
-    # Plot bias and confidence interval
-    plt.plot(df["trial"], df["bias"], "b-", linewidth=2)
-    plt.fill_between(df["trial"], df["ci_lower"], df["ci_upper"], color="b", alpha=0.25)
-
-    # Clean up plot
-    plt.axhline(0, color="k", alpha=0.5)
-    plt.ylim(-1, 1)
-    plt.ylabel("bias")
-    plt.xlabel("trial #")
-    ax = plt.gca()
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
