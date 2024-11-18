@@ -27,6 +27,85 @@ To develop the code, run
 pip install -e .[dev]
 ```
 
+## Usage
+### Annotate licks
+To create a dataframe of licks that has been annotated with licking bout starts/stops, cue responsive licks, reward triggered licks, and intertrial choices.
+```
+import aind_dynamic_foraging_basic_analysis.licks.annotation as annotation
+df_licks = annotation.annotate_licks(nwb)
+```
+
+You can then plot interlick interval analyses with:
+```
+import aind_dynamic_foraging_basic_analysis.licks.plot_interlick_interval as pii
+
+#Plot interlick interval of all licks
+pii.plot_interlick_interval(df_licks)
+
+#plot interlick interval for left and right licks separately
+pii.plot_interlick_interval(df_licks, categories='event')
+```
+
+### Create lick analysis report
+To create a figure with several licking pattern analyses:
+
+```
+import aind_dynamic_foraging_basic_analysis.licks.lick_analysis as lick_analysis
+lick_analysis.plot_lick_analysis(nwb)
+```
+
+### Compute trial by trial metrics
+To annotate the trials dataframe with trial by trial metrics:
+
+```
+import aind_dynamic_foraging_basic_analysis.metrics.trial_metrics as tm
+df_trials = tm.compute_all_trial_metrics(nwb)
+```
+
+### Plot interactive session scroller
+```
+import aind_dynamic_foraging_basic_analysis.plot.plot_session_scroller as pss
+pss.plot_session_scroller(nwb)
+```
+
+To disable lick bout and other annotations:
+```
+pss.plot_session_scroller(nwb,plot_bouts=False)
+```
+
+This function will automatically plot FIP data if available. To change the processing method plotted use:
+```
+pss.plot_session_scroller(nwb, processing="bright")
+```
+
+To change which trial by trial metrics plotted:
+```
+pss.plot_session_scroller(nwb, metrics=['response_rate'])
+```
+
+### Plot FIP PSTH
+You can use the `plot_fip` module to compute and plot PSTHs for the FIP data. 
+
+To compare one channel to multiple event types
+```
+from aind_dynamic_foraging_basic_analysis.plot import plot_fip as pf
+channel = 'G_1_dff-poly'
+rewarded_go_cues = nwb.df_trials.query('earned_reward == 1')['goCue_start_time_in_session'].values
+unrewarded_go_cues = nwb.df_trials.query('earned_reward == 0')['goCue_start_time_in_session'].values
+pf.plot_fip_psth_compare_alignments(
+    nwb, 
+    {'rewarded goCue':rewarded_go_cues,'unrewarded goCue':unrewarded_go_cues}, 
+    channel, 
+    censor=True
+    )
+```
+
+To compare multiple channels to the same event type:
+```
+pf.plot_fip_psth(nwb, 'goCue_start_time')
+```
+
+
 ## Contributing
 
 ### Linters and testing
