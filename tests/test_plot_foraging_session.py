@@ -40,6 +40,9 @@ class TestPlotSession(unittest.TestCase):
         ) = get_history_from_nwb(nwb_file)
 
     def test_nwb_wrapper(self):
+        """
+        Test wrapper function that plots foraging session from nwb file
+        """
         # Test we have df_trials
         nwb = EmptyNWB()
         pfs.plot_foraging_session_nwb(nwb)
