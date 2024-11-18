@@ -141,6 +141,20 @@ class TestPlotSession(unittest.TestCase):
             bbox_inches="tight",
         )
 
+        fig, _ = plot_foraging_session(
+            choice_history=self.choice_history,
+            reward_history=self.reward_history,
+            p_reward=self.p_reward,
+            autowater_offered=np.array([0] * len(self.choice_history)),
+            fitted_data=None,
+            photostim=None,  # trial, power, s_type
+            valid_range=None,
+            smooth_factor=5,
+            base_color="y",
+            ax=None,
+            vertical=True,
+        )
+
     def test_plot_session_wrong_format(self):
         """Some wrong input format"""
         with self.assertRaises(ValueError):
