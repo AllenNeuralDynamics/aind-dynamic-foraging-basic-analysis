@@ -26,6 +26,8 @@ def plot_foraging_session_nwb(nwb, **kwargs):
     """
     Wrapper function that extracts fields
     """
+    # TODO, should check for nwb.df_trials (and return)
+    # TODO, should check for bias (and not pass it in)
     fig, axes = plot_foraging_session(
         [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
         nwb.df_trials["earned_reward"].values,
