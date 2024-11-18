@@ -18,7 +18,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     nwb,
     ax=None,
     fig=None,
-    plot_bouts=False,
+    plot_bouts=True,
     processing="bright",
     metrics=["pR", "pL", "response_rate"],
 ):
