@@ -103,7 +103,7 @@ def compute_trial_metrics(nwb):
     return df
 
 
-def compute_bias(nwb):
+def compute_bias(nwb,n_trials_back=5,max_window=200, compute_every=10):
     """
     Computes side bias by fitting a logistic regression model
     returns trials table with the following columns:
@@ -113,10 +113,7 @@ def compute_bias(nwb):
     """
 
     # Parameters for computing bias
-    n_trials_back = 5
-    max_window = 200
     cv = 1
-    compute_every = 10
     BIAS_LIMIT = 10
 
     # Make sure trials table has been computed
@@ -196,5 +193,9 @@ def compute_bias(nwb):
     df_trials["bias"] = df_trials["bias"].bfill().ffill()
     df_trials["bias_ci_lower"] = df_trials["bias_ci_lower"].bfill().ffill()
     df_trials["bias_ci_upper"] = df_trials["bias_ci_upper"].bfill().ffill()
+    df_trials = df_trials.rename(columns={
+        'bias':'bias_{}_{}_{}'.format(n_trials_back,max_window,compute_every),
+        'bias_ci_lower':'bias_ci_lower_{}_{}_{}'.format(n_trials_back,max_window,compute_every),
+        'bias_ci_upper':'bias_ci_upper_{}_{}_{}'.format(n_trials_back,max_window,compute_every)})
 
     return df_trials

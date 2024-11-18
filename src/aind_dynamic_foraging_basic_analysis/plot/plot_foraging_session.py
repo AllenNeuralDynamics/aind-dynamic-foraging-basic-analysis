@@ -22,7 +22,7 @@ def moving_average(a, n=3):
     return ret[(n - 1) :] / n  # noqa: E203
 
 
-def plot_foraging_session_nwb(nwb, **kwargs):
+def plot_foraging_session_nwb(nwb, bias_types = [], **kwargs):
     """
     Wrapper function that extracts fields
     """
@@ -69,7 +69,21 @@ def plot_foraging_session_nwb(nwb, **kwargs):
         fontsize=8,
         transform=axes[0].transAxes,
     )
-
+    colors = ['g','b','r','m']
+    xx = np.arange(0, len(nwb.df_trials)) + 1
+    for i,bias_type in enumerate(bias_types):
+        bias = nwb.df_trials['bias_'+bias_type]
+        bias_lower = nwb.df_trials['bias_ci_lower_'+bias_type]
+        bias_upper = nwb.df_trials['bias_ci_upper_'+bias_type]
+        bias = (np.array(bias) + 1) / (2)
+        bias_lower = (np.array(bias_lower) + 1) / (2)
+        bias_upper = (np.array(bias_upper) + 1) / (2)
+        bias_lower[bias_lower < 0] = 0
+        bias_upper[bias_upper > 1] = 1
+        axes[0].plot(xx, bias, color=colors[i], lw=1.5, label=bias_type)
+        axes[0].fill_between(xx, bias_lower, bias_upper, color=colors[i], alpha=0.25)
+        axes[0].plot(xx, [0.5] * len(xx), color=colors[i], linestyle="--", alpha=0.2, lw=1)
+    axes[0].legend(fontsize=6, loc="upper left", bbox_to_anchor=(0.4, 1.3), ncol=3)
 
 def plot_foraging_session(  # noqa: C901
     choice_history: Union[List, np.ndarray],
