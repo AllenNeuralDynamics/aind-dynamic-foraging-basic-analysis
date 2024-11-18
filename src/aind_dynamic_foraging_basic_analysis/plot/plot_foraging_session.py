@@ -46,6 +46,7 @@ def plot_foraging_session_nwb(nwb, **kwargs):
             bias=nwb.df_trials["bias"].values,
             bias_lower=nwb.df_trials["bias_ci_lower"].values,
             bias_upper=nwb.df_trials["bias_ci_upper"].values,
+            plot_list=["bias"],
             **kwargs,
         )
 
