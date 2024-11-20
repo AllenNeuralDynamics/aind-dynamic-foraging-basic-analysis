@@ -21,25 +21,6 @@ def moving_average(a, n=3):
     ret[n:] = ret[n:] - ret[:-n]
     return ret[(n - 1) :] / n  # noqa: E203
 
-def plot_foraging_lifetime(lifetime_df_trials):
-    '''
-        Takes a dataframe of the aggregate for all sessions from this animal
-        
-    '''
-    fig, ax = plt.subplots(2,1,figsize=(8,4))
-    
-    ax[0].plot(nwb.df_trials['bias'],'g',label='bias')
-    ax[0].axhline(0, linestyle='--',color='k',alpha=.25)
-    ax[0].set_ylabel('bias')
-    ax[0].set_ylim(-1,1)
-    ax[1].plot(nwb.df_trials['lickspout_position_z']-nwb.df_trials['lickspout_position_z'].values[0],'k',label='z')
-    ax[1].plot(nwb.df_trials['lickspout_position_y']-nwb.df_trials['lickspout_position_y'].values[0],'r',label='y')
-    ax[1].plot(nwb.df_trials['lickspout_position_x']-nwb.df_trials['lickspout_position_x'].values[0],'b',label='x')
-    ax[1].set_ylabel('$\Delta$ lickspout')
-    ax[1].legend()
-    ax[1].set_xlabel('Trial #')
-    plt.tight_layout()
-
 
 def plot_foraging_session_nwb(nwb, **kwargs):
     """
