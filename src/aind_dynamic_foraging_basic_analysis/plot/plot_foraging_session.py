@@ -16,7 +16,9 @@ from aind_dynamic_foraging_basic_analysis.plot.style import PHOTOSTIM_EPOCH_MAPP
 
 
 def moving_average(a, n=3):
-    """Compute moving average of a list or array."""
+    """
+    Compute moving average of a list or array.
+    """
     ret = np.nancumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[(n - 1) :] / n  # noqa: E203
