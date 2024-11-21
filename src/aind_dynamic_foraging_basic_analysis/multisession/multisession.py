@@ -12,7 +12,6 @@ import aind_dynamic_foraging_basic_analysis.metrics.trial_metrics as tm
 Make specification for multisession trials df
 Make some capsule to generate them, and make data assets, what metadata?
 Add axis for licking/rewards
-make bias/lickspout plots dynamically loaded
 Investigate why some sessions crash on bias computation
 Add some indicator for missing session
 """
@@ -49,7 +48,7 @@ def make_multisession_trials_df(nwb_list, DATA_DIR, AGG_DIR):
 def plot_foraging_lifetime(lifetime_df, plot_list=["bias", "lickspout_position"]):
     """
     Takes a dataframe of the aggregate for all sessions from this animal
-
+    
     """
 
     # Ensure dataframe is sorted by session then trial
@@ -58,11 +57,14 @@ def plot_foraging_lifetime(lifetime_df, plot_list=["bias", "lickspout_position"]
     df["lifetime_trial"] = df.reset_index().index
 
     # Set up figure
-    fig, ax = plt.subplots(len(plot_list), 1, figsize=(14, 2 * len(plot_list)), sharex=True)
+    fig, ax = plt.subplots(len(plot_list)+1, 1, figsize=(14, 2 * (1+len(plot_list))), sharex=True)
+
+    # Plot basic behavior
+    plot_foraging_behavior(ax[0],df)
 
     # Plot each element
     for index, plot in enumerate(plot_list):
-        plot_foraging_lifetime_inner(ax[index], plot, df)
+        plot_foraging_lifetime_inner(ax[index+1], plot, df)
 
     # Add session breaks to each axis
     session_breaks = list(df.query("trial == 0")["lifetime_trial"].values - 0.5) + [
@@ -88,6 +90,8 @@ def plot_foraging_lifetime(lifetime_df, plot_list=["bias", "lickspout_position"]
     plt.suptitle(df["ses_idx"].values[0].split("_")[0])
     plt.tight_layout()
 
+    # Add interactive scrolling
+    xhome = ax[0].get_xlim()
     def on_key_press(event):
         """
         Define interaction resonsivity
@@ -108,10 +112,131 @@ def plot_foraging_lifetime(lifetime_df, plot_list=["bias", "lickspout_position"]
         elif event.key == "down":
             xmin += xStep * (2 / 3)
             xmax -= xStep * (2 / 3)
+        elif event.key == 'h':
+            xmin = xhome[0]
+            xmax = xhome[1]
         ax[0].set_xlim(xmin, xmax)
         plt.draw()
-
     kpid = fig.canvas.mpl_connect("key_press_event", on_key_press)  # noqa: F841
+
+def plot_foraging_behavior(ax, df):
+
+    # Grab data
+    choice_history =np.array([np.nan if x == 2 else x for x in df["animal_response"].values])
+    reward_history = df["earned_reward"].values
+    p_reward = [df["reward_probabilityL"], df["reward_probabilityR"]]
+    autowater_offered=df[["auto_waterL", "auto_waterR"]].any(axis=1)
+
+    # Compute things
+    ignored = np.isnan(choice_history)
+    rewarded_excluding_autowater = reward_history & ~autowater_offered
+    autowater_collected = autowater_offered & ~ignored
+    autowater_ignored = autowater_offered & ignored
+    unrewarded_trials = ~reward_history & ~ignored & ~autowater_offered
+
+
+    # Mark unrewarded trials
+    xx = np.nonzero(unrewarded_trials)[0] + 1
+    yy_temp = choice_history[unrewarded_trials]
+    yy_right = yy_temp[yy_temp > 0.5]
+    xx_right = xx[yy_temp > 0.5]
+    yy_left = yy_temp[yy_temp < 0.5] + 1
+    xx_left = xx[yy_temp < 0.5]
+    ax.vlines(
+        xx_right,
+        yy_right + 0.05,
+        yy_right + 0.1,
+        alpha=1,
+        linewidth=1,
+        color="gray",
+        label="Unrewarded choices",
+    )
+    ax.vlines(
+        xx_left,
+        yy_left - 0.1,
+        yy_left - 0.05,
+        alpha=1,
+        linewidth=1,
+        color="gray",
+    )
+
+    # Rewarded trials (real foraging, autowater excluded)
+    xx = np.nonzero(rewarded_excluding_autowater)[0] + 1
+    yy_temp = choice_history[rewarded_excluding_autowater]
+    yy_right = yy_temp[yy_temp > 0.5] + 0.05
+    xx_right = xx[yy_temp > 0.5]
+    yy_left = yy_temp[yy_temp < 0.5] - 0.05 + 1
+    xx_left = xx[yy_temp < 0.5]
+    ax.vlines(
+        xx_right,
+        yy_right,
+        yy_right + 0.1,
+        alpha=1,
+        linewidth=1,
+        color="black",
+        label="Rewarded choices",
+    )
+    ax.vlines(
+        xx_left,
+        yy_left - 0.1,
+        yy_left,
+        alpha=1,
+        linewidth=1,
+        color="black",
+    )
+
+    # Ignored trials
+    xx = np.nonzero(ignored & ~autowater_ignored)[0] + 1
+    yy = [1] * sum(ignored & ~autowater_ignored)
+    ax.plot(
+        *(xx, yy) ,
+        "x",
+        color="red",
+        markersize=3,
+        markeredgewidth=0.5,
+        label="Ignored",
+    )
+
+    # Autowater offered and collected
+    xx = np.nonzero(autowater_collected)[0] + 1
+    yy_temp = choice_history[autowater_collected]
+    yy_right = yy_temp[yy_temp > 0.5] + 0.05
+    xx_right = xx[yy_temp > 0.5]
+    yy_left = yy_temp[yy_temp < 0.5] - 0.05 + 1
+    xx_left = xx[yy_temp < 0.5]
+    ax.vlines(
+        xx_right,
+        yy_right,
+        yy_right + 0.1,
+        alpha=1,
+        linewidth=1,
+        color="royalblue",
+        label="Autowater collected",
+    )
+    ax.vlines(
+        xx_left,
+        yy_left - 0.1,
+        yy_left,
+        alpha=1,
+        linewidth=1,
+        color="royalblue",
+    )
+    
+    # Also highlight the autowater offered but still ignored
+    xx = np.nonzero(autowater_ignored)[0] + 1
+    yy = [1] * sum(autowater_ignored)
+    ax.plot(
+        *(xx, yy) ,
+        "x",
+        color="royalblue",
+        markersize=3,
+        markeredgewidth=0.5,
+        label="Autowater ignored",
+    )
+    
+    ax.set_yticks([.9,1,1.1])
+    ax.set_yticklabels(['Left','Ignored','Right'])
+
 
 
 def plot_foraging_lifetime_inner(ax, plot, df):
@@ -119,6 +244,8 @@ def plot_foraging_lifetime_inner(ax, plot, df):
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
+    # some metrics have special formatting
+    # otherwise we just plot the metric
     if plot == "bias":
         ax.plot(df["lifetime_trial"], df["bias"], label="bias")
         ax.axhline(0, linestyle="--", color="k", alpha=0.25)
