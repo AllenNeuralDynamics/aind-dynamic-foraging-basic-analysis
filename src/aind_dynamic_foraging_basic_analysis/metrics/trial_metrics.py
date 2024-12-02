@@ -12,7 +12,8 @@ MIN_EVENTS = 2
 
 LEFT, RIGHT, IGNORE = 0, 1, 2
 
-def compute_all_trial_metrics(nwb):
+
+def compute_trial_metrics(nwb):
     """
     Computes all trial by trial metrics
 
@@ -35,112 +36,144 @@ def compute_all_trial_metrics(nwb):
         print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
         return
 
-    df = nwb.df_trials.copy()
+    df_trials = nwb.df_trials.copy()
 
     # --- Add reward-related columns ---
-    df['reward'] = False
-    df.loc[(df.rewarded_historyL | df.rewarded_historyR
-            | df.auto_waterR | df.auto_waterL 
-            & (df.animal_response != IGNORE)) > 0, 'reward'] = True
-    
-    df['reward_non_autowater'] = False
-    df.loc[(df.rewarded_historyL | df.rewarded_historyR), 'reward_non_autowater'] = True
-    
-    df['non_autowater_trial'] = False
-    df.loc[(df.auto_waterL==0) & (df.auto_waterR==0), 'non_autowater_trial'] = True
-    
-    df['non_autowater_finished_trial'] = df['non_autowater_trial'] & (df['animal_response'] != IGNORE)
-    df['ignored_non_autowater'] = df['non_autowater_trial'] & (df['animal_response'] == IGNORE)
-    df['ignored_autowater'] = ~df['non_autowater_trial'] & (df['animal_response'] == IGNORE)
-    
-    # --- Lick-related stats ---    
-    all_left_licks = nwb.acquisition['left_lick_time'].timestamps[:]
-    all_right_licks = nwb.acquisition['right_lick_time'].timestamps[:]
-    
+    df_trials["reward"] = False
+    df_trials.loc[
+        (
+            df_trials.rewarded_historyL
+            | df_trials.rewarded_historyR
+            | df_trials.auto_waterR
+            | df_trials.auto_waterL
+        )
+        & (df_trials.animal_response != IGNORE),
+        "reward",
+    ] = True
+
+    df_trials["reward_non_autowater"] = False
+    df_trials.loc[
+        (df_trials.rewarded_historyL | df_trials.rewarded_historyR), "reward_non_autowater"
+    ] = True
+
+    df_trials["non_autowater_trial"] = False
+    df_trials.loc[
+        (df_trials.auto_waterL == 0) & (df_trials.auto_waterR == 0), "non_autowater_trial"
+    ] = True
+
+    df_trials["non_autowater_finished_trial"] = df_trials["non_autowater_trial"] & (
+        df_trials["animal_response"] != IGNORE
+    )
+    df_trials["ignored_non_autowater"] = df_trials["non_autowater_trial"] & (
+        df_trials["animal_response"] == IGNORE
+    )
+    df_trials["ignored_autowater"] = ~df_trials["non_autowater_trial"] & (
+        df_trials["animal_response"] == IGNORE
+    )
+
+    # --- Lick-related stats ---
+    all_left_licks = nwb.acquisition["left_lick_time"].timestamps[:]
+    all_right_licks = nwb.acquisition["right_lick_time"].timestamps[:]
+
     # Define the start and stop time for each epoch
-    # Use _in_session columns
+    # Using _in_session columns
     lick_stats_epochs = {
-        'gocue_stop': ['goCue_start_time_in_session', 'stop_time_in_session'],
-        'delay_period': ['delay_start_time_in_session', 'goCue_start_time_in_session'],
-        'iti': ['start_time_in_session', 'delay_start_time_in_session'],        
+        "gocue_stop": ["goCue_start_time_in_session", "stop_time_in_session"],
+        "delay_period": ["delay_start_time_in_session", "goCue_start_time_in_session"],
+        "iti": ["start_time_in_session", "delay_start_time_in_session"],
     }
-    
+
     # Trial-by-trial counts
-    for i in range(len(df)):
+    for i in range(len(df_trials)):
         for epoch_name, (start_time_name, stop_time_name) in lick_stats_epochs.items():
-            start_time, stop_time = df.loc[i, [start_time_name, stop_time_name]]
-            
+            start_time, stop_time = df_trials.loc[i, [start_time_name, stop_time_name]]
+
             # Lick analysis for the specific epoch
-            left_licks = all_left_licks[(all_left_licks > start_time) & (all_left_licks < stop_time)]
-            right_licks = all_right_licks[(all_right_licks > start_time) & (all_right_licks < stop_time)]
+            left_licks = all_left_licks[
+                (all_left_licks > start_time) & (all_left_licks < stop_time)
+            ]
+            right_licks = all_right_licks[
+                (all_right_licks > start_time) & (all_right_licks < stop_time)
+            ]
             all_licks = np.hstack([left_licks, right_licks])
-            
+
             # Lick counts
-            df.loc[i, f'duration_{epoch_name}'] = stop_time - start_time
-            df.loc[i, f'n_lick_left_{epoch_name}'] = len(left_licks)
-            df.loc[i, f'n_lick_right_{epoch_name}'] = len(right_licks)
-            df.loc[i, f'n_lick_all_{epoch_name}'] = len(all_licks)
-            
+            df_trials.loc[i, f"duration_{epoch_name}"] = stop_time - start_time
+            df_trials.loc[i, f"n_lick_left_{epoch_name}"] = len(left_licks)
+            df_trials.loc[i, f"n_lick_right_{epoch_name}"] = len(right_licks)
+            df_trials.loc[i, f"n_lick_all_{epoch_name}"] = len(all_licks)
+
             # Lick switches
             if len(all_licks) > 1:
-                _lick_identity = np.hstack([np.ones(len(left_licks)) * LEFT, np.ones(len(right_licks)) * RIGHT])
-                _lick_identity_sorted = [x for x, _ in sorted(zip(_lick_identity, all_licks), key=lambda pairs: pairs[1])]
-                df.loc[i, f'n_lick_switches_{epoch_name}'] = np.sum(np.diff(_lick_identity_sorted) != 0)
-                
+                _lick_identity = np.hstack(
+                    [np.ones(len(left_licks)) * LEFT, np.ones(len(right_licks)) * RIGHT]
+                )
+                _lick_identity_sorted = [
+                    x for x, _ in sorted(zip(_lick_identity, all_licks), key=lambda pairs: pairs[1])
+                ]
+                df_trials.loc[i, f"n_lick_switches_{epoch_name}"] = np.sum(
+                    np.diff(_lick_identity_sorted) != 0
+                )
+
                 # Lick consistency
-                choice = df.loc[i, 'animal_response']
-                df.loc[i, f'n_lick_consistency_{epoch_name}'] = (
+                choice = df_trials.loc[i, "animal_response"]
+                df_trials.loc[i, f"n_lick_consistency_{epoch_name}"] = (
                     np.sum(_lick_identity_sorted == choice) / len(_lick_identity_sorted)
-                    if len(_lick_identity_sorted) > 0 else np.nan
+                    if len(_lick_identity_sorted) > 0
+                    else np.nan
                 )
             else:
-                df.loc[i, f'n_lick_switches_{epoch_name}'] = 0
-                df.loc[i, f'n_lick_consistency_{epoch_name}'] = np.nan
-            
+                df_trials.loc[i, f"n_lick_switches_{epoch_name}"] = 0
+                df_trials.loc[i, f"n_lick_consistency_{epoch_name}"] = np.nan
+
             # Special treatment for gocue to stop epoch
-            if epoch_name == 'gocue_stop':
+            if epoch_name == "gocue_stop":
                 # Reaction time
                 first_lick = all_licks.min() if len(all_licks) > 0 else np.nan
-                df.loc[i, 'reaction_time'] = (
-                    first_lick - df.loc[i, 'goCue_start_time_in_session']
-                    if not np.isnan(first_lick) else np.nan
+                df_trials.loc[i, "reaction_time"] = (
+                    first_lick - df_trials.loc[i, "goCue_start_time_in_session"]
+                    if not np.isnan(first_lick)
+                    else np.nan
                 )
-                
-                # Handle ignored trials
-                if df.loc[i, 'animal_response'] == IGNORE:
-                    df.loc[i, 'reaction_time'] = np.nan
-                    df.loc[i, 'n_valid_licks_left'] = 0
-                    df.loc[i, 'n_valid_licks_right'] = 0
-                    df.loc[i, 'n_valid_licks_all'] = 0
 
-    # Response and reward rate calculation 
-    df["RESPONDED"] = [x in [0, 1] for x in df["animal_response"].values]
+                # Handle ignored trials
+                if df_trials.loc[i, "animal_response"] == IGNORE:
+                    df_trials.loc[i, "reaction_time"] = np.nan
+                    df_trials.loc[i, "n_valid_licks_left"] = 0
+                    df_trials.loc[i, "n_valid_licks_right"] = 0
+                    df_trials.loc[i, "n_valid_licks_all"] = 0
+
+    df_trials["RESPONDED"] = [x in [0, 1] for x in df_trials["animal_response"].values]
     # Rolling fraction of goCues with a response
-    df["response_rate"] = (
-        df["RESPONDED"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["response_rate"] = (
+        df_trials["RESPONDED"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Rolling fraction of goCues with a response
-    df["gocue_reward_rate"] = (
-        df["earned_reward"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["gocue_reward_rate"] = (
+        df_trials["earned_reward"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Rolling fraction of responses with a response
-    df["RESPONSE_REWARD"] = [
-        x[0] if x[1] else np.nan for x in zip(df["earned_reward"], df["RESPONDED"])
+    df_trials["RESPONSE_REWARD"] = [
+        x[0] if x[1] else np.nan for x in zip(df_trials["earned_reward"], df_trials["RESPONDED"])
     ]
-    df["response_reward_rate"] = (
-        df["RESPONSE_REWARD"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["response_reward_rate"] = (
+        df_trials["RESPONSE_REWARD"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Rolling fraction of choosing right
-    df["WENT_RIGHT"] = [x if x in [0, 1] else np.nan for x in df["animal_response"]]
-    df["choose_right_rate"] = (
-        df["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["WENT_RIGHT"] = [x if x in [0, 1] else np.nan for x in df_trials["animal_response"]]
+    df_trials["choose_right_rate"] = (
+        df_trials["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
     # Clean up temp columns
-    drop_cols = ["RESPONDED", "RESPONSE_REWARD", "WENT_RIGHT"]
-    df = df.drop(columns=drop_cols)
+    drop_cols = [
+        "RESPONDED",
+        "RESPONSE_REWARD",
+        "WENT_RIGHT",
+    ]
+    df_trials = df_trials.drop(columns=drop_cols)
 
-    return df
+    return df_trials
