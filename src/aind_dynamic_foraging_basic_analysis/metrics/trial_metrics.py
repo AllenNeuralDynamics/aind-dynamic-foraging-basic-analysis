@@ -16,6 +16,7 @@ MIN_EVENTS = 2
 
 LEFT, RIGHT, IGNORE = 0, 1, 2
 
+
 def compute_trial_metrics(nwb):
     """
     Computes trial by trial metrics
@@ -40,7 +41,6 @@ def compute_trial_metrics(nwb):
         return
 
     df_trials = nwb.df_trials.copy()
-
 
     # --- Add reward-related columns ---
     df_trials["reward"] = False
@@ -147,7 +147,6 @@ def compute_trial_metrics(nwb):
                     df_trials.loc[i, "n_valid_licks_right"] = 0
                     df_trials.loc[i, "n_valid_licks_all"] = 0
 
-
     df_trials["RESPONDED"] = [x in [0, 1] for x in df_trials["animal_response"].values]
     # Rolling fraction of goCues with a response
     df_trials["response_rate"] = (
@@ -190,7 +189,6 @@ def compute_trial_metrics(nwb):
         "WENT_RIGHT",
     ]
     df_trials = df_trials.drop(columns=drop_cols)
-
 
     return df_trials
 
@@ -290,6 +288,5 @@ def compute_bias(nwb):
     df_trials["bias"] = df_trials["bias"].bfill().ffill()
     df_trials["bias_ci_lower"] = df_trials["bias_ci_lower"].bfill().ffill()
     df_trials["bias_ci_upper"] = df_trials["bias_ci_upper"].bfill().ffill()
-
 
     return df_trials
