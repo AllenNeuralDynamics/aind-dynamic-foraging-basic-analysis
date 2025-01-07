@@ -76,6 +76,7 @@ def plot_foraging_session(  # noqa: C901
     choice_history: Union[List, np.ndarray],
     reward_history: Union[List, np.ndarray],
     p_reward: Union[List, np.ndarray],
+    trial_time: Union[List, np.ndarray] = None,
     autowater_offered: Union[List, np.ndarray] = None,
     fitted_data: Union[List, np.ndarray] = None,
     photostim: dict = None,
@@ -99,6 +100,8 @@ def plot_foraging_session(  # noqa: C901
         Reward history (0 = unrewarded, 1 = rewarded).
     p_reward : Union[List, np.ndarray]
         Reward probability for both sides. The size should be (2, len(choice_history)).
+    trial_time : Union[List, np.ndarray], optional
+        Time of each trial, by default None.
     autowater_offered: Union[List, np.ndarray], optional
         If not None, indicates trials where autowater was offered.
     fitted_data : Union[List, np.ndarray], optional
@@ -156,10 +159,15 @@ def plot_foraging_session(  # noqa: C901
         ax_choice_reward = ax.get_figure().add_subplot(gs[0, 1])
         ax_reward_schedule = ax.get_figure().add_subplot(gs[0, 0], sharey=ax_choice_reward)
 
+    trace_width = 1
+    choice_bar = 1
+    gap = 0.2
+
     # == Fetch data ==
     n_trials = len(choice_history)
 
     p_reward_fraction = p_reward[1, :] / (np.sum(p_reward, axis=0))
+    p_reward_fraction= (p_reward_fraction - 0.5)*trace_width
 
     ignored = np.isnan(choice_history)
 
@@ -174,20 +182,26 @@ def plot_foraging_session(  # noqa: C901
         autowater_ignored = autowater_offered & ignored
         unrewarded_trials = ~reward_history & ~ignored & ~autowater_offered
 
+    trace_width = 1
+    choice_bar = 1
+    gap = 0.2
     # == Choice trace ==
     # Rewarded trials (real foraging, autowater excluded)
-    xx = np.nonzero(rewarded_excluding_autowater)[0] + 1
-    yy = 0.5 + (choice_history[rewarded_excluding_autowater] - 0.5) * 1.4
-    yy_temp = choice_history[rewarded_excluding_autowater]
-    yy_right = yy_temp[yy_temp > 0.5] + 0.05
-    xx_right = xx[yy_temp > 0.5]
-    yy_left = yy_temp[yy_temp < 0.5] - 0.05
-    xx_left = xx[yy_temp < 0.5]
+    if trial_time is None:
+        xx = np.nonzero(rewarded_excluding_autowater)[0] + 1
+    else:
+        xx = trial_time[rewarded_excluding_autowater]
+    yy = (choice_history[rewarded_excluding_autowater] - 0.5) * trace_width
+    yy_temp = (choice_history[rewarded_excluding_autowater] - 0.5) * trace_width
+    yy_right = yy_temp[yy_temp > 0] + gap
+    xx_right = xx[yy_temp > 0]
+    yy_left = yy_temp[yy_temp < 0] - gap
+    xx_left = xx[yy_temp < 0]
     if not vertical:
         ax_choice_reward.vlines(
             xx_right,
             yy_right,
-            yy_right + 0.1,
+            yy_right + choice_bar,
             alpha=1,
             linewidth=1,
             color="black",
@@ -195,7 +209,7 @@ def plot_foraging_session(  # noqa: C901
         )
         ax_choice_reward.vlines(
             xx_left,
-            yy_left - 0.1,
+            yy_left - choice_bar,
             yy_left,
             alpha=1,
             linewidth=1,
@@ -212,18 +226,21 @@ def plot_foraging_session(  # noqa: C901
         )
 
     # Unrewarded trials (real foraging; not ignored or autowater trials)
-    xx = np.nonzero(unrewarded_trials)[0] + 1
-    yy = 0.5 + (choice_history[unrewarded_trials] - 0.5) * 1.4
-    yy_temp = choice_history[unrewarded_trials]
-    yy_right = yy_temp[yy_temp > 0.5]
-    xx_right = xx[yy_temp > 0.5]
-    yy_left = yy_temp[yy_temp < 0.5]
-    xx_left = xx[yy_temp < 0.5]
+    if trial_time is None:
+        xx = np.nonzero(unrewarded_trials)[0] + 1
+    else:
+        xx = trial_time[unrewarded_trials]
+    yy = (choice_history[unrewarded_trials] - 0.5) * trace_width
+    yy_temp = (choice_history[unrewarded_trials] - 0.5) * trace_width
+    yy_right = yy_temp[yy_temp > 0] + gap
+    xx_right = xx[yy_temp > 0]
+    yy_left = yy_temp[yy_temp < 0] - gap
+    xx_left = xx[yy_temp < 0]
     if not vertical:
         ax_choice_reward.vlines(
             xx_right,
-            yy_right + 0.05,
-            yy_right + 0.1,
+            yy_right,
+            yy_right + 0.5*choice_bar,
             alpha=1,
             linewidth=1,
             color="gray",
@@ -231,8 +248,8 @@ def plot_foraging_session(  # noqa: C901
         )
         ax_choice_reward.vlines(
             xx_left,
-            yy_left - 0.1,
-            yy_left - 0.05,
+            yy_left,
+            yy_left - 0.5*choice_bar,
             alpha=1,
             linewidth=1,
             color="gray",
@@ -248,8 +265,11 @@ def plot_foraging_session(  # noqa: C901
         )
 
     # Ignored trials
-    xx = np.nonzero(ignored & ~autowater_ignored)[0] + 1
-    yy = [1.2] * sum(ignored & ~autowater_ignored)
+    if trial_time is None:
+        xx = np.nonzero(ignored & ~autowater_ignored)[0] + 1
+    else:
+        xx = trial_time[ignored & ~autowater_ignored]
+    yy = [0.001] * sum(ignored & ~autowater_ignored)
     ax_choice_reward.plot(
         *(xx, yy) if not vertical else [*(yy, xx)],
         "x",
@@ -262,20 +282,23 @@ def plot_foraging_session(  # noqa: C901
     # Autowater history
     if autowater_offered is not None:
         # Autowater offered and collected
-        xx = np.nonzero(autowater_collected)[0] + 1
-        yy = 0.5 + (choice_history[autowater_collected] - 0.5) * 1.4
+        if trial_time is None:
+            xx = np.nonzero(autowater_collected)[0] + 1
+        else:
+            xx = trial_time[autowater_collected]
+        yy = (choice_history[autowater_collected] - 0.5) * trace_width
 
-        yy_temp = choice_history[autowater_collected]
-        yy_right = yy_temp[yy_temp > 0.5] + 0.05
-        xx_right = xx[yy_temp > 0.5]
-        yy_left = yy_temp[yy_temp < 0.5] - 0.05
-        xx_left = xx[yy_temp < 0.5]
+        yy_temp = (choice_history[autowater_collected] - 0.5) * trace_width
+        yy_right = yy_temp[yy_temp > 0] + gap
+        xx_right = xx[yy_temp > 0]
+        yy_left = yy_temp[yy_temp < 0] - gap
+        xx_left = xx[yy_temp < 0]
 
         if not vertical:
             ax_choice_reward.vlines(
                 xx_right,
                 yy_right,
-                yy_right + 0.1,
+                yy_right + choice_bar,
                 alpha=1,
                 linewidth=1,
                 color="royalblue",
@@ -283,7 +306,7 @@ def plot_foraging_session(  # noqa: C901
             )
             ax_choice_reward.vlines(
                 xx_left,
-                yy_left - 0.1,
+                yy_left - choice_bar,
                 yy_left,
                 alpha=1,
                 linewidth=1,
@@ -300,8 +323,11 @@ def plot_foraging_session(  # noqa: C901
             )
 
         # Also highlight the autowater offered but still ignored
-        xx = np.nonzero(autowater_ignored)[0] + 1
-        yy = [1.2] * sum(autowater_ignored)
+        if trial_time is None:
+            xx = np.nonzero(autowater_ignored)[0] + 1
+        else:
+            xx = trial_time[autowater_ignored]
+        yy = [5] * sum(autowater_ignored)
         ax_choice_reward.plot(
             *(xx, yy) if not vertical else [*(yy, xx)],
             "x",
@@ -312,7 +338,10 @@ def plot_foraging_session(  # noqa: C901
         )
 
     # Base probability
-    xx = np.arange(0, n_trials) + 1
+    if trial_time is None:
+        xx = np.arange(0, n_trials) + 1
+    else:
+        xx = trial_time
     yy = p_reward_fraction
     if "reward_prob" in plot_list:
         ax_choice_reward.plot(
@@ -327,7 +356,11 @@ def plot_foraging_session(  # noqa: C901
         moving_average(~np.isnan(choice_history), smooth_factor) + 1e-6
     )
     y[y > 100] = np.nan
-    x = np.arange(0, len(y)) + int(smooth_factor / 2) + 1
+    y = (y - 0.5) * trace_width
+    if trial_time is None:
+        x = np.arange(0, len(y)) + int(smooth_factor / 2) + 1
+    else:
+        x = trial_time[int(smooth_factor / 2) : -int(smooth_factor / 2)]
     if "choice" in plot_list:
         ax_choice_reward.plot(
             *(x, y) if not vertical else [*(y, x)],
@@ -338,8 +371,11 @@ def plot_foraging_session(  # noqa: C901
 
     # finished ratio
     if np.sum(np.isnan(choice_history)):
-        x = np.arange(0, len(y)) + int(smooth_factor / 2) + 1
-        y = moving_average(~np.isnan(choice_history), smooth_factor)
+        y = 0.5*trace_width*(moving_average(~np.isnan(choice_history), smooth_factor)) + trace_width * 0.5 + gap + choice_bar + gap
+        if trial_time is None:
+            x = np.arange(0, len(y)) + int(smooth_factor / 2) + 1
+        else:
+            x = trial_time[int(smooth_factor / 2) : -int(smooth_factor / 2)]
         if "finished" in plot_list:
             ax_choice_reward.plot(
                 *(x, y) if not vertical else [*(y, x)],
@@ -385,6 +421,8 @@ def plot_foraging_session(  # noqa: C901
             edgecolors = "darkcyan"
 
         x = trial
+        if trial_time is not None:
+            x = trial_time[trial]
         y = np.ones_like(trial) + 0.4
         _ = ax_choice_reward.scatter(
             *(x, y) if not vertical else [*(y, x)],
@@ -398,6 +436,8 @@ def plot_foraging_session(  # noqa: C901
 
     # p_reward
     xx = np.arange(0, n_trials) + 1
+    if trial_time is not None:
+        xx = trial_time
     ll = p_reward[0, :]
     rr = p_reward[1, :]
     ax_reward_schedule.plot(
@@ -409,7 +449,7 @@ def plot_foraging_session(  # noqa: C901
     ax_reward_schedule.legend(fontsize=5, ncol=1, loc="upper left", bbox_to_anchor=(0, 1))
 
     if not vertical:
-        ax_choice_reward.set_yticks([0, 1, 1.2])
+        ax_choice_reward.set_yticks([-0.5*trace_width, 0.5*trace_width, 0])
         ax_choice_reward.set_yticklabels(["Left", "Right", "Ignored"])
         ax_choice_reward.legend(fontsize=6, loc="upper left", bbox_to_anchor=(0.4, 1.3), ncol=3)
 
@@ -418,13 +458,18 @@ def plot_foraging_session(  # noqa: C901
         ax_choice_reward.spines["bottom"].set_visible(False)
         ax_choice_reward.tick_params(labelbottom=False)
         ax_choice_reward.xaxis.set_ticks_position("none")
-        ax_choice_reward.set_ylim([-0.15, 1.25])
+        ax_choice_reward.set_ylim([-(choice_bar + gap + 0.5 * trace_width), choice_bar + 3 * gap + trace_width])
+        ax_reward_schedule.set_xlim([np.min(xx), np.max(xx)])
 
         ax_reward_schedule.set_ylim([0, 1])
+        ax_reward_schedule.set_xlim([np.min(xx), np.max(xx)])
         ax_reward_schedule.spines["top"].set_visible(False)
         ax_reward_schedule.spines["right"].set_visible(False)
         ax_reward_schedule.spines["bottom"].set_bounds(0, n_trials)
-        ax_reward_schedule.set(xlabel="Trial number")
+        if trial_time is not None:
+            ax_reward_schedule.set(xlabel="Time in session (s)")
+        else:
+            ax_reward_schedule.set(xlabel="Trial number")
 
     else:
         ax_choice_reward.set_xticks([0, 1])
@@ -443,7 +488,10 @@ def plot_foraging_session(  # noqa: C901
         ax_reward_schedule.spines["top"].set_visible(False)
         ax_reward_schedule.spines["right"].set_visible(False)
         ax_reward_schedule.spines["left"].set_bounds(0, n_trials)
-        ax_reward_schedule.set(ylabel="Trial number")
+        if trial_time is not None:
+            ax_reward_schedule.set(ylabel="Time (s)")
+        else:
+            ax_reward_schedule.set(ylabel="Trial number")
 
     ax.remove()
     plt.tight_layout()
