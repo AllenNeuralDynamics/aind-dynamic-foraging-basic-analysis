@@ -32,7 +32,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     pressing "down arrow" zooms in, in time
 
     nwb, an nwb like object that contains attributes: df_events, session_id
-        and optionally contains attributes fip_df, df_licks
+        and optionally contains attributes df_fip, df_licks
 
     ax is a pyplot figure axis. If None, a new figure is created
 
@@ -54,10 +54,10 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         df_events = nwb.df_events
     else:
         df_events = nwb.df_events
-    if hasattr(nwb, "fip_df"):
-        fip_df = nwb.fip_df
+    if hasattr(nwb, "df_fip"):
+        df_fip = nwb.df_fip
     else:
-        fip_df = None
+        df_fip = None
     if hasattr(nwb, "df_licks") & plot_bouts:
         df_licks = nwb.df_licks
     elif plot_bouts:
@@ -74,7 +74,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         df_trials = nwb.df_trials
 
     if ax is None:
-        if fip_df is None:
+        if df_fip is None:
             fig, ax = plt.subplots(figsize=(15, 4))
         else:
             fig, ax = plt.subplots(figsize=(15, 8))
@@ -145,14 +145,14 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     ]
     ycolors = ["k", "k", "r", "r", "darkgray", "darkgray", "darkgray", "k"]
 
-    if fip_df is not None:
+    if df_fip is not None:
         fip_channels = [
             "G_2_dff-{}".format(processing),
             "G_1_dff-{}".format(processing),
             "R_2_dff-{}".format(processing),
             "R_1_dff-{}".format(processing),
         ]
-        present_channels = fip_df["event"].unique()
+        present_channels = df_fip["event"].unique()
         for index, channel in enumerate(fip_channels):
             if channel in present_channels:
                 yticks.append(
@@ -162,7 +162,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 ylabels.append(channel)
                 color = FIP_COLORS.get(channel, "k")
                 ycolors.append(color)
-                C = fip_df.query("event == @channel").copy()
+                C = df_fip.query("event == @channel").copy()
                 d_min = C["data"].min()
                 d_max = C["data"].max()
                 d_range = d_max - d_min
@@ -360,13 +360,13 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     for tick, color in zip(ax.get_yticklabels(), ycolors):
         tick.set_color(color)
     ax.set_xlabel("time (s)", fontsize=STYLE["axis_fontsize"])
-    if fip_df is None:
+    if df_fip is None:
         ax.set_ylim(0, 2)
     else:
         ax.set_ylim(0, 6)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    if fip_df is not None:
+    if df_fip is not None:
         ax.set_title(nwb.session_id + ", FIP processing: {}".format(processing))
     else:
         ax.set_title(nwb.session_id)
