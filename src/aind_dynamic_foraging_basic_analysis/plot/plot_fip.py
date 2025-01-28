@@ -24,17 +24,17 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censo
     plot_fip_psth_compare_alignments(nwb,['left_reward_delivery_time',
         'right_reward_delivery_time'],'G_1_preprocessed')
     """
-    if not hasattr(nwb, "fip_df"):
-        print("You need to compute the fip_df first")
-        print("running `nwb.fip_df = create_fib_df(nwb,tidy=True)`")
-        nwb.fip_df = nu.create_fib_df(nwb, tidy=True)
+    if not hasattr(nwb, "df_fip"):
+        print("You need to compute the df_fip first")
+        print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
+        nwb.df_fip = nu.create_fib_df(nwb, tidy=True)
     if not hasattr(nwb, "df_events"):
         print("You need to compute the df_events first")
         print("run `nwb.df_events = create_events_df(nwb)`")
         nwb.df_events = nu.create_events_df(nwb)
 
-    if channel not in nwb.fip_df["event"].values:
-        print("channel {} not in fip_df".format(channel))
+    if channel not in nwb.df_fip["event"].values:
+        print("channel {} not in df_fip".format(channel))
 
     if isinstance(alignments, list):
         align_dict = {}
@@ -105,10 +105,10 @@ def plot_fip_psth_compare_channels(
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
     """
-    if not hasattr(nwb, "fip_df"):
-        print("You need to compute the fip_df first")
-        print("running `nwb.fip_df = create_fib_df(nwb,tidy=True)`")
-        nwb.fip_df = nu.create_fib_df(nwb, tidy=True)
+    if not hasattr(nwb, "df_fip"):
+        print("You need to compute the df_fip first")
+        print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
+        nwb.df_fip = nu.create_fib_df(nwb, tidy=True)
     if not hasattr(nwb, "df_events"):
         print("You need to compute the df_events first")
         print("run `nwb.df_events = create_events_df(nwb)`")
@@ -128,7 +128,7 @@ def plot_fip_psth_compare_channels(
 
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
-        if c in nwb.fip_df["event"].values:
+        if c in nwb.df_fip["event"].values:
             etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor)
             fip_psth_inner_plot(ax, etr, colors[dex], c)
         else:
@@ -167,14 +167,14 @@ def fip_psth_inner_compute(
 ):
     """
     helper function that computes the event triggered response
-    nwb, nwb object for the session of interest, should have fip_df attribute
+    nwb, nwb object for the session of interest, should have df_fip attribute
     align_timepoints, an iterable list of the timepoints to compute the ETR aligned to
-    channel, what channel in the fip_df dataframe to use
+    channel, what channel in the df_fip dataframe to use
     average(bool), whether to return the average, or all individual traces
     tw, time window before and after each event
     """
 
-    data = nwb.fip_df.query("event == @channel")
+    data = nwb.df_fip.query("event == @channel")
     etr = an.event_triggered_response(
         data,
         "timestamps",
@@ -205,10 +205,10 @@ def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
     ***********************
     plot_histogram(nwb)
     """
-    if not hasattr(nwb, "fip_df"):
-        print("You need to compute the fip_df first")
-        print("running `nwb.fip_df = create_fib_df(nwb,tidy=True)`")
-        nwb.fip_df = nu.create_fib_df(nwb, tidy=True)
+    if not hasattr(nwb, "df_fip"):
+        print("You need to compute the df_fip first")
+        print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
+        nwb.df_fip = nu.create_fib_df(nwb, tidy=True)
         return
 
     fig, ax = plt.subplots(3, 2, sharex=True)
@@ -221,7 +221,7 @@ def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
                 dex = c + "_" + count + "_preprocessed"
             else:
                 dex = c + "_" + count
-            df = nwb.fip_df.query("event == @dex")
+            df = nwb.df_fip.query("event == @dex")
             ax[i, j].hist(df["data"], bins=1000, color=FIP_COLORS.get(dex, "k"))
             ax[i, j].spines["top"].set_visible(False)
             ax[i, j].spines["right"].set_visible(False)
