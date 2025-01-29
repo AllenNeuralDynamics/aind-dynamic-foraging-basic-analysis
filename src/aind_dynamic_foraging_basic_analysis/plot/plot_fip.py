@@ -20,7 +20,8 @@ def plot_fip_psth_compare_alignments(
         whose keys are event types and values are a list of timepoints
     channel, (str) the name of the FIP channel
     tw, time window for the PSTH
-    extra_colors (dict), a dictionary of extra colors. keys should be alignments, or colors are random
+    extra_colors (dict), a dictionary of extra colors.
+        keys should be alignments, or colors are random
 
     EXAMPLE
     *******************
