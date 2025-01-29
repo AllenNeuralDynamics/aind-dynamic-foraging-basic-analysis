@@ -190,10 +190,10 @@ def plot_lick_analysis(nwb):
             )
 
         # We should check lab_meta_data once its added to NWB processing
+        box = "?"
         if ("metadata" in nwb.scratch) and ("box" in nwb.scratch["metadata"]):
             box = nwb.scratch["metadata"][0].box.values
-        else:
-            box = "?"
+
         plt.suptitle(f"{session_id} in {box}")
 
         # Response latency
