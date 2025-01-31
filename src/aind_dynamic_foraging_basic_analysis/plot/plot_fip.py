@@ -10,7 +10,9 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
 from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 
 
-def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censor=True):
+def plot_fip_psth_compare_alignments(
+    nwb, alignments, channel, tw=[-4, 4], censor=True, extra_colors={}
+):
     """
     Compare the same FIP channel aligned to multiple event types
     nwb, nwb object for the session
@@ -18,6 +20,8 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censo
         whose keys are event types and values are a list of timepoints
     channel, (str) the name of the FIP channel
     tw, time window for the PSTH
+    extra_colors (dict), a dictionary of extra colors.
+        keys should be alignments, or colors are random
 
     EXAMPLE
     *******************
@@ -63,11 +67,13 @@ def plot_fip_psth_compare_alignments(nwb, alignments, channel, tw=[-4, 4], censo
 
     fig, ax = plt.subplots()
 
+    colors = {**FIP_COLORS, **extra_colors}
+
     for alignment in align_dict:
         etr = fip_psth_inner_compute(
             nwb, align_dict[alignment], channel, True, tw, censor, censor_times
         )
-        fip_psth_inner_plot(ax, etr, FIP_COLORS.get(alignment, ""), alignment)
+        fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
