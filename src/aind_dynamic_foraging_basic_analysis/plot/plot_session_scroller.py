@@ -18,9 +18,10 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     nwb,
     ax=None,
     fig=None,
-    plot_bouts=True,
+    plot_fip=True,
     processing="bright",
     metrics=["pR", "pL", "response_rate"],
+    plot_list=["bouts", "go cue",],
 ):
     """
     Creates an interactive plot of the session.
@@ -36,7 +37,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     ax is a pyplot figure axis. If None, a new figure is created
 
-    plot_bouts (bool), if True, plot licks colored by segmented lick bouts
+    plot_fip (bool) plot FIP data, defaults True
 
     processing (str) processing method for FIP data to plot
 
@@ -45,8 +46,13 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     EXAMPLES:
     plot_foraging_session.plot_session_scroller(nwb)
-    plot_foraging_session.plot_session_scroller(nwb, plot_bouts=True)
     """
+
+    approved_plot_list = ["bouts", "go cue", "rewarded lick", "cue response", "baiting"]
+    unapproved = set(plot_list) - set(approved_plot_list)
+    if len(unapproved) > 0:
+        print("Unknown plot_list options: {}".format(list(unapproved)))
+        return
 
     if not hasattr(nwb, "df_events"):
         print("computing df_events first")
@@ -54,13 +60,13 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         df_events = nwb.df_events
     else:
         df_events = nwb.df_events
-    if hasattr(nwb, "fip_df"):
+    if hasattr(nwb, "fip_df") and plot_fip:
         fip_df = nwb.fip_df
     else:
         fip_df = None
-    if hasattr(nwb, "df_licks") & plot_bouts:
+    if hasattr(nwb, "df_licks"):
         df_licks = nwb.df_licks
-    elif plot_bouts:
+    elif ("bouts" in plot_list) or ("cue response" in plot_list) or ("rewarded lick" in plot_list):
         print("computing df_licks first")
         nwb.df_licks = a.annotate_licks(nwb)
         df_licks = nwb.df_licks
@@ -196,7 +202,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 ax.plot(C.timestamps.values, C.data.values, color)
                 ax.axhline(params[channel + "_bottom"], color="k", linewidth=0.5, alpha=0.25)
 
-    if df_licks is None:
+    if ("bouts" not in plot_list) or (df_licks is None):
         left_licks = df_events.query('event == "left_lick_time"')
         left_times = left_licks.timestamps.values
         ax.vlines(
@@ -245,6 +251,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 color=cmap(np.mod(b, 20)),
             )
 
+    if ("rewarded lick" in plot_list) and (df_licks is not None):
         # plot licks that trigger left rewards
         left_rewarded_licks = df_licks.query(
             '(event == "left_lick_time")&(rewarded)'
@@ -264,6 +271,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             right_rewarded_licks, [params["right_lick_bottom"]] * len(right_rewarded_licks), "ro"
         )
 
+    if ("cue response" in plot_list) and (df_licks is not None):
         # plot cue responsive licks
         left_cue_licks = df_licks.query(
             '(event == "left_lick_time")&(cue_response)'
@@ -291,6 +299,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             "bD",
         )
 
+    if "baiting" in plot_list:
         # Plot baiting
         bait_right = df_trials.query("bait_right")["goCue_start_time_in_session"].values
         bait_left = df_trials.query("bait_left")["goCue_start_time_in_session"].values
@@ -322,15 +331,16 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     go_cues = df_events.query('event == "goCue_start_time"')
     go_cue_times = go_cues.timestamps.values
-    ax.vlines(
-        go_cue_times,
-        params["go_cue_bottom"],
-        params["go_cue_top"],
-        alpha=0.75,
-        linewidth=1,
-        color="b",
-        label="go cue",
-    )
+    if "go cue" in plot_list:
+        ax.vlines(
+            go_cue_times,
+            params["go_cue_bottom"],
+            params["go_cue_top"],
+            alpha=0.75,
+            linewidth=1,
+            color="b",
+            label="go cue",
+        )
 
     # plot metrics
     ax.axhline(params["metrics_bottom"], color="k", linewidth=0.5, alpha=0.25)
