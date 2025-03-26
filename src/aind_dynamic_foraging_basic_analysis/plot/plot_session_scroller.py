@@ -18,10 +18,13 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     nwb,
     ax=None,
     fig=None,
-    plot_fip=True,
     processing="bright",
     metrics=["pR", "pL", "response_rate"],
-    plot_list=["bouts", "go cue",],
+    plot_list=[
+        "FIP",
+        "bouts",
+        "go cue",
+    ],
 ):
     """
     Creates an interactive plot of the session.
@@ -37,18 +40,18 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     ax is a pyplot figure axis. If None, a new figure is created
 
-    plot_fip (bool) plot FIP data, defaults True
-
     processing (str) processing method for FIP data to plot
 
     metrics (list of strings), list of metrics to plot. Must be either 'pR','pL' or
         columns in nwb.df_trials
 
+    plot_list (list of strings), list of annotations and features to plot
+
     EXAMPLES:
     plot_foraging_session.plot_session_scroller(nwb)
     """
 
-    approved_plot_list = ["bouts", "go cue", "rewarded lick", "cue response", "baiting"]
+    approved_plot_list = ["bouts", "go cue", "rewarded lick", "cue response", "baiting", "FIP"]
     unapproved = set(plot_list) - set(approved_plot_list)
     if len(unapproved) > 0:
         print("Unknown plot_list options: {}".format(list(unapproved)))
