@@ -65,7 +65,14 @@ class TestPlotSession(unittest.TestCase):
 
         # Test with bias column
         nwb.df_trials["side_bias"] = np.array([0, 0, 0.1, 0.1, 0.05, 0.05])
-        nwb.df_trials["side_bias_confidence_interval"] = np.array([[-1, 1] * 6])
+        nwb.df_trials["side_bias_confidence_interval"] = [
+            [-1, 1],
+            [-1, 1],
+            [-1, 1],
+            [-1, 1],
+            [-1, 1],
+            [-1, 1],
+        ]
         pfs.plot_foraging_session_nwb(nwb)
 
     def test_plot_session(self):
