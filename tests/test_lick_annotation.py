@@ -161,6 +161,7 @@ class TestLickAnnotation(unittest.TestCase):
 
         # Verify that we check for the existence of df_events
         assert a.annotate_lick_bouts(nwb) is None
+        assert a.annotate_artifacts(nwb) is None
         assert a.annotate_rewards(nwb) is None
         assert a.annotate_cue_response(nwb) is None
         assert a.annotate_intertrial_choices(nwb) is None
@@ -170,6 +171,8 @@ class TestLickAnnotation(unittest.TestCase):
         # Verify that we check for the prerequisite columns from other annotations
         nwb.df_events = df
         nwb.df_licks = a.annotate_lick_bouts(nwb)
+        del nwb.df_licks
+        nwb.df_licks = a.annotate_artifacts(nwb)
         del nwb.df_licks
         nwb.df_licks = a.annotate_rewards(nwb)
         del nwb.df_licks
