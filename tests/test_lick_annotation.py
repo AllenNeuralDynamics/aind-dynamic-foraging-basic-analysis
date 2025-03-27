@@ -160,6 +160,7 @@ class TestLickAnnotation(unittest.TestCase):
         df = df.sort_values(by="timestamps")
 
         # Verify that we check for the existence of df_events
+        assert a.annotate_licks(nwb) is None
         assert a.annotate_lick_bouts(nwb) is None
         assert a.annotate_artifacts(nwb) is None
         assert a.annotate_rewards(nwb) is None
