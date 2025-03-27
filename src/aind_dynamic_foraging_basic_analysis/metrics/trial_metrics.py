@@ -58,32 +58,6 @@ def compute_trial_metrics(nwb):
         df_trials["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
-    # Rolling reward probability for best option
-    df_trials["IDEAL_OBSERVER_REWARD_PROB"] = df_trials[
-        ["reward_probabilityR", "reward_probabilityL"]
-    ].max(axis=1)
-    df_trials["ideal_observer_reward_rate"] = (
-        df_trials["IDEAL_OBSERVER_REWARD_PROB"]
-        .rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True)
-        .mean()
-    )
-
-    # Rolling reward probability for best option with baiting
-    if "bait_left" in df_trials:
-        df_trials["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"] = [
-            1 if (x[0] or x[1]) else x[2]
-            for x in zip(
-                df_trials["bait_left"],
-                df_trials["bait_right"],
-                df_trials["IDEAL_OBSERVER_REWARD_PROB"],
-            )
-        ]
-        df_trials["ideal_observer_reward_rate_with_baiting"] = (
-            df_trials["IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING"]
-            .rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True)
-            .mean()
-        )
-
     # TODO, add from process_nwb
     # trial duration (stop-time - start-time) (start/stop time, or gocue to gocue?)
     # n_licks_left (# of left licks in response window)
@@ -99,8 +73,6 @@ def compute_trial_metrics(nwb):
         "RESPONDED",
         "RESPONSE_REWARD",
         "WENT_RIGHT",
-        "IDEAL_OBSERVER_REWARD_PROB",
-        "IDEAL_OBSERVER_REWARD_PROB_WITH_BAITING",
     ]
     df_trials = df_trials.drop(columns=drop_cols)
 
