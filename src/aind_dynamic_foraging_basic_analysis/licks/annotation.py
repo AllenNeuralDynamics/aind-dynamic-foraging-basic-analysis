@@ -22,13 +22,20 @@ CUE_TO_LICK_TOLERANCE = 1
 # Maximum time after the last go cue for a bout to start and be considered within the session
 CUE_TO_SESSION_END_TOLERANCE = CUE_TO_LICK_TOLERANCE
 
+# Minimum time between licks to be flagged as artifacts
+ARTIFACT_TOLERANCE = 0.0001
+
 
 def annotate_licks(nwb):
     """
     Adds all annotations
     nwb is an object that has df_events as an attribute
     """
+    if not hasattr(nwb, "df_events"):
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
     nwb.df_licks = annotate_lick_bouts(nwb)
+    nwb.df_licks = annotate_artifacts(nwb)
     nwb.df_licks = annotate_rewards(nwb)
     nwb.df_licks = annotate_cue_response(nwb)
     nwb.df_licks = annotate_intertrial_choices(nwb)
@@ -73,6 +80,36 @@ def annotate_lick_bouts(nwb):
     assert num_bout_start == num_bout_end, "Bout Starts and Bout Ends don't align"
     assert num_bout_start == num_bouts, "Number of bouts is incorrect"
 
+    return df_licks
+
+
+def annotate_artifacts(nwb):
+    """
+    annotates df_licks with which licks could be electrical artifacts
+        likely_artifact (bool) was this lick likely an artifact
+    nwb, an object with attributes: df_licks, df_events
+    """
+    if not hasattr(nwb, "df_events"):
+        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        return
+
+    if not hasattr(nwb, "df_licks"):
+        print("annotating lick bouts")
+        nwb.df_licks = annotate_lick_bouts(nwb)
+
+    # make a copy of df licks
+    df_licks = nwb.df_licks.copy()
+
+    # Find lick intervals less than tolerance that also switch sides
+    # mark the second lick as a likely artifact
+    df_licks["switch_lick"] = df_licks["event"] != df_licks.shift(1)["event"]
+    df_licks.loc[0, "switch_lick"] = False
+    df_licks["likely_artifact"] = [
+        np.all(x) for x in zip(df_licks["switch_lick"], df_licks["pre_ili"] < ARTIFACT_TOLERANCE)
+    ]
+
+    # Clean up temporary column
+    df_licks = df_licks.drop(columns=["switch_lick"])
     return df_licks
 
 
