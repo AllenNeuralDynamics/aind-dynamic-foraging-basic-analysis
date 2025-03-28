@@ -31,7 +31,7 @@ def plot_foraging_session_nwb(nwb, **kwargs):
         print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
         return
 
-    if "bias" not in nwb.df_trials:
+    if "side_bias" not in nwb.df_trials:
         fig, axes = plot_foraging_session(
             [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
             nwb.df_trials["earned_reward"].values,
@@ -40,14 +40,14 @@ def plot_foraging_session_nwb(nwb, **kwargs):
         )
     else:
         if "plot_list" not in kwargs:
-            kwargs["plot_list"] = ["choice", "finished", "reward_prob", "bias"]
+            kwargs["plot_list"] = ["choice", "reward_prob", "bias"]
         fig, axes = plot_foraging_session(
             [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
             nwb.df_trials["earned_reward"].values,
             [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
-            bias=nwb.df_trials["bias"].values,
-            bias_lower=nwb.df_trials["bias_ci_lower"].values,
-            bias_upper=nwb.df_trials["bias_ci_upper"].values,
+            bias=nwb.df_trials["side_bias"].values,
+            bias_lower=[x[0] for x in nwb.df_trials["side_bias_confidence_interval"].values],
+            bias_upper=[x[1] for x in nwb.df_trials["side_bias_confidence_interval"].values],
             autowater_offered=nwb.df_trials[["auto_waterL", "auto_waterR"]].any(axis=1),
             **kwargs,
         )
