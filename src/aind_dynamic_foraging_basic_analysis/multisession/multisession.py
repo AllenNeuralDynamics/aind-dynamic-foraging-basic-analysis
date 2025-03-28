@@ -33,7 +33,6 @@ def make_multisession_trials_df(nwb_list, DATA_DIR, AGG_DIR):
             nwb = nu.load_nwb_from_filename(n)
             nwb.df_trials = nu.create_df_trials(nwb)
             nwb.df_trials = tm.compute_trial_metrics(nwb)
-            nwb.df_trials = tm.compute_bias(nwb)
             nwbs.append(nwb)
         except:
             print("Bad {}".format(n))
