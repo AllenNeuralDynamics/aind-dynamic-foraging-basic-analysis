@@ -51,7 +51,15 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     plot_foraging_session.plot_session_scroller(nwb)
     """
 
-    approved_plot_list = ["bouts", "go cue", "rewarded lick", "cue response", "baiting", "FIP"]
+    approved_plot_list = [
+        "bouts",
+        "go cue",
+        "rewarded lick",
+        "cue response",
+        "baiting",
+        "FIP",
+        "lick artifacts",
+    ]
     unapproved = set(plot_list) - set(approved_plot_list)
     if len(unapproved) > 0:
         print("Unknown plot_list options: {}".format(list(unapproved)))
@@ -308,6 +316,24 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         bait_left = df_trials.query("bait_left")["goCue_start_time_in_session"].values
         ax.plot(bait_right, [params["go_cue_top"] - 0.05] * len(bait_right), "ms", label="baited")
         ax.plot(bait_left, [params["go_cue_bottom"] + 0.05] * len(bait_left), "ms")
+
+    if "lick artifacts" in plot_list:
+        artifacts_right = df_licks.query('likely_artifact and (event=="right_lick_time")')[
+            "timestamps"
+        ].values
+        artifacts_left = df_licks.query('likely_artifact and (event=="left_lick_time")')[
+            "timestamps"
+        ].values
+        ax.plot(
+            artifacts_right,
+            [params["go_cue_top"]] * len(artifacts_right),
+            "d",
+            color="darkorange",
+            label="lick artifact",
+        )
+        ax.plot(
+            artifacts_left, [params["go_cue_bottom"]] * len(artifacts_left), "d", color="darkorange"
+        )
 
     left_reward_deliverys = df_events.query('event == "left_reward_delivery_time"')
     left_times = left_reward_deliverys.timestamps.values
