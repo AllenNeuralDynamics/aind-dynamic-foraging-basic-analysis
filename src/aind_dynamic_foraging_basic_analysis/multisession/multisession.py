@@ -8,16 +8,27 @@ import aind_dynamic_foraging_basic_analysis.metrics.trial_metrics as tm
 
 """
 
+import aind_dynamic_foraging_basic_analysis.multisession.multisession as ms
+AGG_DIR = '/Users/alex.piet/data/multisession'
+NWB_FILES = glob.glob(DATA_DIR + 'behavior_<mouse_id>_**.nwb')
+nwbs, df = ms.make_multisession_trials_df(NWB_LIST, AGG_DIR)
+
 # TODO
+add vertical scroll bar when there are lots of metrics?
+add trial metrics to multisession trials
+maybe avoid using the term "lifetime" since we aren't ensuring that its actually the lifetime
+make_multisession_trials_df should check for the existence in the agg dir first
 Make specification for multisession trials df
 Make some capsule to generate them, and make data assets, what metadata?
-Add axis for licking/rewards
+Add axis for licking/rewards, reward probability
+add some indicator for weekends
 Investigate why some sessions crash on bias computation
 Add some indicator for missing session
+plot_foraging_behavior should be re-factored to use the same code as the plotting library
 """
 
 
-def make_multisession_trials_df(nwb_list, DATA_DIR, AGG_DIR):
+def make_multisession_trials_df(nwb_list, AGG_DIR):
     """
     takes a list of NWBs
     loads each NWB file
@@ -34,8 +45,9 @@ def make_multisession_trials_df(nwb_list, DATA_DIR, AGG_DIR):
             nwb.df_trials = nu.create_df_trials(nwb)
             nwb.df_trials = tm.compute_trial_metrics(nwb)
             nwbs.append(nwb)
-        except:
+        except Exception as e:
             print("Bad {}".format(n))
+            print('   '+str(e))
 
     df = pd.concat([x.df_trials for x in nwbs])
 
@@ -44,7 +56,7 @@ def make_multisession_trials_df(nwb_list, DATA_DIR, AGG_DIR):
     return nwbs, df
 
 
-def plot_foraging_lifetime(lifetime_df, plot_list=["bias", "lickspout_position"]):
+def plot_foraging_lifetime(lifetime_df, plot_list=["side_bias", "lickspout_position"]):
     """
     Takes a dataframe of the aggregate for all sessions from this animal
     
@@ -86,7 +98,7 @@ def plot_foraging_lifetime(lifetime_df, plot_list=["bias", "lickspout_position"]
     ax[-1].set_xticks(ticks, labels)
     ax[-1].set_xlabel("Session")
     ax[-1].set_xlim(df["lifetime_trial"].values[0], df["lifetime_trial"].values[-1])
-    plt.suptitle(df["ses_idx"].values[0].split("_")[0])
+    plt.suptitle(df["ses_idx"].values[0].split("_")[0]+' use arrow keys in scroll or zoom in/out, use h to reset')
     plt.tight_layout()
 
     # Add interactive scrolling
@@ -245,11 +257,27 @@ def plot_foraging_lifetime_inner(ax, plot, df):
 
     # some metrics have special formatting
     # otherwise we just plot the metric
-    if plot == "bias":
-        ax.plot(df["lifetime_trial"], df["bias"], label="bias")
+    if plot == "side_bias":
+        ax.plot(df["lifetime_trial"], df["side_bias"], label="bias")
         ax.axhline(0, linestyle="--", color="k", alpha=0.25)
         ax.set_ylim(-1, 1)
+        ax.set_ylabel('Side Bias')
+    elif plot == 'reward_probability':
+        ax.plot(
+            df['lifetime_trial'],
+            df['reward_probabilityL'],
+            color='b',
+            label='L'
+        )
+        ax.plot(
+            df['lifetime_trial'],
+            df['reward_probabilityR'],
+            color='r',
+            label='R'
+        )
+        ax.set_ylabel("Reward Probability")
     elif plot == "lickspout_position":
+        ax.axhline(0, linestyle="--", color="k", alpha=0.25)
         ax.plot(
             df["lifetime_trial"],
             df["lickspout_position_z"] - df["lickspout_position_z"].values[0],
@@ -258,9 +286,15 @@ def plot_foraging_lifetime_inner(ax, plot, df):
         )
         ax.plot(
             df["lifetime_trial"],
-            df["lickspout_position_y"] - df["lickspout_position_y"].values[0],
+            df["lickspout_position_y1"] - df["lickspout_position_y1"].values[0],
             "r",
-            label="y",
+            label="y1",
+        )
+        ax.plot(
+            df["lifetime_trial"],
+            df["lickspout_position_y2"] - df["lickspout_position_y2"].values[0],
+            "m",
+            label="y2",
         )
         ax.plot(
             df["lifetime_trial"],
