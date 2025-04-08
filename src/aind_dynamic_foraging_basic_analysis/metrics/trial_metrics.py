@@ -8,13 +8,28 @@
 import pandas as pd
 import numpy as np
 
+import aind_dynamic_foraging_data_utils.nwb_utils as nu
 import aind_dynamic_foraging_models.logistic_regression.model as model
+import aind_dynamic_foraging_basic_analysis.licks.annotation as a
+
+# TODO, Metrics to add
+# trial duration (stop-time - start-time) (start/stop time, or gocue to gocue?)
+# n_licks_left (# of left licks in response window)
+# n_licks_left_total (# of left licks from goCue to next go cue)
+# Same for Right, same for all
+# number of intertrial choices
+# number of intertrial switches
+# response switch or repeat
 
 # TODO, we might want to make these parameters metric specific
 WIN_DUR = 15
 MIN_EVENTS = 2
 
 def compute_ideal_efficiency(nwb):
+    '''
+        This metric does not make sense if there is baiting
+    '''
+
     df_trials = nwb.df_trials.copy()
     df_trials['AVERAGE_PROB'] = [np.mean(x) for x in zip(df_trials['reward_probabilityL'], df_trials['reward_probabilityR'])]
     df_trials['CHOICE_PROB'] = [x[x[2]] if x[2]!=2 else np.nan for x in zip(df_trials['reward_probabilityL'], df_trials['reward_probabilityR'],df_trials['animal_response'].astype(int))]
@@ -27,7 +42,7 @@ def compute_ideal_efficiency(nwb):
         "CHOICE_PROB",
         "PROB_DIFF",
     ]
-    ##df_trials = df_trials.drop(columns=drop_cols)
+    df_trials = df_trials.drop(columns=drop_cols)
 
     return df_trials
 
@@ -74,16 +89,6 @@ def compute_trial_metrics(nwb):
         df_trials["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
-    # TODO, add from process_nwb
-    # trial duration (stop-time - start-time) (start/stop time, or gocue to gocue?)
-    # n_licks_left (# of left licks in response window)
-    # n_licks_left_total (# of left licks from goCue to next go cue)
-    # Same for Right, same for all
-    # intertrial choices (boolean)
-    # number of intertrial choices
-    # number of intertrial switches
-    # response switch or repeat
-
     # Clean up temp columns
     drop_cols = [
         "RESPONDED",
@@ -91,7 +96,7 @@ def compute_trial_metrics(nwb):
         "WENT_RIGHT",
     ]
     df_trials = df_trials.drop(columns=drop_cols)
-
+ 
     return df_trials
 
 
@@ -195,13 +200,17 @@ def compute_bias(nwb):
 
 def add_intertrial_licking(nwb):
 
+    if not hasattr(nwb, "df_events"):
+        print("computing df_events first")
+        nwb.df_events = nu.create_events_df(nwb)
+
     if not hasattr(nwb, "df_trials"):
-        print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
-        return
+        print("computing df_trials")
+        nwb.df_trials = nu.create_df_trials(nwb)
 
     if not hasattr(nwb, "df_licks"):
-        print("You need to compute df_licks: licks.annotation.annotate_licks(nwb)")
-        return nwb.df_trials
+        print("Annotating licks")
+        nwb.df_licks = a.annotate_licks(nwb)
 
     has_intertrial_lick = nwb.df_licks.query('within_session').groupby('trial')['intertrial_choice'].any()
     df_trials = nwb.df_trials.copy()
