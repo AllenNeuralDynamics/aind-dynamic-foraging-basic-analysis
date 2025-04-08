@@ -14,6 +14,22 @@ import aind_dynamic_foraging_models.logistic_regression.model as model
 WIN_DUR = 15
 MIN_EVENTS = 2
 
+def compute_ideal_efficiency(nwb):
+    df_trials = nwb.df_trials.copy()
+    df_trials['AVERAGE_PROB'] = [np.mean(x) for x in zip(df_trials['reward_probabilityL'], df_trials['reward_probabilityR'])]
+    df_trials['CHOICE_PROB'] = [x[x[2]] if x[2]!=2 else np.nan for x in zip(df_trials['reward_probabilityL'], df_trials['reward_probabilityR'],df_trials['animal_response'].astype(int))]
+    df_trials['PROB_DIFF'] = df_trials['CHOICE_PROB'] - df_trials['AVERAGE_PROB']
+    df_trials['theoretical_efficiency'] = df_trials['PROB_DIFF'].rolling(WIN_DUR*3, min_periods=MIN_EVENTS, center=True).mean()
+
+    # Clean up temp columns
+    drop_cols = [
+        "AVERAGE_PROB",
+        "CHOICE_PROB",
+        "PROB_DIFF",
+    ]
+    ##df_trials = df_trials.drop(columns=drop_cols)
+
+    return df_trials
 
 def compute_trial_metrics(nwb):
     """
@@ -175,4 +191,27 @@ def compute_bias(nwb):
     df_trials["bias_ci_lower"] = df_trials["bias_ci_lower"].bfill().ffill()
     df_trials["bias_ci_upper"] = df_trials["bias_ci_upper"].bfill().ffill()
 
+    return df_trials
+
+def add_intertrial_licking(nwb):
+
+    if not hasattr(nwb, "df_trials"):
+        print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
+        return
+
+    if not hasattr(nwb, "df_licks"):
+        print("You need to compute df_licks: licks.annotation.annotate_licks(nwb)")
+        return nwb.df_trials
+
+    has_intertrial_lick = nwb.df_licks.query('within_session').groupby('trial')['intertrial_choice'].any()
+    df_trials = nwb.df_trials.copy()
+    df_trials.drop(columns=['intertrial_choice','intertrial_choice_rate'],errors='ignore')
+    df_trials = pd.merge(df_trials, has_intertrial_lick, on='trial',how='left')
+    with pd.option_context('future.no_silent_downcasting',True):
+        df_trials['intertrial_choice'] = df_trials['intertrial_choice'].fillna(False).infer_objects(copy=False)
+
+    # Rolling fraction of goCues with a response
+    df_trials["intertrial_choice_rate"] = (
+        df_trials["intertrial_choice"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    )
     return df_trials
