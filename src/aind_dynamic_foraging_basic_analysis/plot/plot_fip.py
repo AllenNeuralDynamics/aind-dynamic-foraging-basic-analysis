@@ -11,7 +11,7 @@ from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 
 
 def plot_fip_psth_compare_alignments(
-    nwb, alignments, channel, tw=[-4, 4], censor=True, extra_colors={}
+    nwb, alignments, channel, tw=[-4, 4], censor=True, extra_colors={}, ax=None
 ):
     """
     Compare the same FIP channel aligned to multiple event types
@@ -22,6 +22,8 @@ def plot_fip_psth_compare_alignments(
     tw, time window for the PSTH
     extra_colors (dict), a dictionary of extra colors.
         keys should be alignments, or colors are random
+    ax : plt.Axes, optional
+        If not None, use the provided axis to plot, by default None.
 
     EXAMPLE
     *******************
@@ -64,8 +66,10 @@ def plot_fip_psth_compare_alignments(
     censor_times = np.sort(np.concatenate(censor_times))
 
     align_label = "Time (s)"
-
-    fig, ax = plt.subplots()
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.get_figure()
 
     colors = {**FIP_COLORS, **extra_colors}
 

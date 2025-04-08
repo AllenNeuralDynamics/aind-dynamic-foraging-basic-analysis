@@ -19,7 +19,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     ax=None,
     fig=None,
     plot_bouts=True,
-    processing="bright",
+    processing="preprocessed-bright",
     metrics=["pR", "pL", "response_rate"],
 ):
     """
@@ -120,6 +120,30 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "R_1_dff-exp_top": 5,
         "R_2_dff-exp_bottom": 5,
         "R_2_dff-exp_top": 6,
+        "G_1_preprocessed-poly_bottom": 2,
+        "G_1_preprocessed-poly_top": 3,
+        "G_2_preprocessed-poly_bottom": 3,
+        "G_2_preprocessed-poly_top": 4,
+        "R_1_preprocessed-poly_bottom": 4,
+        "R_1_preprocessed-poly_top": 5,
+        "R_2_preprocessed-poly_bottom": 5,
+        "R_2_preprocessed-poly_top": 6,
+        "G_1_preprocessed-exp_bottom": 2,
+        "G_1_preprocessed-exp_top": 3,
+        "G_2_preprocessed-exp_bottom": 3,
+        "G_2_preprocessed-exp_top": 4,
+        "R_1_preprocessed-exp_bottom": 4,
+        "R_1_preprocessed-exp_top": 5,
+        "R_2_preprocessed-exp_bottom": 5,
+        "R_2_preprocessed-exp_top": 6,
+        "G_1_preprocessed-bright_bottom": 2,
+        "G_1_preprocessed-bright_top": 3,
+        "G_2_preprocessed-bright_bottom": 3,
+        "G_2_preprocessed-bright_top": 4,
+        "R_1_preprocessed-bright_bottom": 4,
+        "R_1_preprocessed-bright_top": 5,
+        "R_2_preprocessed-bright_bottom": 5,
+        "R_2_preprocessed-bright_top": 6,
     }
     yticks = [
         (params["left_lick_top"] - params["left_lick_bottom"]) / 2 + params["left_lick_bottom"],
@@ -147,10 +171,10 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     if df_fip is not None:
         fip_channels = [
-            "G_2_dff-{}".format(processing),
-            "G_1_dff-{}".format(processing),
-            "R_2_dff-{}".format(processing),
-            "R_1_dff-{}".format(processing),
+            "G_2_{}".format(processing),
+            "G_1_{}".format(processing),
+            "R_2_{}".format(processing),
+            "R_1_{}".format(processing),
         ]
         present_channels = df_fip["event"].unique()
         for index, channel in enumerate(fip_channels):
