@@ -5,27 +5,39 @@
 
 """
 
-import pandas as pd
-import numpy as np
-
 import aind_dynamic_foraging_data_utils.nwb_utils as nu
 import aind_dynamic_foraging_models.logistic_regression.model as model
+import numpy as np
+import pandas as pd
+
 import aind_dynamic_foraging_basic_analysis.licks.annotation as a
 
 # We might want to make these parameters metric specific
 WIN_DUR = 15
 MIN_EVENTS = 2
 
+
 def compute_ideal_efficiency(nwb):
-    '''
-        This metric does not make sense if there is baiting
-    '''
+    """
+    This metric does not make sense if there is baiting
+    """
 
     df_trials = nwb.df_trials.copy()
-    df_trials['AVERAGE_PROB'] = [np.mean(x) for x in zip(df_trials['reward_probabilityL'], df_trials['reward_probabilityR'])]
-    df_trials['CHOICE_PROB'] = [x[x[2]] if x[2]!=2 else np.nan for x in zip(df_trials['reward_probabilityL'], df_trials['reward_probabilityR'],df_trials['animal_response'].astype(int))]
-    df_trials['PROB_DIFF'] = df_trials['CHOICE_PROB'] - df_trials['AVERAGE_PROB']
-    df_trials['theoretical_efficiency'] = df_trials['PROB_DIFF'].rolling(WIN_DUR*3, min_periods=MIN_EVENTS, center=True).mean()
+    df_trials["AVERAGE_PROB"] = [
+        np.mean(x) for x in zip(df_trials["reward_probabilityL"], df_trials["reward_probabilityR"])
+    ]
+    df_trials["CHOICE_PROB"] = [
+        x[x[2]] if x[2] != 2 else np.nan
+        for x in zip(
+            df_trials["reward_probabilityL"],
+            df_trials["reward_probabilityR"],
+            df_trials["animal_response"].astype(int),
+        )
+    ]
+    df_trials["PROB_DIFF"] = df_trials["CHOICE_PROB"] - df_trials["AVERAGE_PROB"]
+    df_trials["theoretical_efficiency"] = (
+        df_trials["PROB_DIFF"].rolling(WIN_DUR * 3, min_periods=MIN_EVENTS, center=True).mean()
+    )
 
     # Clean up temp columns
     drop_cols = [
@@ -36,6 +48,7 @@ def compute_ideal_efficiency(nwb):
     df_trials = df_trials.drop(columns=drop_cols)
 
     return df_trials
+
 
 def compute_trial_metrics(nwb):
     """
@@ -87,7 +100,7 @@ def compute_trial_metrics(nwb):
         "WENT_RIGHT",
     ]
     df_trials = df_trials.drop(columns=drop_cols)
- 
+
     return df_trials
 
 
@@ -189,6 +202,7 @@ def compute_bias(nwb):
 
     return df_trials
 
+
 def add_intertrial_licking(nwb):
 
     if not hasattr(nwb, "df_events"):
@@ -203,12 +217,16 @@ def add_intertrial_licking(nwb):
         print("Annotating licks")
         nwb.df_licks = a.annotate_licks(nwb)
 
-    has_intertrial_lick = nwb.df_licks.query('within_session').groupby('trial')['intertrial_choice'].any()
+    has_intertrial_lick = (
+        nwb.df_licks.query("within_session").groupby("trial")["intertrial_choice"].any()
+    )
     df_trials = nwb.df_trials.copy()
-    df_trials.drop(columns=['intertrial_choice','intertrial_choice_rate'],errors='ignore')
-    df_trials = pd.merge(df_trials, has_intertrial_lick, on='trial',how='left')
-    with pd.option_context('future.no_silent_downcasting',True):
-        df_trials['intertrial_choice'] = df_trials['intertrial_choice'].fillna(False).infer_objects(copy=False)
+    df_trials.drop(columns=["intertrial_choice", "intertrial_choice_rate"], errors="ignore")
+    df_trials = pd.merge(df_trials, has_intertrial_lick, on="trial", how="left")
+    with pd.option_context("future.no_silent_downcasting", True):
+        df_trials["intertrial_choice"] = (
+            df_trials["intertrial_choice"].fillna(False).infer_objects(copy=False)
+        )
 
     # Rolling fraction of goCues with a response
     df_trials["intertrial_choice_rate"] = (
