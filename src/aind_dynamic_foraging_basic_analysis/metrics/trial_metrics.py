@@ -12,16 +12,7 @@ import aind_dynamic_foraging_data_utils.nwb_utils as nu
 import aind_dynamic_foraging_models.logistic_regression.model as model
 import aind_dynamic_foraging_basic_analysis.licks.annotation as a
 
-# TODO, Metrics to add
-# trial duration (stop-time - start-time) (start/stop time, or gocue to gocue?)
-# n_licks_left (# of left licks in response window)
-# n_licks_left_total (# of left licks from goCue to next go cue)
-# Same for Right, same for all
-# number of intertrial choices
-# number of intertrial switches
-# response switch or repeat
-
-# TODO, we might want to make these parameters metric specific
+# We might want to make these parameters metric specific
 WIN_DUR = 15
 MIN_EVENTS = 2
 
