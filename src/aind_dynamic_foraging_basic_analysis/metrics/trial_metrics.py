@@ -17,39 +17,6 @@ WIN_DUR = 15
 MIN_EVENTS = 2
 
 
-def compute_ideal_efficiency(nwb):
-    """
-    This metric does not make sense if there is baiting
-    """
-
-    df_trials = nwb.df_trials.copy()
-    df_trials["AVERAGE_PROB"] = [
-        np.mean(x) for x in zip(df_trials["reward_probabilityL"], df_trials["reward_probabilityR"])
-    ]
-    df_trials["CHOICE_PROB"] = [
-        x[x[2]] if x[2] != 2 else np.nan
-        for x in zip(
-            df_trials["reward_probabilityL"],
-            df_trials["reward_probabilityR"],
-            df_trials["animal_response"].astype(int),
-        )
-    ]
-    df_trials["PROB_DIFF"] = df_trials["CHOICE_PROB"] - df_trials["AVERAGE_PROB"]
-    df_trials["theoretical_efficiency"] = (
-        df_trials["PROB_DIFF"].rolling(WIN_DUR * 3, min_periods=MIN_EVENTS, center=True).mean()
-    )
-
-    # Clean up temp columns
-    drop_cols = [
-        "AVERAGE_PROB",
-        "CHOICE_PROB",
-        "PROB_DIFF",
-    ]
-    df_trials = df_trials.drop(columns=drop_cols)
-
-    return df_trials
-
-
 def compute_trial_metrics(nwb):
     """
     Computes trial by trial metrics
