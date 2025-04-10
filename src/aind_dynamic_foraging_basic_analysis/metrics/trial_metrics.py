@@ -27,11 +27,21 @@ def compute_trial_metrics(nwb):
                             computed only on trials with a response
     choose_right_rate,      fraction of trials where chose right,
                             computed only on trials with a response
+    intertrial_choice,      whether there was an intertrial lick event
+    intertrial_choice_rate,   rolling fraction of go cues with intertrial licking
 
     """
+    if not hasattr(nwb, "df_events"):
+        print("computing df_events first")
+        nwb.df_events = nu.create_events_df(nwb)
+
     if not hasattr(nwb, "df_trials"):
-        print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
-        return
+        print("computing df_trials")
+        nwb.df_trials = nu.create_df_trials(nwb)
+
+    if not hasattr(nwb, "df_licks"):
+        print("Annotating licks")
+        nwb.df_licks = a.annotate_licks(nwb)
 
     df_trials = nwb.df_trials.copy()
 
@@ -59,6 +69,9 @@ def compute_trial_metrics(nwb):
     df_trials["choose_right_rate"] = (
         df_trials["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
+
+    # Add intertrial licking
+    df_trials = add_intertrial_licking(df_trials, nwb.df_licks) 
 
     # Clean up temp columns
     drop_cols = [
@@ -170,32 +183,24 @@ def compute_bias(nwb):
     return df_trials
 
 
-def add_intertrial_licking(nwb):
+def add_intertrial_licking(df_trials, df_licks):
+    '''
+    Adds two metrics
+    intertrial_choice (bool), whether there was an intertrial lick event
+    intertrial_choice_rate (float), rolling fraction of go cues with intertrial licking
+    '''
 
-    if not hasattr(nwb, "df_events"):
-        print("computing df_events first")
-        nwb.df_events = nu.create_events_df(nwb)
-
-    if not hasattr(nwb, "df_trials"):
-        print("computing df_trials")
-        nwb.df_trials = nu.create_df_trials(nwb)
-
-    if not hasattr(nwb, "df_licks"):
-        print("Annotating licks")
-        nwb.df_licks = a.annotate_licks(nwb)
-
-    has_intertrial_lick = (
-        nwb.df_licks.query("within_session").groupby("trial")["intertrial_choice"].any()
+    has_intertrial_choice = (
+        df_licks.query("within_session").groupby("trial")["intertrial_choice"].any()
     )
-    df_trials = nwb.df_trials.copy()
     df_trials.drop(columns=["intertrial_choice", "intertrial_choice_rate"], errors="ignore")
-    df_trials = pd.merge(df_trials, has_intertrial_lick, on="trial", how="left")
+    df_trials = pd.merge(df_trials, has_intertrial_choice, on="trial", how="left")
     with pd.option_context("future.no_silent_downcasting", True):
         df_trials["intertrial_choice"] = (
             df_trials["intertrial_choice"].fillna(False).infer_objects(copy=False)
         )
 
-    # Rolling fraction of goCues with a response
+    # Rolling fraction of goCues with intertrial licking
     df_trials["intertrial_choice_rate"] = (
         df_trials["intertrial_choice"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
