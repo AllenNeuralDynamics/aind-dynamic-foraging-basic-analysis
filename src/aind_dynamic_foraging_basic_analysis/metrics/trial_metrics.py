@@ -84,13 +84,12 @@ def compute_trial_metrics(nwb):
     return df_trials
 
 
-def compute_bias(nwb):
+def compute_side_bias(nwb):
     """
     Computes side bias by fitting a logistic regression model
     returns trials table with the following columns:
-    bias, the side bias
-    bias_ci_lower, the lower confidence interval on the bias
-    bias_ci_upper, the uppwer confidence interval on the bias
+    side_bias, the side bias
+    side_bias_confidence_interval, the [lower,upper] confidence interval on the bias
     """
 
     # Parameters for computing bias
@@ -162,23 +161,53 @@ def compute_bias(nwb):
     # Pack results into a dataframe
     df = pd.DataFrame()
     df["trial"] = compute_on
-    df["bias"] = bias
-    df["bias_ci_lower"] = ci_lower
-    df["bias_ci_upper"] = ci_upper
-    df["bias_C"] = C
+    df["side_bias"] = bias
+    df["side_bias_confidence_interval_lower"] = ci_lower
+    df["side_bias_confidence_interval_upper"] = ci_upper
+    df["side_bias_C"] = C
 
     # merge onto trials dataframe
+    df_trials = nwb.df_trials.copy()
     df_trials = pd.merge(
-        nwb.df_trials.drop(columns=["bias", "bias_ci_lower", "bias_ci_upper"], errors="ignore"),
-        df[["trial", "bias", "bias_ci_lower", "bias_ci_upper"]],
+        df_trials.drop(
+            columns=[
+                "side_bias",
+                "side_bias_confidence_interval_lower",
+                "side_bias_confidence_interval_upper",
+            ],
+            errors="ignore",
+        ),
+        df[
+            [
+                "trial",
+                "side_bias",
+                "side_bias_confidence_interval_lower",
+                "side_bias_confidence_interval_upper",
+            ]
+        ],
         how="left",
         on=["trial"],
     )
 
-    # fill in bias on non-computed trials
-    df_trials["bias"] = df_trials["bias"].bfill().ffill()
-    df_trials["bias_ci_lower"] = df_trials["bias_ci_lower"].bfill().ffill()
-    df_trials["bias_ci_upper"] = df_trials["bias_ci_upper"].bfill().ffill()
+    # fill in side_bias on non-computed trials
+    df_trials["side_bias"] = df_trials["side_bias"].bfill().ffill()
+    df_trials["side_bias_confidence_interval_lower"] = (
+        df_trials["side_bias_confidence_interval_lower"].bfill().ffill()
+    )
+    df_trials["side_bias_confidence_interval_upper"] = (
+        df_trials["side_bias_confidence_interval_upper"].bfill().ffill()
+    )
+    df_trials["side_bias_confidence_interval"] = [
+        x
+        for x in zip(
+            df_trials["side_bias_confidence_interval_lower"],
+            df_trials["side_bias_confidence_interval_upper"],
+        )
+    ]
+
+    df_trials = df_trials.drop(
+        columns=["side_bias_confidence_interval_lower", "side_bias_confidence_interval_upper"]
+    )
 
     return df_trials
 
