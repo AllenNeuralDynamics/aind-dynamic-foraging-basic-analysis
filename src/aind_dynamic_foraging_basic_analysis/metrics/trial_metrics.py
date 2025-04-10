@@ -71,7 +71,7 @@ def compute_trial_metrics(nwb):
     )
 
     # Add intertrial licking
-    df_trials = add_intertrial_licking(df_trials, nwb.df_licks) 
+    df_trials = add_intertrial_licking(df_trials, nwb.df_licks)
 
     # Clean up temp columns
     drop_cols = [
@@ -184,11 +184,11 @@ def compute_bias(nwb):
 
 
 def add_intertrial_licking(df_trials, df_licks):
-    '''
+    """
     Adds two metrics
     intertrial_choice (bool), whether there was an intertrial lick event
     intertrial_choice_rate (float), rolling fraction of go cues with intertrial licking
-    '''
+    """
 
     has_intertrial_choice = (
         df_licks.query("within_session").groupby("trial")["intertrial_choice"].any()
