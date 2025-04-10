@@ -5,12 +5,14 @@
 
 """
 
-import pandas as pd
-import numpy as np
-
+import aind_dynamic_foraging_data_utils.nwb_utils as nu
 import aind_dynamic_foraging_models.logistic_regression.model as model
+import numpy as np
+import pandas as pd
 
-# TODO, we might want to make these parameters metric specific
+import aind_dynamic_foraging_basic_analysis.licks.annotation as a
+
+# We might want to make these parameters metric specific
 WIN_DUR = 15
 MIN_EVENTS = 2
 
@@ -25,11 +27,21 @@ def compute_trial_metrics(nwb):
                             computed only on trials with a response
     choose_right_rate,      fraction of trials where chose right,
                             computed only on trials with a response
+    intertrial_choice,      whether there was an intertrial lick event
+    intertrial_choice_rate,   rolling fraction of go cues with intertrial licking
 
     """
+    if not hasattr(nwb, "df_events"):
+        print("computing df_events first")
+        nwb.df_events = nu.create_events_df(nwb)
+
     if not hasattr(nwb, "df_trials"):
-        print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
-        return
+        print("computing df_trials")
+        nwb.df_trials = nu.create_df_trials(nwb)
+
+    if not hasattr(nwb, "df_licks"):
+        print("Annotating licks")
+        nwb.df_licks = a.annotate_licks(nwb)
 
     df_trials = nwb.df_trials.copy()
 
@@ -58,15 +70,8 @@ def compute_trial_metrics(nwb):
         df_trials["WENT_RIGHT"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
 
-    # TODO, add from process_nwb
-    # trial duration (stop-time - start-time) (start/stop time, or gocue to gocue?)
-    # n_licks_left (# of left licks in response window)
-    # n_licks_left_total (# of left licks from goCue to next go cue)
-    # Same for Right, same for all
-    # intertrial choices (boolean)
-    # number of intertrial choices
-    # number of intertrial switches
-    # response switch or repeat
+    # Add intertrial licking
+    df_trials = add_intertrial_licking(df_trials, nwb.df_licks)
 
     # Clean up temp columns
     drop_cols = [
@@ -79,13 +84,12 @@ def compute_trial_metrics(nwb):
     return df_trials
 
 
-def compute_bias(nwb):
+def compute_side_bias(nwb):
     """
     Computes side bias by fitting a logistic regression model
     returns trials table with the following columns:
-    bias, the side bias
-    bias_ci_lower, the lower confidence interval on the bias
-    bias_ci_upper, the uppwer confidence interval on the bias
+    side_bias, the side bias
+    side_bias_confidence_interval, the [lower,upper] confidence interval on the bias
     """
 
     # Parameters for computing bias
@@ -157,22 +161,76 @@ def compute_bias(nwb):
     # Pack results into a dataframe
     df = pd.DataFrame()
     df["trial"] = compute_on
-    df["bias"] = bias
-    df["bias_ci_lower"] = ci_lower
-    df["bias_ci_upper"] = ci_upper
-    df["bias_C"] = C
+    df["side_bias"] = bias
+    df["side_bias_confidence_interval_lower"] = ci_lower
+    df["side_bias_confidence_interval_upper"] = ci_upper
+    df["side_bias_C"] = C
 
     # merge onto trials dataframe
+    df_trials = nwb.df_trials.copy()
     df_trials = pd.merge(
-        nwb.df_trials.drop(columns=["bias", "bias_ci_lower", "bias_ci_upper"], errors="ignore"),
-        df[["trial", "bias", "bias_ci_lower", "bias_ci_upper"]],
+        df_trials.drop(
+            columns=[
+                "side_bias",
+                "side_bias_confidence_interval_lower",
+                "side_bias_confidence_interval_upper",
+            ],
+            errors="ignore",
+        ),
+        df[
+            [
+                "trial",
+                "side_bias",
+                "side_bias_confidence_interval_lower",
+                "side_bias_confidence_interval_upper",
+            ]
+        ],
         how="left",
         on=["trial"],
     )
 
-    # fill in bias on non-computed trials
-    df_trials["bias"] = df_trials["bias"].bfill().ffill()
-    df_trials["bias_ci_lower"] = df_trials["bias_ci_lower"].bfill().ffill()
-    df_trials["bias_ci_upper"] = df_trials["bias_ci_upper"].bfill().ffill()
+    # fill in side_bias on non-computed trials
+    df_trials["side_bias"] = df_trials["side_bias"].bfill().ffill()
+    df_trials["side_bias_confidence_interval_lower"] = (
+        df_trials["side_bias_confidence_interval_lower"].bfill().ffill()
+    )
+    df_trials["side_bias_confidence_interval_upper"] = (
+        df_trials["side_bias_confidence_interval_upper"].bfill().ffill()
+    )
+    df_trials["side_bias_confidence_interval"] = [
+        x
+        for x in zip(
+            df_trials["side_bias_confidence_interval_lower"],
+            df_trials["side_bias_confidence_interval_upper"],
+        )
+    ]
 
+    df_trials = df_trials.drop(
+        columns=["side_bias_confidence_interval_lower", "side_bias_confidence_interval_upper"]
+    )
+
+    return df_trials
+
+
+def add_intertrial_licking(df_trials, df_licks):
+    """
+    Adds two metrics
+    intertrial_choice (bool), whether there was an intertrial lick event
+    intertrial_choice_rate (float), rolling fraction of go cues with intertrial licking
+    """
+
+    has_intertrial_choice = (
+        df_licks.query("within_session").groupby("trial")["intertrial_choice"].any()
+    )
+    df_trials.drop(columns=["intertrial_choice", "intertrial_choice_rate"], errors="ignore")
+    df_trials = pd.merge(df_trials, has_intertrial_choice, on="trial", how="left")
+    with pd.option_context("future.no_silent_downcasting", True):
+        df_trials["intertrial_choice"] = (
+            df_trials["intertrial_choice"].fillna(False).infer_objects(copy=False)
+        )
+
+    # Rolling fraction of goCues with intertrial licking
+    df_trials["intertrial_choice_rate"] = (
+        df_trials["intertrial_choice"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
+    )
     return df_trials

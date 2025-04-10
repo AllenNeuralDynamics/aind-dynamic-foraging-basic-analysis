@@ -19,7 +19,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     ax=None,
     fig=None,
     processing="bright",
-    metrics=["pR", "pL", "response_rate"],
+    metrics=["pR", "pL"],
     plot_list=[
         "FIP",
         "bouts",
