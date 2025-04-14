@@ -13,12 +13,13 @@ from aind_dynamic_foraging_basic_analysis.plot.style import (
     FIP_COLORS,
 )
 
+
 def plot_session_scroller_v2(  # noqa: C901 pragma: no cover
     nwb,
     ax=None,
     fig=None,
     processing="bright",
-    metrics=["pR", "pL", "response_rate"],
+    metrics=[],
     plot_list=[
         "FIP",
         "bouts",
@@ -41,8 +42,8 @@ def plot_session_scroller_v2(  # noqa: C901 pragma: no cover
 
     processing (str) processing method for FIP data to plot
 
-    metrics (list of strings), list of metrics to plot. Must be either 'pR','pL' or
-        columns in nwb.df_trials
+    metrics (list of strings), list of metrics to plot. Must be a
+        column in nwb.df_trials
 
     plot_list (list of strings), list of annotations and features to plot
 
