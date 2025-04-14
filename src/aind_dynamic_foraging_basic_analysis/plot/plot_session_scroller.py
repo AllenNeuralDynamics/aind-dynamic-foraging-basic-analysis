@@ -14,7 +14,7 @@ from aind_dynamic_foraging_basic_analysis.plot.style import (
 )
 
 
-def plot_session_scroller_v2(  # noqa: C901 pragma: no cover
+def plot_session_scroller(  # noqa: C901 pragma: no cover
     nwb,
     ax=None,
     fig=None,
