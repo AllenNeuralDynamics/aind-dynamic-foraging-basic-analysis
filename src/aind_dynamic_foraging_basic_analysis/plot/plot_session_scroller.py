@@ -379,12 +379,14 @@ def plot_session_scroller_v2(  # noqa: C901 pragma: no cover
 
     pR = params["probs_bottom"] + df_trials["reward_probabilityR"]/4
     pR = np.repeat(pR, 2)[:-1]
-    ax.fill_between(go_cue_times_doubled,  params["probs_bottom"], pR, color="b", label="pR", alpha = 0.5)
+    ax.fill_between(go_cue_times_doubled,  params["probs_bottom"], pR,
+                    color="b", label="pR", alpha=0.5)
 
     pL = params["probs_bottom"] - df_trials["reward_probabilityL"]/4
     pL = np.repeat(pL, 2)[:-1]
 
-    ax.fill_between(go_cue_times_doubled, pL, params["probs_bottom"], color="r", label="pL", alpha = 0.5)
+    ax.fill_between(go_cue_times_doubled, pL, params["probs_bottom"],
+                    color="r", label="pL", alpha=0.5)
 
     # plot metrics if they are available
     for metric in metrics:
