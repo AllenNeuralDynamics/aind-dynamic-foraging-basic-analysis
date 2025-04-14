@@ -92,7 +92,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     if ax is None:
         if fip_df is None:
-            fig, ax = plt.subplots(figsize=(15, 4))
+            fig, ax = plt.subplots(figsize=(15, 5))
         else:
             fig, ax = plt.subplots(figsize=(15, 8))
 
@@ -150,6 +150,9 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         (params["probs_top"] - params["probs_bottom"]) * -0.33 + params["probs_bottom"],
         (params["probs_top"] - params["probs_bottom"]) * 0 + params["probs_bottom"],
         (params["probs_top"] - params["probs_bottom"]) * 0.33 + params["probs_bottom"],
+        (params["metrics_top"] - params["metrics_bottom"]) * 0.25 + params["metrics_bottom"],
+        (params["metrics_top"] - params["metrics_bottom"]) * 0.5 + params["metrics_bottom"],
+        (params["metrics_top"] - params["metrics_bottom"]) * 0.75 + params["metrics_bottom"],
         params["probs_top"],
     ]
     ylabels = [
@@ -160,6 +163,9 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "1",
         "0",
         "1",
+        "0.25",
+        "0.5",
+        "0.75",
         "metrics",
     ]
     ycolors = ["k", "k", "r", "r", "darkgray", "darkgray", "darkgray", "k"]
@@ -405,9 +411,9 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         tick.set_color(color)
     ax.set_xlabel("time (s)", fontsize=STYLE["axis_fontsize"])
     if fip_df is None:
-        ax.set_ylim(0, 2)
+        ax.set_ylim(0, 2.5)
     else:
-        ax.set_ylim(0, 6)
+        ax.set_ylim(0, 6.5)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     if fip_df is not None:
