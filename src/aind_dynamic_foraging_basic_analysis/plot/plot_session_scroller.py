@@ -163,15 +163,15 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "right licks",
         "left reward",
         "right reward",
-        "1",
+        "pL = 1",
         "0",
-        "1",
+        "pR = 1",
         "0.25",
         "0.5",
         "0.75",
         "metrics",
     ]
-    ycolors = ["k", "k", "r", "r", "darkgray", "darkgray", "darkgray", "k"]
+    ycolors = ["b", "r", "b", "r", "darkgray", "darkgray", "darkgray", "k"]
 
     if fip_df is not None:
         fip_channels = [
@@ -360,7 +360,6 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         alpha=1,
         linewidth=2,
         color="black",
-        label="reward times",
     )
 
     right_reward_deliverys = df_events.query('event == "right_reward_delivery_time"')
@@ -379,12 +378,20 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     if "go cue" in plot_list:
         ax.vlines(
             go_cue_times,
-            params["go_cue_bottom"],
-            params["go_cue_top"],
+            params["left_lick_bottom"],
+            params["left_reward_top"],
             alpha=0.75,
             linewidth=1,
             color="b",
             label="go cue",
+        )
+        ax.vlines(
+            go_cue_times,
+            params["right_reward_bottom"],
+            params["right_lick_top"],
+            alpha=0.75,
+            linewidth=1,
+            color="b",
         )
 
     # plot metrics
@@ -393,16 +400,18 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     pR = params["probs_bottom"] + df_trials["reward_probabilityR"] / 4
     pR = np.repeat(pR, 2)[:-1]
-    ax.fill_between(
-        go_cue_times_doubled, params["probs_bottom"], pR, color="b", label="pR", alpha=0.4
-    )
+    ax.fill_between(go_cue_times_doubled, params["probs_bottom"], pR, color="r", alpha=0.4)
+    # ax.fill_between(
+    #    go_cue_times_doubled, params["probs_bottom"], pR, color="lightcoral",
+    # )
 
     pL = params["probs_bottom"] - df_trials["reward_probabilityL"] / 4
     pL = np.repeat(pL, 2)[:-1]
 
-    ax.fill_between(
-        go_cue_times_doubled, pL, params["probs_bottom"], color="r", label="pL", alpha=0.4
-    )
+    ax.fill_between(go_cue_times_doubled, pL, params["probs_bottom"], color="b", alpha=0.4)
+    # ax.fill_between(
+    #    go_cue_times_doubled, pL, params["probs_bottom"], color="lightskyblue",
+    # )
 
     # plot metrics if they are available
     for metric in metrics:
@@ -413,7 +422,8 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             print('Metric "{}" not available in df_trials'.format(metric))
 
     # Clean up plot
-    ax.legend(framealpha=1, loc="lower left", reverse=True)
+    if len(plot_list) > 0:
+        ax.legend(framealpha=1, loc="lower left", reverse=True)
     ax.set_yticks(yticks)
     ax.set_yticklabels(ylabels, fontsize=STYLE["axis_ticks_fontsize"])
 
