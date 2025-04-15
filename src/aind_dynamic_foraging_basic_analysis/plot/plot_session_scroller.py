@@ -398,9 +398,9 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     for tick, color in zip(ax[0].get_yticklabels(), ycolors):
         tick.set_color(color)
 
-    for a in ax:
-        a.spines["top"].set_visible(False)
-        a.spines["right"].set_visible(False)
+    for my_ax in ax:
+        my_ax.spines["top"].set_visible(False)
+        my_ax.spines["right"].set_visible(False)
 
     ax[-1].set_title(nwb.session_id)
 
