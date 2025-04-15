@@ -60,6 +60,8 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "baiting",
         "FIP",
         "lick artifacts",
+        "manual rewards",
+        "auto rewards",
     ]
     unapproved = set(plot_list) - set(approved_plot_list)
     if len(unapproved) > 0:
@@ -372,6 +374,47 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         linewidth=2,
         color="black",
     )
+
+    if "manual rewards" in plot_list:
+        manual_left_times = left_reward_deliverys.query('data == "manual"').timestamps.values
+        ax.vlines(
+            manual_left_times,
+            params["left_reward_bottom"],
+            params["left_reward_top"],
+            alpha=1,
+            linewidth=2,
+            color="deepskyblue",
+            label="manual reward",
+        )
+        manual_right_times = right_reward_deliverys.query('data == "manual"').timestamps.values
+        ax.vlines(
+            manual_right_times,
+            params["right_reward_bottom"],
+            params["right_reward_top"],
+            alpha=1,
+            linewidth=2,
+            color="deepskyblue",
+        )
+    if "auto rewards" in plot_list:
+        auto_left_times = left_reward_deliverys.query('data == "auto"').timestamps.values
+        ax.vlines(
+            auto_left_times,
+            params["left_reward_bottom"],
+            params["left_reward_top"],
+            alpha=1,
+            linewidth=2,
+            color="royalblue",
+            label="auto reward",
+        )
+        auto_right_times = right_reward_deliverys.query('data == "auto"').timestamps.values
+        ax.vlines(
+            auto_right_times,
+            params["right_reward_bottom"],
+            params["right_reward_top"],
+            alpha=1,
+            linewidth=2,
+            color="royalblue",
+        )
 
     go_cues = df_events.query('event == "goCue_start_time"')
     go_cue_times = go_cues.timestamps.values
