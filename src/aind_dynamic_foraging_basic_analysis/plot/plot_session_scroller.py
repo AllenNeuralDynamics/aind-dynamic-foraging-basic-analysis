@@ -18,13 +18,12 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     nwb,
     ax=None,
     fig=None,
-    processing="bright",
     metrics=[],
     plot_list=[
-        "FIP",
         "bouts",
         "go cue",
     ],
+    fip=[],
 ):
     """
     Creates an interactive plot of the session.
@@ -41,10 +40,20 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     ax is a pyplot figure axis. If None, a new figure is created
 
-    processing (str) processing method for FIP data to plot
-
-    metrics (list of strings), list of metrics to plot. Must be a
-        column in nwb.df_trials
+    metrics, list of metrics to plot. Each metric must be a column of
+        nwb.df_trials
+        This can be formatted in several ways
+        a string containing the name of the metric
+            example: "response_rate"
+        a list that contains the metric
+            example: ["response_rate"]
+        a list that contains the metric and ylimits
+            example: ["response_rate",(0,1)]
+        a list that contains multiple metrics and ylimits
+            example: ["response_rate","side_bias",(-1,1)]
+        If ylimits are not supplied, then the limits of the data are used
+        The ylabel will be the metric name unless multiple metrics are used
+            then the ylabel is "metrics", and a legend is added
 
     plot_list (list of strings), list of annotations and features to plot
 
@@ -58,7 +67,6 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "rewarded lick",
         "cue response",
         "baiting",
-        "FIP",
         "lick artifacts",
         "manual rewards",
         "auto rewards",
@@ -74,10 +82,8 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         df_events = nwb.df_events
     else:
         df_events = nwb.df_events
-    if hasattr(nwb, "fip_df") and ("FIP" in plot_list):
+    if hasattr(nwb, "fip_df"):
         fip_df = nwb.fip_df
-    else:
-        fip_df = None
     if hasattr(nwb, "df_licks"):
         df_licks = nwb.df_licks
     elif ("bouts" in plot_list) or ("cue response" in plot_list) or ("rewarded lick" in plot_list):
@@ -93,7 +99,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     else:
         df_trials = nwb.df_trials
 
-    num_plots = 1 + len(metrics)
+    num_plots = 1 + len(metrics) + len(fip)
 
     if (ax is None) or len(ax) != num_plots:
         fig, ax = plt.subplots(
@@ -127,32 +133,6 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "probs_top": 1.5,
         "go_cue_bottom": 0,
         "go_cue_top": 1.5,
-        "metrics_bottom": 1.5,
-        "metrics_top": 2.5,
-        "G_1_dff-bright_bottom": 2.5,
-        "G_1_dff-bright_top": 3.5,
-        "G_2_dff-bright_bottom": 3.5,
-        "G_2_dff-bright_top": 4.5,
-        "R_1_dff-bright_bottom": 4.5,
-        "R_1_dff-bright_top": 5.5,
-        "R_2_dff-bright_bottom": 5.5,
-        "R_2_dff-bright_top": 6.5,
-        "G_1_dff-poly_bottom": 2.5,
-        "G_1_dff-poly_top": 3.5,
-        "G_2_dff-poly_bottom": 3.5,
-        "G_2_dff-poly_top": 4.5,
-        "R_1_dff-poly_bottom": 4.5,
-        "R_1_dff-poly_top": 5.5,
-        "R_2_dff-poly_bottom": 5.5,
-        "R_2_dff-poly_top": 6.5,
-        "G_1_dff-exp_bottom": 2.5,
-        "G_1_dff-exp_top": 3.5,
-        "G_2_dff-exp_bottom": 3.5,
-        "G_2_dff-exp_top": 4.5,
-        "R_1_dff-exp_bottom": 4.5,
-        "R_1_dff-exp_top": 5.5,
-        "R_2_dff-exp_bottom": 5.5,
-        "R_2_dff-exp_top": 6.5,
     }
     yticks = [
         (params["left_lick_top"] - params["left_lick_bottom"]) / 2 + params["left_lick_bottom"],
@@ -164,10 +144,6 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         (params["probs_top"] - params["probs_bottom"]) * -0.33 + params["probs_bottom"],
         (params["probs_top"] - params["probs_bottom"]) * 0 + params["probs_bottom"],
         (params["probs_top"] - params["probs_bottom"]) * 0.33 + params["probs_bottom"],
-        # (params["metrics_top"] - params["metrics_bottom"]) * 0.25 + params["metrics_bottom"],
-        # (params["metrics_top"] - params["metrics_bottom"]) * 0.5 + params["metrics_bottom"],
-        # (params["metrics_top"] - params["metrics_bottom"]) * 0.75 + params["metrics_bottom"],
-        # params["metrics_top"],
     ]
     ylabels = [
         "left licks",
@@ -177,63 +153,8 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         "pL = 1",
         "0",
         "pR = 1",
-        # "0.25",
-        # "0.5",
-        # "0.75",
-        # "metrics",
     ]
     ycolors = ["b", "r", "b", "r", "darkgray", "darkgray", "darkgray"]
-
-    if fip_df is not None:
-        fip_channels = [
-            "G_2_dff-{}".format(processing),
-            "G_1_dff-{}".format(processing),
-            "R_2_dff-{}".format(processing),
-            "R_1_dff-{}".format(processing),
-        ]
-        present_channels = fip_df["event"].unique()
-        for index, channel in enumerate(fip_channels):
-            if channel in present_channels:
-                yticks.append(
-                    (params[channel + "_top"] - params[channel + "_bottom"]) * 1
-                    + params[channel + "_bottom"]
-                )
-                ylabels.append(channel)
-                color = FIP_COLORS.get(channel, "k")
-                ycolors.append(color)
-                C = fip_df.query("event == @channel").copy()
-                d_min = C["data"].min()
-                d_max[0] = C["data"].max[0]()
-                d_range = d_max[0] - d_min
-                t1 = 0.25
-                t2 = 0.5
-                t3 = 0.75
-                p1 = d_min + t1 * d_range
-                p2 = d_min + t2 * d_range
-                p3 = d_min + t3 * d_range
-                yticks.append(
-                    params[channel + "_bottom"]
-                    + (params[channel + "_top"] - params[channel + "_bottom"]) * t1
-                )
-                yticks.append(
-                    params[channel + "_bottom"]
-                    + (params[channel + "_top"] - params[channel + "_bottom"]) * t2
-                )
-                yticks.append(
-                    params[channel + "_bottom"]
-                    + (params[channel + "_top"] - params[channel + "_bottom"]) * t3
-                )
-                ylabels.append(str(round(p1, 3)))
-                ylabels.append(str(round(p2, 3)))
-                ylabels.append(str(round(p3, 3)))
-                ycolors.append("darkgray")
-                ycolors.append("darkgray")
-                ycolors.append("darkgray")
-                C["data"] = C["data"] - d_min
-                C["data"] = C["data"].values / (d_max[0] - d_min)
-                C["data"] += params[channel + "_bottom"]
-                ax[0].plot(C.timestamps.values, C.data.values, color)
-                ax[0].axhline(params[channel + "_bottom"], color="k", linewidth=0.5, alpha=0.25)
 
     if ("bouts" not in plot_list) or (df_licks is None):
         left_licks = df_events.query('event == "left_lick_time"')
@@ -447,7 +368,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         )
 
     # plot metrics
-    ax[0].axhline(params["metrics_bottom"], color="k", linewidth=0.5, alpha=0.25)
+    ax[0].axhline(params["right_lick_top"], color="k", linewidth=0.5, alpha=0.25)
     go_cue_times_doubled = np.repeat(go_cue_times, 2)[1:]
 
     pR = params["probs_bottom"] + df_trials["reward_probabilityR"] / 4
@@ -463,26 +384,26 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     for index, metric in enumerate(metrics):
         plot_metric(df_trials, go_cue_times, metric, ax[index + 1])
 
+    # plot fip if they are available:
+    for index, f in enumerate(fip):
+        plot_fip(fip_df, f, ax[index + 1 + len(metrics)])
+
     # Clean up plot
     if len(plot_list) > 0:
         ax[0].legend(framealpha=1, loc="lower left", reverse=True)
+    ax[0].set_xlabel("time (s)", fontsize=STYLE["axis_fontsize"])
+    ax[0].set_ylim(0, 1.5)
     ax[0].set_yticks(yticks)
     ax[0].set_yticklabels(ylabels, fontsize=STYLE["axis_ticks_fontsize"])
-
     for tick, color in zip(ax[0].get_yticklabels(), ycolors):
         tick.set_color(color)
-    ax[0].set_xlabel("time (s)", fontsize=STYLE["axis_fontsize"])
-    if fip_df is None:
-        ax[0].set_ylim(0, 1.5)
-    else:
-        ax[0].set_ylim(0, 6.5)
+
     for a in ax:
         a.spines["top"].set_visible(False)
         a.spines["right"].set_visible(False)
-    if fip_df is not None:
-        ax[-1].set_title(nwb.session_id + ", FIP processing: {}".format(processing))
-    else:
-        ax[-1].set_title(nwb.session_id)
+
+    ax[-1].set_title(nwb.session_id)
+
     if num_plots == 1:
         plt.tight_layout()
 
@@ -575,3 +496,38 @@ def plot_metric(df_trials, go_cue_times, metric, ax):
 
     # Set ylabel
     ax.set_ylabel(ylabel, fontsize=12)
+
+
+def plot_fip(fip_df, channel, ax):
+    """
+    Plot an FIP channel
+    """
+
+    if fip_df is None:
+        raise Exception("Cannot plot FIP, no FIP data")
+
+    if channel not in fip_df["event"].unique():
+        raise Exception("Cannot plot {}, no data".format(channel))
+
+    color = get_fip_color(channel)
+    C = fip_df.query("event == @channel")
+    ax.plot(C.timestamps.values, C.data.values, color)
+    ax.axhline(0, color="k", linewidth=0.5, alpha=0.25)
+    ax.set_ylabel(channel, fontsize=12)
+
+
+def get_fip_color(channel):
+    """
+    Gets the color for FIP
+    if the channel is defined in style.FIP_COLORS, use that
+    otherwise look for the root "G" in "G_0_dff"
+    otherwise use black
+    """
+    if channel in FIP_COLORS:
+        return FIP_COLORS.get(channel)
+
+    root = channel.split("_")[0]
+    if root in FIP_COLORS:
+        return FIP_COLORS.get(root)
+
+    return "k"
