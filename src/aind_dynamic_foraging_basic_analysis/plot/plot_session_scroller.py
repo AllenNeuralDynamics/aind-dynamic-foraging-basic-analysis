@@ -313,7 +313,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             params["left_reward_top"],
             alpha=1,
             linewidth=2,
-            color="deepskyblue",
+            color="cyan",
             label="manual reward",
         )
         manual_right_times = right_reward_deliverys.query('data == "manual"').timestamps.values
@@ -323,7 +323,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             params["right_reward_top"],
             alpha=1,
             linewidth=2,
-            color="deepskyblue",
+            color="cyan",
         )
     if "auto rewards" in plot_list:
         auto_left_times = left_reward_deliverys.query('data == "auto"').timestamps.values
