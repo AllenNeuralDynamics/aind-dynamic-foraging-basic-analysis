@@ -10,7 +10,7 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
 from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 
 
-def plot_fip_psth_compare_alignments(
+def plot_fip_psth_compare_alignments(  # NOQA C901
     nwb, alignments, channel, tw=[-4, 4],
     ax=None, fig=None,
     censor=True, extra_colors={}
