@@ -12,7 +12,7 @@ from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 
 def plot_fip_psth_compare_alignments(
     nwb, alignments, channel, tw=[-4, 4],
-    ax=None,fig=None,
+    ax=None, fig=None,
     censor=True, extra_colors={}
 ):
     """
@@ -94,7 +94,7 @@ def plot_fip_psth_compare_channels(
     nwb,
     align,
     tw=[-4, 4],
-    ax=None,fig=None,
+    ax=None, fig=None,
     channels=[
         "G_1_preprocessed",
         "G_2_preprocessed",
