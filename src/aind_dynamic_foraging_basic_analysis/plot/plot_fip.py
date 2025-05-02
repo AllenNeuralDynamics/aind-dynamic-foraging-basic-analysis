@@ -13,7 +13,8 @@ from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 def plot_fip_psth_compare_alignments(  # NOQA C901
     nwb, alignments, channel, tw=[-4, 4],
     ax=None, fig=None,
-    censor=True, extra_colors={}
+    censor=True, extra_colors={},
+    data_column="data"
 ):
     """
     Compare the same FIP channel aligned to multiple event types
@@ -24,6 +25,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     tw, time window for the PSTH
     extra_colors (dict), a dictionary of extra colors.
         keys should be alignments, or colors are random
+    data_column (string), name of data column in nwb.df_fip
 
     EXAMPLE
     *******************
@@ -73,7 +75,8 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
 
     for alignment in align_dict:
         etr = fip_psth_inner_compute(
-            nwb, align_dict[alignment], channel, True, tw, censor, censor_times
+            nwb, align_dict[alignment], channel, True, tw, 
+            censor, censor_times, data_column
         )
         fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment)
 
@@ -139,7 +142,8 @@ def plot_fip_psth_compare_channels(
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
         if c in nwb.df_fip["event"].values:
-            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor)
+            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, 
+                        tw, censor, data_column)
             fip_psth_inner_plot(ax, etr, colors[dex], c)
         else:
             print("No data for channel: {}".format(c))
@@ -173,7 +177,7 @@ def fip_psth_inner_plot(ax, etr, color, label):
 
 
 def fip_psth_inner_compute(
-    nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True, censor_times=None
+    nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True, censor_times=None, data_column="data"
 ):
     """
     helper function that computes the event triggered response
@@ -182,13 +186,16 @@ def fip_psth_inner_compute(
     channel, what channel in the df_fip dataframe to use
     average(bool), whether to return the average, or all individual traces
     tw, time window before and after each event
+    censor_times, timepoints to censor
+    data_column (string), name of data column in nwb.df_fip
+
     """
 
     data = nwb.df_fip.query("event == @channel")
     etr = an.event_triggered_response(
         data,
         "timestamps",
-        "data",
+        data_column,
         align_timepoints,
         t_start=tw[0],
         t_end=tw[1],
@@ -200,16 +207,17 @@ def fip_psth_inner_compute(
     if average:
         mean = etr.groupby("time").mean()
         sem = etr.groupby("time").sem()
-        mean["sem"] = sem["data"]
+        mean["sem"] = sem[data_column]
         return mean
     return etr
 
 
-def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
+def plot_histogram(nwb, preprocessed=True, edge_percentile=2, data_column="data"):
     """
     Generates a histogram of values of each FIP channel
     preprocessed (Bool), if True, uses the preprocessed channel
     edge_percentile (float), displays only the (2, 100-2) percentiles of the data
+    data_column (string), name of data column in nwb.df_fip
 
     EXAMPLE
     ***********************
@@ -232,7 +240,7 @@ def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
             else:
                 dex = c + "_" + count
             df = nwb.df_fip.query("event == @dex")
-            ax[i, j].hist(df["data"], bins=1000, color=FIP_COLORS.get(dex, "k"))
+            ax[i, j].hist(df[data_column], bins=1000, color=FIP_COLORS.get(dex, "k"))
             ax[i, j].spines["top"].set_visible(False)
             ax[i, j].spines["right"].set_visible(False)
             if preprocessed:
@@ -241,8 +249,8 @@ def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
                 ax[i, j].set_xlabel("f")
             ax[i, j].set_ylabel("count")
             ax[i, j].set_title(dex)
-            mins.append(np.percentile(df["data"].values, edge_percentile))
-            maxs.append(np.percentile(df["data"].values, 100 - edge_percentile))
+            mins.append(np.percentile(df[data_column].values, edge_percentile))
+            maxs.append(np.percentile(df[data_column].values, 100 - edge_percentile))
     ax[0, 0].set_xlim(np.min(mins), np.max(maxs))
     fig.suptitle(nwb.session_id)
     plt.tight_layout()
