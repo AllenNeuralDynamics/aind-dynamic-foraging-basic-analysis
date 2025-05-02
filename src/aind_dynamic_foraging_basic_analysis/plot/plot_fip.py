@@ -83,7 +83,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
         etr = fip_psth_inner_compute(
             nwb, align_dict[alignment], channel, True, tw, censor, censor_times, data_column
         )
-        fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment)
+        fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment, data_column)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -153,7 +153,7 @@ def plot_fip_psth_compare_channels(
     for dex, c in enumerate(channels):
         if c in nwb.df_fip["event"].values:
             etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor, data_column)
-            fip_psth_inner_plot(ax, etr, colors[dex], c)
+            fip_psth_inner_plot(ax, etr, colors[dex], c, data_column)
         else:
             print("No data for channel: {}".format(c))
 
@@ -170,19 +170,21 @@ def plot_fip_psth_compare_channels(
     return fig, ax
 
 
-def fip_psth_inner_plot(ax, etr, color, label):
+def fip_psth_inner_plot(ax, etr, color, label, data_column):
     """
     helper function that plots an event triggered response
     ax, the pyplot axis to plot on
     etr, the dataframe that contains the event triggered response
     color, the line color to plot
     label, the label for the etr
+    data_column (string), name of data_column
     """
     if color == "":
         cmap = plt.get_cmap("tab20")
         color = cmap(np.random.randint(20))
-    ax.fill_between(etr.index, etr.data - etr["sem"], etr.data + etr["sem"], color=color, alpha=0.2)
-    ax.plot(etr.index, etr.data, color=color, label=label)
+    ax.fill_between(etr.index, etr[data_column] - etr["sem"],
+                    etr[data_column] + etr["sem"], color=color, alpha=0.2)
+    ax.plot(etr.index, etr[data_column], color=color, label=label)
 
 
 def fip_psth_inner_compute(
