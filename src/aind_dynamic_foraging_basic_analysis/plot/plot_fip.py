@@ -11,10 +11,15 @@ from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 
 
 def plot_fip_psth_compare_alignments(  # NOQA C901
-    nwb, alignments, channel, tw=[-4, 4],
-    ax=None, fig=None,
-    censor=True, extra_colors={},
-    data_column="data"
+    nwb,
+    alignments,
+    channel,
+    tw=[-4, 4],
+    ax=None,
+    fig=None,
+    censor=True,
+    extra_colors={},
+    data_column="data",
 ):
     """
     Compare the same FIP channel aligned to multiple event types
@@ -23,6 +28,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
         whose keys are event types and values are a list of timepoints
     channel, (str) the name of the FIP channel
     tw, time window for the PSTH
+    censor, censor important timepoints before and after aligned timepoints
     extra_colors (dict), a dictionary of extra colors.
         keys should be alignments, or colors are random
     data_column (string), name of data column in nwb.df_fip
@@ -75,8 +81,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
 
     for alignment in align_dict:
         etr = fip_psth_inner_compute(
-            nwb, align_dict[alignment], channel, True, tw, 
-            censor, censor_times, data_column
+            nwb, align_dict[alignment], channel, True, tw, censor, censor_times, data_column
         )
         fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment)
 
@@ -97,7 +102,8 @@ def plot_fip_psth_compare_channels(
     nwb,
     align,
     tw=[-4, 4],
-    ax=None, fig=None,
+    ax=None,
+    fig=None,
     channels=[
         "G_1_preprocessed",
         "G_2_preprocessed",
@@ -107,12 +113,16 @@ def plot_fip_psth_compare_channels(
         "Iso_2_preprocessed",
     ],
     censor=True,
+    data_column="data",
 ):
     """
     nwb, the nwb object for the session of interest
     align should either be a string of the name of an event type in nwb.df_events,
         or a list of timepoints
     channels should be a list of channel names (strings)
+    censor, censor important timepoints before and after aligned timepoints
+    data_column (string), name of data column in nwb.df_fip
+
     EXAMPLE
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
@@ -142,8 +152,7 @@ def plot_fip_psth_compare_channels(
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
         if c in nwb.df_fip["event"].values:
-            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, 
-                        tw, censor, data_column)
+            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor, data_column)
             fip_psth_inner_plot(ax, etr, colors[dex], c)
         else:
             print("No data for channel: {}".format(c))
@@ -177,7 +186,14 @@ def fip_psth_inner_plot(ax, etr, color, label):
 
 
 def fip_psth_inner_compute(
-    nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True, censor_times=None, data_column="data"
+    nwb,
+    align_timepoints,
+    channel,
+    average,
+    tw=[-1, 1],
+    censor=True,
+    censor_times=None,
+    data_column="data",
 ):
     """
     helper function that computes the event triggered response
@@ -186,6 +202,7 @@ def fip_psth_inner_compute(
     channel, what channel in the df_fip dataframe to use
     average(bool), whether to return the average, or all individual traces
     tw, time window before and after each event
+    censor, censor important timepoints before and after aligned timepoints
     censor_times, timepoints to censor
     data_column (string), name of data column in nwb.df_fip
 
