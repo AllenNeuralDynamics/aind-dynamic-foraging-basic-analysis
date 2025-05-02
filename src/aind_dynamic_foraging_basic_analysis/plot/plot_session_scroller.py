@@ -82,8 +82,8 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         df_events = nwb.df_events
     else:
         df_events = nwb.df_events
-    if hasattr(nwb, "fip_df"):
-        fip_df = nwb.fip_df
+    if hasattr(nwb, "df_fip"):
+        fip_df = nwb.df_fip
     if hasattr(nwb, "df_licks"):
         df_licks = nwb.df_licks
     elif ("bouts" in plot_list) or ("cue response" in plot_list) or ("rewarded lick" in plot_list):
