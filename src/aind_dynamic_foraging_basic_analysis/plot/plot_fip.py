@@ -11,9 +11,15 @@ from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
 
 
 def plot_fip_psth_compare_alignments(  # NOQA C901
-    nwb, alignments, channel, tw=[-4, 4],
-    ax=None, fig=None,
-    censor=True, extra_colors={}
+    nwb,
+    alignments,
+    channel,
+    tw=[-4, 4],
+    ax=None,
+    fig=None,
+    censor=True,
+    extra_colors={},
+    data_column="data",
 ):
     """
     Compare the same FIP channel aligned to multiple event types
@@ -22,8 +28,10 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
         whose keys are event types and values are a list of timepoints
     channel, (str) the name of the FIP channel
     tw, time window for the PSTH
+    censor, censor important timepoints before and after aligned timepoints
     extra_colors (dict), a dictionary of extra colors.
         keys should be alignments, or colors are random
+    data_column (string), name of data column in nwb.df_fip
 
     EXAMPLE
     *******************
@@ -73,9 +81,9 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
 
     for alignment in align_dict:
         etr = fip_psth_inner_compute(
-            nwb, align_dict[alignment], channel, True, tw, censor, censor_times
+            nwb, align_dict[alignment], channel, True, tw, censor, censor_times, data_column
         )
-        fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment)
+        fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment, data_column)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -94,7 +102,8 @@ def plot_fip_psth_compare_channels(
     nwb,
     align,
     tw=[-4, 4],
-    ax=None, fig=None,
+    ax=None,
+    fig=None,
     channels=[
         "G_1_preprocessed",
         "G_2_preprocessed",
@@ -104,12 +113,16 @@ def plot_fip_psth_compare_channels(
         "Iso_2_preprocessed",
     ],
     censor=True,
+    data_column="data",
 ):
     """
     nwb, the nwb object for the session of interest
     align should either be a string of the name of an event type in nwb.df_events,
         or a list of timepoints
     channels should be a list of channel names (strings)
+    censor, censor important timepoints before and after aligned timepoints
+    data_column (string), name of data column in nwb.df_fip
+
     EXAMPLE
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
@@ -139,8 +152,8 @@ def plot_fip_psth_compare_channels(
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
         if c in nwb.df_fip["event"].values:
-            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor)
-            fip_psth_inner_plot(ax, etr, colors[dex], c)
+            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor, data_column)
+            fip_psth_inner_plot(ax, etr, colors[dex], c, data_column)
         else:
             print("No data for channel: {}".format(c))
 
@@ -157,23 +170,32 @@ def plot_fip_psth_compare_channels(
     return fig, ax
 
 
-def fip_psth_inner_plot(ax, etr, color, label):
+def fip_psth_inner_plot(ax, etr, color, label, data_column):
     """
     helper function that plots an event triggered response
     ax, the pyplot axis to plot on
     etr, the dataframe that contains the event triggered response
     color, the line color to plot
     label, the label for the etr
+    data_column (string), name of data_column
     """
     if color == "":
         cmap = plt.get_cmap("tab20")
         color = cmap(np.random.randint(20))
-    ax.fill_between(etr.index, etr.data - etr["sem"], etr.data + etr["sem"], color=color, alpha=0.2)
-    ax.plot(etr.index, etr.data, color=color, label=label)
+    ax.fill_between(etr.index, etr[data_column] - etr["sem"],
+                    etr[data_column] + etr["sem"], color=color, alpha=0.2)
+    ax.plot(etr.index, etr[data_column], color=color, label=label)
 
 
 def fip_psth_inner_compute(
-    nwb, align_timepoints, channel, average, tw=[-1, 1], censor=True, censor_times=None
+    nwb,
+    align_timepoints,
+    channel,
+    average,
+    tw=[-1, 1],
+    censor=True,
+    censor_times=None,
+    data_column="data",
 ):
     """
     helper function that computes the event triggered response
@@ -182,13 +204,17 @@ def fip_psth_inner_compute(
     channel, what channel in the df_fip dataframe to use
     average(bool), whether to return the average, or all individual traces
     tw, time window before and after each event
+    censor, censor important timepoints before and after aligned timepoints
+    censor_times, timepoints to censor
+    data_column (string), name of data column in nwb.df_fip
+
     """
 
     data = nwb.df_fip.query("event == @channel")
     etr = an.event_triggered_response(
         data,
         "timestamps",
-        "data",
+        data_column,
         align_timepoints,
         t_start=tw[0],
         t_end=tw[1],
@@ -200,16 +226,17 @@ def fip_psth_inner_compute(
     if average:
         mean = etr.groupby("time").mean()
         sem = etr.groupby("time").sem()
-        mean["sem"] = sem["data"]
+        mean["sem"] = sem[data_column]
         return mean
     return etr
 
 
-def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
+def plot_histogram(nwb, preprocessed=True, edge_percentile=2, data_column="data"):
     """
     Generates a histogram of values of each FIP channel
     preprocessed (Bool), if True, uses the preprocessed channel
     edge_percentile (float), displays only the (2, 100-2) percentiles of the data
+    data_column (string), name of data column in nwb.df_fip
 
     EXAMPLE
     ***********************
@@ -232,7 +259,7 @@ def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
             else:
                 dex = c + "_" + count
             df = nwb.df_fip.query("event == @dex")
-            ax[i, j].hist(df["data"], bins=1000, color=FIP_COLORS.get(dex, "k"))
+            ax[i, j].hist(df[data_column], bins=1000, color=FIP_COLORS.get(dex, "k"))
             ax[i, j].spines["top"].set_visible(False)
             ax[i, j].spines["right"].set_visible(False)
             if preprocessed:
@@ -241,8 +268,8 @@ def plot_histogram(nwb, preprocessed=True, edge_percentile=2):
                 ax[i, j].set_xlabel("f")
             ax[i, j].set_ylabel("count")
             ax[i, j].set_title(dex)
-            mins.append(np.percentile(df["data"].values, edge_percentile))
-            maxs.append(np.percentile(df["data"].values, 100 - edge_percentile))
+            mins.append(np.percentile(df[data_column].values, edge_percentile))
+            maxs.append(np.percentile(df[data_column].values, 100 - edge_percentile))
     ax[0, 0].set_xlim(np.min(mins), np.max(maxs))
     fig.suptitle(nwb.session_id)
     plt.tight_layout()
