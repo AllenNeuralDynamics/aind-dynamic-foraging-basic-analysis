@@ -1,14 +1,17 @@
 import numpy as np
 from scipy.signal import fftconvolve
 
-def event_rate(event_times,
-                t_start=None,
-                t_end=None,
-                dt=1/20, # matching photometry frame rate
-                tau=25.0, # to be optimised
-                kernel="exp", # exp/hyperbolic
-                hyper_p=1.0, # only for hyperbolic 
-                normalize_kernel=True):
+
+def event_rate(
+    event_times,
+    t_start=None,
+    t_end=None,
+    dt=1 / 20,  # matching photometry frame rate
+    tau=25.0,  # to be optimised
+    kernel="exp",  # exp/hyperbolic
+    hyper_p=1.0,  # only for hyperbolic
+    normalize_kernel=True,
+):
     """
     Compute an event-rate timeseries by convolving discrete events (e.g. rewards) with a decay kernel.
 
@@ -23,9 +26,9 @@ def event_rate(event_times,
         If too small, computation gets too slow, now matching photometry frame rate
     tau : float, default 1.0
         Time constant of the kernel [s].
-        A parameter to be optimised using behavior relationship etc. 
+        A parameter to be optimised using behavior relationship etc.
     kernel : {"exp", "hyperbolic"}, default "exp"
-        * "exp": k(t) = exp(-t / tau)                              (classic EWMA)  
+        * "exp": k(t) = exp(-t / tau)                              (classic EWMA)
         * "hyperbolic": k(t) = (1 + t / tau)^{-hyper_p}            (hyperbolic discounting)
     hyper_p : float, default 1.0
         Power *p* of the hyperbolic kernel. Ignored if kernel="exp".
@@ -88,6 +91,6 @@ def event_rate(event_times,
     # ------------------------------------------------------------------
     # Convolution (truncate to match timeline length)
     # ------------------------------------------------------------------
-    e_rate = fftconvolve(event_series, k, mode="full")[:len(t)]
+    e_rate = fftconvolve(event_series, k, mode="full")[: len(t)]
 
     return t, e_rate
