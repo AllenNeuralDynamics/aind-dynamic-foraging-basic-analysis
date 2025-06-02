@@ -13,7 +13,8 @@ def event_rate(
     normalize_kernel=True,
 ):
     """
-    Compute an event-rate timeseries by convolving discrete events (e.g. rewards) with a decay kernel.
+    Compute an event-rate timeseries by convolving discrete events
+    (e.g. rewards) with a decay kernel.
 
     Parameters
     ----------
