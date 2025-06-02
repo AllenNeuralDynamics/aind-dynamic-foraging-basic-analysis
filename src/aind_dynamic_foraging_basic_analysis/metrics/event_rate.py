@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.signal import fftconvolve
 
-def reward_rate(event_times,
+def event_rate(event_times,
                 t_start=None,
                 t_end=None,
                 dt=1/20, # matching photometry frame rate
@@ -10,18 +10,20 @@ def reward_rate(event_times,
                 hyper_p=1.0, # only for hyperbolic 
                 normalize_kernel=True):
     """
-    Compute a reward-rate timeseries by convolving discrete reward events with a decay kernel.
+    Compute an event-rate timeseries by convolving discrete events (e.g. rewards) with a decay kernel.
 
     Parameters
     ----------
     event_times : (N,) array-like
-        1-D array of reward timestamps [s].
+        1-D array of event (e.g. reward) timestamps [s].
     t_start, t_end : float, optional
         Output time range [s].  Defaults: t_start=0, t_end=max(event_times).
     dt : float, default 0.001
         Time step of the output signal [s].
+        If too small, computation gets too slow, now matching photometry frame rate
     tau : float, default 1.0
         Time constant of the kernel [s].
+        A parameter to be optimised using behavior relationship etc. 
     kernel : {"exp", "hyperbolic"}, default "exp"
         * "exp": k(t) = exp(-t / tau)                              (classic EWMA)  
         * "hyperbolic": k(t) = (1 + t / tau)^{-hyper_p}            (hyperbolic discounting)
@@ -34,8 +36,8 @@ def reward_rate(event_times,
     -------
     t : (T,) ndarray
         Time axis [s].
-    r_rate : (T,) ndarray
-        Reward rate (events · s⁻¹).
+    e_rate : (T,) ndarray
+        event rate (events · s⁻¹).
 
     Notes
     -----
@@ -86,6 +88,6 @@ def reward_rate(event_times,
     # ------------------------------------------------------------------
     # Convolution (truncate to match timeline length)
     # ------------------------------------------------------------------
-    r_rate = fftconvolve(event_series, k, mode="full")[:len(t)]
+    e_rate = fftconvolve(event_series, k, mode="full")[:len(t)]
 
-    return t, r_rate
+    return t, e_rate
