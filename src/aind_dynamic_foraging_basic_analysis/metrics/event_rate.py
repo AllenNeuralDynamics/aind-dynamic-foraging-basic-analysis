@@ -1,8 +1,10 @@
+"""Compute an event-rate timeseries by convolving discrete events"""
+
 import numpy as np
 from scipy.signal import fftconvolve
 
 
-def event_rate(
+def compute_event_rate(
     event_times,
     t_start=None,
     t_end=None,
