@@ -8,7 +8,7 @@ import unittest
 
 import numpy as np
 
-from aind_dynamic_foraging_basic_analysis.metrics import compute_foraging_efficiency
+from aind_dynamic_foraging_basic_analysis import compute_foraging_efficiency
 from tests.nwb_io import get_history_from_nwb
 
 
