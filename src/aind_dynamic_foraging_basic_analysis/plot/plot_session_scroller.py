@@ -112,13 +112,12 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         fig.subplots_adjust(hspace=0)
         if num_plots == 1:
             ax = [ax]
-        ax = np.flip(ax)
 
     xmin = df_events.iloc[0]["timestamps"]
     x_first = xmin
     x_last = df_events.iloc[-1]["timestamps"]
     xmax = xmin + 20
-    ax[0].set_xlim(xmin, xmax)
+    ax[-1].set_xlim(xmin, xmax)
 
     params = {
         "left_lick_bottom": 0,
@@ -159,7 +158,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     if ("bouts" not in plot_list) or (df_licks is None):
         left_licks = df_events.query('event == "left_lick_time"')
         left_times = left_licks.timestamps.values
-        ax[0].vlines(
+        ax[-1].vlines(
             left_times,
             params["left_lick_bottom"],
             params["left_lick_top"],
@@ -170,7 +169,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
         right_licks = df_events.query('event == "right_lick_time"')
         right_times = right_licks.timestamps.values
-        ax[0].vlines(
+        ax[-1].vlines(
             right_times,
             params["right_lick_bottom"],
             params["right_lick_top"],
@@ -188,7 +187,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             bout_right_licks = df_licks.query(
                 '(bout_number == @b)&(event=="right_lick_time")'
             ).timestamps.values
-            ax[0].vlines(
+            ax[-1].vlines(
                 bout_left_licks,
                 params["left_lick_bottom"],
                 params["left_lick_top"],
@@ -196,7 +195,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
                 linewidth=2,
                 color=cmap(np.mod(b, 20)),
             )
-            ax[0].vlines(
+            ax[-1].vlines(
                 bout_right_licks,
                 params["right_lick_bottom"],
                 params["right_lick_top"],
@@ -210,7 +209,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         left_rewarded_licks = df_licks.query(
             '(event == "left_lick_time")&(rewarded)'
         ).timestamps.values
-        ax[0].plot(
+        ax[-1].plot(
             left_rewarded_licks,
             [params["left_lick_top"]] * len(left_rewarded_licks),
             "ro",
@@ -221,7 +220,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         right_rewarded_licks = df_licks.query(
             '(event == "right_lick_time")&(rewarded)'
         ).timestamps.values
-        ax[0].plot(
+        ax[-1].plot(
             right_rewarded_licks, [params["right_lick_bottom"]] * len(right_rewarded_licks), "ro"
         )
 
@@ -230,7 +229,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         left_cue_licks = df_licks.query(
             '(event == "left_lick_time")&(cue_response)'
         ).timestamps.values
-        ax[0].plot(
+        ax[-1].plot(
             left_cue_licks,
             [
                 params["left_lick_bottom"]
@@ -243,7 +242,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         right_cue_licks = df_licks.query(
             '(event == "right_lick_time")&(cue_response)'
         ).timestamps.values
-        ax[0].plot(
+        ax[-1].plot(
             right_cue_licks,
             [
                 params["right_lick_bottom"]
@@ -257,10 +256,10 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         # Plot baiting
         bait_right = df_trials.query("bait_right")["goCue_start_time_in_session"].values
         bait_left = df_trials.query("bait_left")["goCue_start_time_in_session"].values
-        ax[0].plot(
+        ax[-1].plot(
             bait_right, [params["right_lick_top"] - 0.05] * len(bait_right), "ms", label="baited"
         )
-        ax[0].plot(bait_left, [params["left_lick_bottom"] + 0.05] * len(bait_left), "ms")
+        ax[-1].plot(bait_left, [params["left_lick_bottom"] + 0.05] * len(bait_left), "ms")
 
     if "lick artifacts" in plot_list:
         artifacts_right = df_licks.query('likely_artifact and (event=="right_lick_time")')[
@@ -269,14 +268,14 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         artifacts_left = df_licks.query('likely_artifact and (event=="left_lick_time")')[
             "timestamps"
         ].values
-        ax[0].plot(
+        ax[-1].plot(
             artifacts_right,
             [params["right_lick_top"]] * len(artifacts_right),
             "d",
             color="darkorange",
             label="lick artifact",
         )
-        ax[0].plot(
+        ax[-1].plot(
             artifacts_left,
             [params["left_lick_bottom"]] * len(artifacts_left),
             "d",
@@ -285,7 +284,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     left_reward_deliverys = df_events.query('event == "left_reward_delivery_time"')
     left_times = left_reward_deliverys.timestamps.values
-    ax[0].vlines(
+    ax[-1].vlines(
         left_times,
         params["left_reward_bottom"],
         params["left_reward_top"],
@@ -296,7 +295,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     right_reward_deliverys = df_events.query('event == "right_reward_delivery_time"')
     right_times = right_reward_deliverys.timestamps.values
-    ax[0].vlines(
+    ax[-1].vlines(
         right_times,
         params["right_reward_bottom"],
         params["right_reward_top"],
@@ -307,7 +306,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     if "manual rewards" in plot_list:
         manual_left_times = left_reward_deliverys.query('data == "manual"').timestamps.values
-        ax[0].vlines(
+        ax[-1].vlines(
             manual_left_times,
             params["left_reward_bottom"],
             params["left_reward_top"],
@@ -317,7 +316,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             label="manual reward",
         )
         manual_right_times = right_reward_deliverys.query('data == "manual"').timestamps.values
-        ax[0].vlines(
+        ax[-1].vlines(
             manual_right_times,
             params["right_reward_bottom"],
             params["right_reward_top"],
@@ -327,7 +326,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         )
     if "auto rewards" in plot_list:
         auto_left_times = left_reward_deliverys.query('data == "auto"').timestamps.values
-        ax[0].vlines(
+        ax[-1].vlines(
             auto_left_times,
             params["left_reward_bottom"],
             params["left_reward_top"],
@@ -337,7 +336,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             label="auto reward",
         )
         auto_right_times = right_reward_deliverys.query('data == "auto"').timestamps.values
-        ax[0].vlines(
+        ax[-1].vlines(
             auto_right_times,
             params["right_reward_bottom"],
             params["right_reward_top"],
@@ -349,7 +348,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     go_cues = df_events.query('event == "goCue_start_time"')
     go_cue_times = go_cues.timestamps.values
     if "go cue" in plot_list:
-        ax[0].vlines(
+        ax[-1].vlines(
             go_cue_times,
             params["left_lick_bottom"],
             params["left_reward_top"],
@@ -358,7 +357,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
             color="b",
             label="go cue",
         )
-        ax[0].vlines(
+        ax[-1].vlines(
             go_cue_times,
             params["right_reward_bottom"],
             params["right_lick_top"],
@@ -368,41 +367,41 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         )
 
     # plot metrics
-    ax[0].axhline(params["right_lick_top"], color="k", linewidth=0.5, alpha=0.25)
+    ax[-1].axhline(params["right_lick_top"], color="k", linewidth=0.5, alpha=0.25)
     go_cue_times_doubled = np.repeat(go_cue_times, 2)[1:]
 
     pR = params["probs_bottom"] + df_trials["reward_probabilityR"] / 4
     pR = np.repeat(pR, 2)[:-1]
-    ax[0].fill_between(go_cue_times_doubled, params["probs_bottom"], pR, color="r", alpha=0.4)
+    ax[-1].fill_between(go_cue_times_doubled, params["probs_bottom"], pR, color="r", alpha=0.4)
 
     pL = params["probs_bottom"] - df_trials["reward_probabilityL"] / 4
     pL = np.repeat(pL, 2)[:-1]
 
-    ax[0].fill_between(go_cue_times_doubled, pL, params["probs_bottom"], color="b", alpha=0.4)
+    ax[-1].fill_between(go_cue_times_doubled, pL, params["probs_bottom"], color="b", alpha=0.4)
 
     # plot metrics if they are available
     for index, metric in enumerate(metrics):
-        plot_metric(df_trials, go_cue_times, metric, ax[index + 1])
+        plot_metric(df_trials, go_cue_times, metric, ax[len(fip) + index])
 
     # plot fip if they are available:
     for index, f in enumerate(fip):
-        plot_fip(fip_df, f, ax[index + 1 + len(metrics)])
+        plot_fip(fip_df, f, ax[index])
 
     # Clean up plot
     if len(plot_list) > 0:
-        ax[0].legend(framealpha=1, loc="lower left", reverse=True)
-    ax[0].set_xlabel("time (s)", fontsize=STYLE["axis_fontsize"])
-    ax[0].set_ylim(0, 1.5)
-    ax[0].set_yticks(yticks)
-    ax[0].set_yticklabels(ylabels, fontsize=STYLE["axis_ticks_fontsize"])
-    for tick, color in zip(ax[0].get_yticklabels(), ycolors):
+        ax[-1].legend(framealpha=1, loc="lower left", reverse=True)
+    ax[-1].set_xlabel("time (s)", fontsize=STYLE["axis_fontsize"])
+    ax[-1].set_ylim(0, 1.5)
+    ax[-1].set_yticks(yticks)
+    ax[-1].set_yticklabels(ylabels, fontsize=STYLE["axis_ticks_fontsize"])
+    for tick, color in zip(ax[-1].get_yticklabels(), ycolors):
         tick.set_color(color)
 
     for my_ax in ax:
         my_ax.spines["top"].set_visible(False)
         my_ax.spines["right"].set_visible(False)
 
-    ax[-1].set_title(nwb.session_id)
+    ax[0].set_title(nwb.session_id)
 
     if num_plots == 1:
         plt.tight_layout()
@@ -411,7 +410,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         """
         Define interaction resonsivity
         """
-        x = ax[0].get_xlim()
+        x = ax[-1].get_xlim()
         xmin = x[0]
         xmax = x[1]
         xStep = (xmax - xmin) / 4
@@ -430,7 +429,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
         elif event.key == "h":
             xmin = x_first
             xmax = x_last
-        ax[0].set_xlim(xmin, xmax)
+        ax[-1].set_xlim(xmin, xmax)
         plt.draw()
 
     kpid = fig.canvas.mpl_connect("key_press_event", on_key_press)  # noqa: F841
