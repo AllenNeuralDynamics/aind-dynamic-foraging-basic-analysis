@@ -38,7 +38,13 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     nwb, an nwb like object that contains attributes: df_events, session_id
         and optionally contains attributes fip_df, df_licks
 
-    ax is a pyplot figure axis. If None, a new figure is created
+    ax is a list of pyplot figure axis. The list must be the correct length of
+            1 + len(metrics) + len(fip). If provided, fig must also be provided.
+            If None, a new figure is created.
+
+
+    fig is a pyplot figure container. If provided, ax must also be provided.
+             If None, a new figure is created.
 
     metrics, list of metrics to plot. Each metric must be a column of
         nwb.df_trials
