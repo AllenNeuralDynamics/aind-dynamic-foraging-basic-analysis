@@ -7,6 +7,7 @@
 
 import aind_dynamic_foraging_data_utils.nwb_utils as nu
 import aind_dynamic_foraging_models.logistic_regression.model as model
+import aind_dynamic_foraging_basic_analysis.plot.plot_fip as pf
 import numpy as np
 import pandas as pd
 
@@ -233,4 +234,70 @@ def add_intertrial_licking(df_trials, df_licks):
     df_trials["intertrial_choice_rate"] = (
         df_trials["intertrial_choice"].rolling(WIN_DUR, min_periods=MIN_EVENTS, center=True).mean()
     )
+    return df_trials
+
+
+def get_average_signal_window(
+    nwb,
+    alignment_event,
+    offsets,
+    channel,
+    data_col='data_z',
+    output_col=None,
+    censor=True
+):
+    """
+    Returns a Series with the mean signal in a window around an alignment event,
+    for each trial, for each session and a specific signal (event).
+
+    Parameters
+    ----------
+    nwb : nwb object (or nwb-like object)
+        nwb object with df_fip and df_trials attributes
+    alignment_event : str
+        The event column in df_trials to align to. should always be in_session
+    offsets : list or tuple of float
+        [start, end] offsets (in seconds) relative to alignment_event.
+    channel : str
+        The value in df_fip['event'] to filter for.
+    data_col : str
+        Column in df_fip to extract (default 'data_z').
+    output_col : str or None
+        Name for the new column. If None, will be generated as
+        '<data_col>_<channel>_<start>_<end>_<alignment_event>'.
+
+
+    Returns
+    -------
+    df_trial: pd.DataFrame
+        DataFrame with a new column containing the mean signal
+        in the specified window for each trial.
+    """
+
+    # Check alignment_event ends with 'in_session'
+    if not alignment_event.endswith('in_session'):
+        raise ValueError(f"alignment_event '{alignment_event}' must end with 'in_session'.")
+
+    # Check alignment_event is in df_trials columns
+    if alignment_event not in nwb.df_trials.columns:
+        raise ValueError(f"alignment_event '{alignment_event}' not found in df_trials columns.")
+
+    # Get output column name
+    if output_col is None:
+        output_col = f"{data_col}_{channel}_{offsets[0]}_{offsets[1]}_{alignment_event}"
+
+    df_trials = nwb.df_trials.copy()
+
+    # get event triggered response
+    etr = pf.fip_psth_inner_compute(nwb, nwb.df_trials[alignment_event].values,
+                                    channel=channel, average=False, tw=offsets,
+                                    censor=censor, data_column=data_col)
+
+    avg_activity = etr.groupby("event_number").mean()
+    avg_activity['trial'] = df_trials.trial.values
+    avg_activity = avg_activity.rename(columns={data_col: output_col})
+
+    # Merge on 'trial'
+    df_trials = df_trials.merge(avg_activity[['trial', output_col]], on='trial', how='left')
+
     return df_trials
