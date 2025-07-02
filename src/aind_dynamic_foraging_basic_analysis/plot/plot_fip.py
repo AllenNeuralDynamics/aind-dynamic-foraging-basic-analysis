@@ -152,7 +152,8 @@ def plot_fip_psth_compare_channels(
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
         if c in nwb.df_fip["event"].values:
-            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw, censor, data_column)
+            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw,
+                                         censor, data_column=data_column)
             fip_psth_inner_plot(ax, etr, colors[dex], c, data_column)
         else:
             print("No data for channel: {}".format(c))
