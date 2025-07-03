@@ -255,7 +255,7 @@ def get_average_signal_window(
     nwb : nwb object (or nwb-like object)
         nwb object with df_fip and df_trials attributes
     alignment_event : str
-        The event column in df_trials to align to. should always be in_session
+        The event column in df_trials to align to. must be given in_session, not in_trial
     offsets : list or tuple of float
         [start, end] offsets (in seconds) relative to alignment_event.
     channel : str
