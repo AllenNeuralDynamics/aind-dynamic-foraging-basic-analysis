@@ -143,20 +143,30 @@ def plot_fip_psth_compare_channels(
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
     """
-    if not hasattr(nwb, "df_fip"):
+    # Check if nwb is a list, and if so, check only the first element for attributes and channel
+    nwb_to_check = nwb[0] if isinstance(nwb, list) else nwb
+
+    if not hasattr(nwb_to_check, "df_fip"):
         print("You need to compute the df_fip first")
         print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
-        nwb.df_fip = nu.create_fib_df(nwb, tidy=True)
-    if not hasattr(nwb, "df_events"):
+        nwb_to_check.df_fip = nu.create_fib_df(nwb_to_check, tidy=True)
+    if not hasattr(nwb_to_check, "df_events"):
         print("You need to compute the df_events first")
         print("run `nwb.df_events = create_events_df(nwb)`")
-        nwb.df_events = nu.create_events_df(nwb)
+        nwb_to_check.df_events = nu.create_events_df(nwb_to_check)
+
+    if channel not in nwb_to_check.df_fip["event"].values:
+        print("channel {} not in df_fip".format(channel))
+
 
     if isinstance(align, str):
-        if align not in nwb.df_events["event"].values:
+        if align not in nwb_to_check.df_events["event"].values:
             print("{} not found in the events table".format(align))
             return
-        align_timepoints = nwb.df_events.query("event == @align")["timestamps"].values
+        if isinstance(nwb, list):
+            align_timepoints = [nwb_i.df_events.query("event == @align")["timestamps"].values for nwb_i in nwb]
+        else:
+            align_timepoints = nwb_to_check.df_events.query("event == @align")["timestamps"].values
         align_label = "Time from {} (s)".format(align)
     else:
         align_timepoints = align
@@ -167,9 +177,18 @@ def plot_fip_psth_compare_channels(
 
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
-        if c in nwb.df_fip["event"].values:
-            etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw,
-                                         censor, data_column=data_column)
+        if c in nwb_to_check.df_fip["event"].values:
+            if isinstance(nwb, list):
+                # Compute etr for every NWB object in the list and average
+                etr = fip_psth_multiple_nwb_inner_compute(nwb, align_timepoints, c, True, tw,
+                                            censor, data_column=data_column)
+                session_id_title = ', '.join([nwb_i.session_id for nwb_i in nwb])
+
+            else:
+                etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw,
+                                            censor, data_column=data_column)
+                session_id_title = nwb.session_id
+
             fip_psth_inner_plot(ax, etr, colors[dex], c, data_column)
         else:
             print("No data for channel: {}".format(c))
@@ -182,7 +201,7 @@ def plot_fip_psth_compare_channels(
     ax.set_xlim(tw)
     ax.axvline(0, color="k", alpha=0.2)
     ax.tick_params(axis="both", labelsize=STYLE["axis_ticks_fontsize"])
-    ax.set_title(nwb.session_id)
+    ax.set_title(session_id_title)
     plt.tight_layout()
     return fig, ax
 
