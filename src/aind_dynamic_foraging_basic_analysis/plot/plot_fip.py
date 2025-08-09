@@ -155,16 +155,13 @@ def plot_fip_psth_compare_channels(
         print("run `nwb.df_events = create_events_df(nwb)`")
         nwb_to_check.df_events = nu.create_events_df(nwb_to_check)
 
-    if channel not in nwb_to_check.df_fip["event"].values:
-        print("channel {} not in df_fip".format(channel))
-
-
     if isinstance(align, str):
         if align not in nwb_to_check.df_events["event"].values:
             print("{} not found in the events table".format(align))
             return
         if isinstance(nwb, list):
-            align_timepoints = [nwb_i.df_events.query("event == @align")["timestamps"].values for nwb_i in nwb]
+            align_timepoints = [nwb_i.df_events.query("event == @align")["timestamps"].values
+                                for nwb_i in nwb]
         else:
             align_timepoints = nwb_to_check.df_events.query("event == @align")["timestamps"].values
         align_label = "Time from {} (s)".format(align)
@@ -181,12 +178,12 @@ def plot_fip_psth_compare_channels(
             if isinstance(nwb, list):
                 # Compute etr for every NWB object in the list and average
                 etr = fip_psth_multiple_nwb_inner_compute(nwb, align_timepoints, c, True, tw,
-                                            censor, data_column=data_column)
+                                                          censor, data_column=data_column)
                 session_id_title = ', '.join([nwb_i.session_id for nwb_i in nwb])
 
             else:
                 etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw,
-                                            censor, data_column=data_column)
+                                             censor, data_column=data_column)
                 session_id_title = nwb.session_id
 
             fip_psth_inner_plot(ax, etr, colors[dex], c, data_column)
@@ -222,6 +219,7 @@ def fip_psth_inner_plot(ax, etr, color, label, data_column):
                     etr[data_column] + etr["sem"], color=color, alpha=0.2)
     ax.plot(etr.index, etr[data_column], color=color, label=label)
 
+
 def fip_psth_multiple_nwb_inner_compute(
     nwbs_list,
     align_timepoints,
@@ -245,7 +243,7 @@ def fip_psth_multiple_nwb_inner_compute(
 
     """
     etr_list = []
-    for (i,nwb) in enumerate(nwbs_list):
+    for (i, nwb) in enumerate(nwbs_list):
         data = nwb.df_fip.query("event == @channel")
         etr = an.event_triggered_response(
             data,
