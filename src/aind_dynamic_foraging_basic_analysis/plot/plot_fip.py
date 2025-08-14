@@ -39,20 +39,21 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     plot_fip_psth_compare_alignments(nwb,['left_reward_delivery_time',
         'right_reward_delivery_time'],'G_1_preprocessed')
     """
-    # Check if nwb is a list, and if so, check only the first element for attributes and channel
-    nwb_to_check = nwb[0] if isinstance(nwb, list) else nwb
+    # Check if nwb is a list, otherwise put it in a list to check
+    nwb_to_check = nwb if isinstance(nwb, list) else [nwb]
 
-    if not hasattr(nwb_to_check, "df_fip"):
-        print("You need to compute the df_fip first")
-        print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
-        nwb_to_check.df_fip = nu.create_fib_df(nwb_to_check, tidy=True)
-    if not hasattr(nwb_to_check, "df_events"):
-        print("You need to compute the df_events first")
-        print("run `nwb.df_events = create_events_df(nwb)`")
-        nwb_to_check.df_events = nu.create_events_df(nwb_to_check)
+    for nwb_i in nwb_to_check:
+        if not hasattr(nwb_i, "df_fip"):
+            print("You need to compute the df_fip first")
+            print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
+            nwb_i.df_fip = nu.create_fib_df(nwb_i, tidy=True)
+        if not hasattr(nwb_i, "df_events"):
+            print("You need to compute the df_events first")
+            print("run `nwb.df_events = create_events_df(nwb)`")
+            nwb_i.df_events = nu.create_events_df(nwb_i)
 
-    if channel not in nwb_to_check.df_fip["event"].values:
-        print("channel {} not in df_fip".format(channel))
+        if channel not in nwb_i.df_fip["event"].values:
+            print("channel {} not in df_fip".format(channel))
 
     if isinstance(alignments, list):
         align_dict = {}
@@ -143,29 +144,28 @@ def plot_fip_psth_compare_channels(
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
     """
-    # Check if nwb is a list, and if so, check only the first element for attributes and channel
-    nwb_to_check = nwb[0] if isinstance(nwb, list) else nwb
+    # Check if nwb is a list, otherwise put it in a list to check
+    nwb_to_check = nwb if isinstance(nwb, list) else [nwb]
+    
+    for nwb_i in nwb_to_check:
+        if not hasattr(nwb_i, "df_fip"):
+            print("You need to compute the df_fip first")
+            print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
+            nwb_i.df_fip = nu.create_fib_df(nwb_i, tidy=True)
+        if not hasattr(nwb_i, "df_events"):
+            print("You need to compute the df_events first")
+            print("run `nwb.df_events = create_events_df(nwb)`")
+            nwb_i.df_events = nu.create_events_df(nwb_i)
 
-    if not hasattr(nwb_to_check, "df_fip"):
-        print("You need to compute the df_fip first")
-        print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
-        nwb_to_check.df_fip = nu.create_fib_df(nwb_to_check, tidy=True)
-    if not hasattr(nwb_to_check, "df_events"):
-        print("You need to compute the df_events first")
-        print("run `nwb.df_events = create_events_df(nwb)`")
-        nwb_to_check.df_events = nu.create_events_df(nwb_to_check)
+        if isinstance(align, str):
+            if align not in nwb_i.df_events["event"].values:
+                print("{} not found in the events table".format(align))
+                return
+            
+            align_timepoints.append(nwb_i.df_events.query("event == @align")["timestamps"].values)
+            align_label = "Time from {} (s)".format(align)
 
-    if isinstance(align, str):
-        if align not in nwb_to_check.df_events["event"].values:
-            print("{} not found in the events table".format(align))
-            return
-        if isinstance(nwb, list):
-            align_timepoints = [nwb_i.df_events.query("event == @align")["timestamps"].values
-                                for nwb_i in nwb]
-        else:
-            align_timepoints = nwb_to_check.df_events.query("event == @align")["timestamps"].values
-        align_label = "Time from {} (s)".format(align)
-    else:
+    if isinstance(align, list):
         align_timepoints = align
         align_label = "Time (s)"
 
@@ -242,6 +242,9 @@ def fip_psth_multiple_nwb_inner_compute(
     data_column (string), name of data column in nwb.df_fip
 
     """
+    # check that alignment and nwbs_list match
+    assert len(nwbs_list) == len(align_timepoints), "Number of NWBs and align timepoints must match"
+
     etr_list = []
     for (i, nwb) in enumerate(nwbs_list):
         data = nwb.df_fip.query("event == @channel")
