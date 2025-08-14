@@ -165,10 +165,9 @@ def plot_fip_psth_compare_channels(
 
             align_timepoints.append(nwb_i.df_events.query("event == @align")["timestamps"].values)
             align_label = "Time from {} (s)".format(align)
-
-    if isinstance(align, list):
-        align_timepoints = align
-        align_label = "Time (s)"
+        else:
+            align_timepoints = align
+            align_label = "Time (s)"
 
     if fig is None and ax is None:
         fig, ax = plt.subplots()
