@@ -196,7 +196,7 @@ def plot_fip_psth_compare_channels(
                 session_id_title = ', '.join([nwb_i.session_id for nwb_i in nwb])
 
             else:
-                etr = fip_psth_inner_compute(nwb, align_timepoints, c, True, tw,
+                etr = fip_psth_inner_compute(nwb, np.squeeze(align_timepoints), c, True, tw,
                                              censor, data_column=data_column)
                 session_id_title = nwb.session_id
 
