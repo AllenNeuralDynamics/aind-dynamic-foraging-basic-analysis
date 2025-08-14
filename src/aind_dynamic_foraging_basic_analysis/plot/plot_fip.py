@@ -41,7 +41,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     """
     # Check if nwb is a list, otherwise put it in a list to check
     nwb_to_check = nwb if isinstance(nwb, list) else [nwb]
-
+    align_dict = {}
     for nwb_i in nwb_to_check:
         if not hasattr(nwb_i, "df_fip"):
             print("You need to compute the df_fip first")
@@ -55,31 +55,45 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
         if channel not in nwb_i.df_fip["event"].values:
             print("channel {} not in df_fip".format(channel))
 
-    if isinstance(alignments, list):
-        align_dict = {}
-        for a in alignments:
-            if a not in nwb.df_events["event"].values:
-                print("{} not found in the events table".format(a))
-                return
-            else:
-                align_dict[a] = nwb.df_events.query("event == @a")["timestamps"].values
-    elif isinstance(alignments, dict):
-        align_dict = alignments
-        align_dict_flat = alignments.copy()
-    else:
-        print(
-            "alignments must be either a list of events in nwb.df_events, "
-            + "or a dictionary where each key is an event type, "
-            + "and the value is a list of timepoints"
-        )
-        return
+        if isinstance(alignments, list):
+            for a in alignments:
+                if a not in nwb_i.df_events["event"].values:
+                    print("{} not found in the events table".format(a))
+                    return
+                else:
+                    align_vals = nwb_i.df_events.query("event == @a")["timestamps"].values
+                    align_list = align_dict.get(a, [])
+                    if len(nwb_to_check) > 1:
+                        align_list.append(align_vals)
+                    else:
+                        align_list = align_vals
+                    align_dict[a] = align_list
+
+        elif isinstance(alignments, dict):
+            align_dict = alignments
+        else:
+            print(
+                "alignments must be either a list of events in nwb.df_events, "
+                + "or a dictionary where each key is an event type, "
+                + "and the value is a list of timepoints"
+            )
+            return
 
     censor_times = []
-    for key in align_dict:
-        if isinstance(nwb, list):
-            align_dict_flat[key] = np.concatenate(align_dict[key])
-        censor_times.append(align_dict_flat[key])
-    censor_times = np.sort(np.concatenate(censor_times))
+    if isinstance(nwb, list):
+        # For multiple NWBs, create a list of sorted, concatenated censor times for each NWB
+        for i in range(len(nwb)):
+            per_nwb_times = []
+            for key in align_dict:
+                per_nwb_times.append(align_dict[key][i])
+            per_nwb_times = np.sort(np.concatenate(per_nwb_times))
+            censor_times.append(per_nwb_times)
+    else:
+        # For a single NWB, concatenate and sort all alignments
+        for key in align_dict:
+            censor_times.append(align_dict[key])
+        censor_times = np.sort(np.concatenate(censor_times))
+
 
     align_label = "Time (s)"
     if fig is None and ax is None:
@@ -243,8 +257,12 @@ def fip_psth_multiple_nwb_inner_compute(
     data_column (string), name of data column in nwb.df_fip
 
     """
+
+    if censor_times is None:
+        censor_times = [None] * len(nwbs_list)
     # check that alignment and nwbs_list match
     assert len(nwbs_list) == len(align_timepoints), "Number of NWBs and align timepoints must match"
+    assert len(nwbs_list) == len(censor_times), "Number of NWBs and censor times must match"
 
     etr_list = []
     for (i, nwb) in enumerate(nwbs_list):
@@ -258,7 +276,7 @@ def fip_psth_multiple_nwb_inner_compute(
             t_end=tw[1],
             output_sampling_rate=40,
             censor=censor,
-            censor_times=censor_times,
+            censor_times=censor_times[i],
         )
         etr['ses_idx'] = data.ses_idx.values[0]
         etr_list.append(etr)
