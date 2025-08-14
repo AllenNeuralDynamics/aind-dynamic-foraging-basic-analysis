@@ -146,7 +146,8 @@ def plot_fip_psth_compare_channels(
     """
     # Check if nwb is a list, otherwise put it in a list to check
     nwb_to_check = nwb if isinstance(nwb, list) else [nwb]
-    
+
+    align_timepoints = []
     for nwb_i in nwb_to_check:
         if not hasattr(nwb_i, "df_fip"):
             print("You need to compute the df_fip first")
@@ -161,7 +162,7 @@ def plot_fip_psth_compare_channels(
             if align not in nwb_i.df_events["event"].values:
                 print("{} not found in the events table".format(align))
                 return
-            
+
             align_timepoints.append(nwb_i.df_events.query("event == @align")["timestamps"].values)
             align_label = "Time from {} (s)".format(align)
 
@@ -174,7 +175,8 @@ def plot_fip_psth_compare_channels(
 
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
-        if c in nwb_to_check.df_fip["event"].values:
+        channel_exists = all(c in nwb_i.df_fip["event"].values for nwb_i in nwb_to_check)
+        if channel_exists:
             if isinstance(nwb, list):
                 # Compute etr for every NWB object in the list and average
                 etr = fip_psth_multiple_nwb_inner_compute(nwb, align_timepoints, c, True, tw,
