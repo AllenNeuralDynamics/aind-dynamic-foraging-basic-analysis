@@ -94,7 +94,6 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
             censor_times.append(align_dict[key])
         censor_times = np.sort(np.concatenate(censor_times))
 
-
     align_label = "Time (s)"
     if fig is None and ax is None:
         fig, ax = plt.subplots()
