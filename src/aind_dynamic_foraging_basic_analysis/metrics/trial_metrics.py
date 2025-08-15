@@ -278,13 +278,17 @@ def get_average_signal_window(
     if not alignment_event.endswith('in_session'):
         raise ValueError(f"alignment_event '{alignment_event}' must end with 'in_session'.")
 
+    if not hasattr(nwb, "df_trials"):
+        raise ValueError("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
+
     # Check alignment_event is in df_trials columns
     if alignment_event not in nwb.df_trials.columns:
         raise ValueError(f"alignment_event '{alignment_event}' not found in df_trials columns.")
 
     # Get output column name
     if output_col is None:
-        output_col = f"{data_col}_{channel}_{offsets[0]}_{offsets[1]}_{alignment_event.replace('_in_session','')}"
+        output_col = f"{data_col}_{channel}_{offsets[0]}_\
+                    {offsets[1]}_{alignment_event.replace('_in_session','')}"
 
     df_trials = nwb.df_trials.copy()
 
