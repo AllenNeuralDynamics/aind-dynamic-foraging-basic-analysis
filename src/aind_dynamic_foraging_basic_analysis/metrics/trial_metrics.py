@@ -292,7 +292,7 @@ def get_average_signal_window(
         )
 
     df_trials = nwb.df_trials.copy()
-    
+
     # get event triggered response. Censor set to FALSE because event_times should match trial #
     etr = pf.fip_psth_inner_compute(nwb, nwb.df_trials[alignment_event].values,
                                     channel=channel, average=False, tw=offsets,
