@@ -24,7 +24,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
 ):
     """
     Compare the same FIP channel aligned to multiple event types
-    nwb, nwb object for the session
+    nwb, nwb object for the session, or list of nwbs
     alignments, either a list of event types in df_events, or a dictionary
         whose keys are event types and values are a list of timepoints
     channel, (str) the name of the FIP channel
@@ -245,14 +245,15 @@ def fip_psth_multiple_nwb_inner_compute(
     data_column="data",
 ):
     """
-    helper function that computes the event triggered response
-    nwb, nwb object for the session of interest, should have df_fip attribute
-    align_timepoints, an iterable list of the timepoints to compute the ETR aligned to
+    helper function that computes the event triggered response for a list of nwbs
+    nwb, list of nwb objects to get PSTH's for
+    align_timepoints, a list of an iterable list of the timepoints to compute the ETR aligned to
+                    (one for each nwb)
     channel, what channel in the df_fip dataframe to use
     average(bool), whether to return the average, or all individual traces
     tw, time window before and after each event
     censor, censor important timepoints before and after aligned timepoints
-    censor_times, timepoints to censor
+    censor_times, timepoints to censor, would also be a list with the same lenght as nwb
     data_column (string), name of data column in nwb.df_fip
 
     """
