@@ -244,7 +244,6 @@ def get_average_signal_window(
     channel,
     data_col='data_z',
     output_col=None,
-    censor=True
 ):
     """
     Returns a Series with the mean signal in a window around an alignment event,
@@ -293,11 +292,11 @@ def get_average_signal_window(
         )
 
     df_trials = nwb.df_trials.copy()
-
-    # get event triggered response
+    
+    # get event triggered response. Censor set to FALSE because event_times should match trial #
     etr = pf.fip_psth_inner_compute(nwb, nwb.df_trials[alignment_event].values,
                                     channel=channel, average=False, tw=offsets,
-                                    censor=censor, data_column=data_col)
+                                    censor=False, data_column=data_col)
 
     avg_activity = etr.groupby("event_number").mean()
     avg_activity['trial'] = df_trials.trial.values
