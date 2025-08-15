@@ -287,8 +287,10 @@ def get_average_signal_window(
 
     # Get output column name
     if output_col is None:
-        output_col = f"{data_col}_{channel}_{offsets[0]}_\
-                    {offsets[1]}_{alignment_event.replace('_in_session','')}"
+        output_col = (
+            f"{data_col}_{channel}_{offsets[0]}_"
+            f"{offsets[1]}_{alignment_event.replace('_in_session','')}"
+        )
 
     df_trials = nwb.df_trials.copy()
 
