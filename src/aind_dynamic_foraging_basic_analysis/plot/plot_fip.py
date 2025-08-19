@@ -24,7 +24,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
 ):
     """
     Compare the same FIP channel aligned to multiple event types
-    nwb, nwb object for the session
+    nwb, nwb object for the session, or a list of nwbs
     alignments, either a list of event types in df_events, or a dictionary
         whose keys are event types and values are a list of timepoints
     channel, (str) the name of the FIP channel
@@ -39,28 +39,43 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     plot_fip_psth_compare_alignments(nwb,['left_reward_delivery_time',
         'right_reward_delivery_time'],'G_1_preprocessed')
     """
-    if not hasattr(nwb, "df_fip"):
-        print("You need to compute the df_fip first")
-        print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
-        nwb.df_fip = nu.create_fib_df(nwb, tidy=True)
-    if not hasattr(nwb, "df_events"):
-        print("You need to compute the df_events first")
-        print("run `nwb.df_events = create_events_df(nwb)`")
-        nwb.df_events = nu.create_events_df(nwb)
 
-    if channel not in nwb.df_fip["event"].values:
-        print("channel {} not in df_fip".format(channel))
+    nwb_list = nwb if isinstance(nwb, list) else [nwb]
+    for nwb_i in nwb_list:
+        if not hasattr(nwb_i, "df_fip"):
+            print("You need to compute the df_fip first")
+            print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
+            nwb_i.df_fip = nu.create_fib_df(nwb_i, tidy=True)
+        if not hasattr(nwb_i, "df_events"):
+            print("You need to compute the df_events first")
+            print("run `nwb.df_events = create_events_df(nwb)`")
+            nwb_i.df_events = nu.create_events_df(nwb_i)
+        if channel not in nwb_i.df_fip["event"].values:
+            print("channel {} not in df_fip".format(channel))
 
-    if isinstance(alignments, list):
-        align_dict = {}
-        for a in alignments:
-            if a not in nwb.df_events["event"].values:
-                print("{} not found in the events table".format(a))
-                return
-            else:
-                align_dict[a] = nwb.df_events.query("event == @a")["timestamps"].values
-    elif isinstance(alignments, dict):
-        align_dict = alignments
+    # if single nwb - can pass list, or dictionary
+    # if list of nwbs - can pass a single list, or list of dictionaries
+    if len(nwb_list) == 1 and not (isinstance(alignments, list) or isinstance(alignments, dict)):
+        raise Exception("Must pass alignments as a list of events, or a dictionary of times")
+    elif len(nwb_list) > 1 and (not isinstance(alignments, list)):
+        raise Exception(
+            "Must pass alignments as a list of events, or a list of dictionariesof times"
+        )
+
+    if isinstance(alignments, dict):
+        # We have a single NWB, given a dictionary of alignments, make it a list and we are done
+        align_list = [alignments]
+    elif isinstance(alignments, list):
+        align_list = []
+        for i, nwb_i in enumerate(nwb_list):
+            align_dict = {}
+            for a in alignments:
+                if a not in nwb_i.df_events["event"].values:
+                    print("{} not found in the events table: {}".format(a, nwb_i.session_id))
+                    return
+                else:
+                    align_dict[a] = nwb_i.df_events.query("event == @a")["timestamps"].values
+            align_list.append(align_dict)
     else:
         print(
             "alignments must be either a list of events in nwb.df_events, "
@@ -69,21 +84,40 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
         )
         return
 
-    censor_times = []
-    for key in align_dict:
-        censor_times.append(align_dict[key])
-    censor_times = np.sort(np.concatenate(censor_times))
+    # Compute censor times
+    censor_times_list = []
+    for i, nwb_i in enumerate(nwb_list):
+        censor_times = []
+        for key in align_list[i]:
+            censor_times.append(align_list[i][key])
+        censor_times = np.sort(np.concatenate(censor_times))
+        censor_times_list.append(censor_times)
 
-    align_label = "Time (s)"
+    # Create figure if not supplied
     if fig is None and ax is None:
         fig, ax = plt.subplots()
 
+    # Get colors
     colors = {**FIP_COLORS, **extra_colors}
 
-    for alignment in align_dict:
-        etr = fip_psth_inner_compute(
-            nwb, align_dict[alignment], channel, True, tw, censor, censor_times, data_column
-        )
+    align_label = "Time (s)"
+    for alignment in align_list[0]:
+        if len(nwb_list) == 1:
+            etr = fip_psth_inner_compute(
+                nwb_list[0],
+                align_list[0][alignment],
+                channel,
+                True,
+                tw,
+                censor,
+                censor_times_list[0],
+                data_column,
+            )
+        else:
+            this_align = [x[alignment] for x in align_list]
+            etr = fip_psth_multiple_inner_compute(
+                nwb_list, this_align, channel, True, tw, censor, censor_times_list, data_column
+            )
         fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment, data_column)
 
     plt.legend()
@@ -94,7 +128,10 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     ax.set_xlim(tw)
     ax.axvline(0, color="k", alpha=0.2)
     ax.tick_params(axis="both", labelsize=STYLE["axis_ticks_fontsize"])
-    ax.set_title(nwb.session_id, fontsize=STYLE["axis_fontsize"])
+    if len(nwb_list) == 1:
+        ax.set_title(nwb_list[0].session_id, fontsize=STYLE["axis_fontsize"])
+    else:
+        ax.set_title("{} sessions".format(len(nwb_list)), fontsize=STYLE["axis_fontsize"])
     plt.tight_layout()
     return fig, ax
 
@@ -176,16 +213,28 @@ def plot_fip_psth_compare_channels(
     # Iterate through channels and plot
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
-        include = [c in nwb.df_fip["event"].values for nwb in nwb_list]
-        etr = fip_psth_multiple_inner_compute(
-            [x for dex, x in enumerate(nwb_list) if include[dex]],
-            [x for dex, x in enumerate(align_timepoints_list) if include[dex]],
-            c,
-            True,
-            tw,
-            censor,
-            data_column=data_column,
-        )
+        if len(nwb_list) == 1:
+            if c in nwb_list[0].df_fip["event"].values:
+                etr = fip_psth_inner_compute(
+                    nwb_list[0],
+                    align_timepoints_list[0],
+                    c,
+                    True,
+                    tw,
+                    censor,
+                    data_column=data_column,
+                )
+        else:
+            include = [c in nwb.df_fip["event"].values for nwb in nwb_list]
+            etr = fip_psth_multiple_inner_compute(
+                [x for dex, x in enumerate(nwb_list) if include[dex]],
+                [x for dex, x in enumerate(align_timepoints_list) if include[dex]],
+                c,
+                True,
+                tw,
+                censor,
+                data_column=data_column,
+            )
         fip_psth_inner_plot(ax, etr, colors[dex], c, data_column)
 
     plt.legend()
