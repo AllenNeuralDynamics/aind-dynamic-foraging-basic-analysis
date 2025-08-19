@@ -3,12 +3,12 @@ Tools for plotting FIP data
 """
 
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
-
+import pandas as pd
 from aind_dynamic_foraging_data_utils import alignment as an
 from aind_dynamic_foraging_data_utils import nwb_utils as nu
-from aind_dynamic_foraging_basic_analysis.plot.style import STYLE, FIP_COLORS
+
+from aind_dynamic_foraging_basic_analysis.plot.style import FIP_COLORS, STYLE
 
 
 def plot_fip_psth_compare_alignments(  # NOQA C901
@@ -21,6 +21,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     censor=True,
     extra_colors={},
     data_column="data",
+    error_type="sem",
 ):
     """
     Compare the same FIP channel aligned to multiple event types
@@ -39,6 +40,8 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     plot_fip_psth_compare_alignments(nwb,['left_reward_delivery_time',
         'right_reward_delivery_time'],'G_1_preprocessed')
     """
+    if error_type not in ["sem", "sem_over_sessions"]:
+        raise Exception("unknown error type")
 
     nwb_list = nwb if isinstance(nwb, list) else [nwb]
     for nwb_i in nwb_list:
@@ -102,23 +105,11 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
 
     align_label = "Time (s)"
     for alignment in align_list[0]:
-        if len(nwb_list) == 1:
-            etr = fip_psth_inner_compute(
-                nwb_list[0],
-                align_list[0][alignment],
-                channel,
-                True,
-                tw,
-                censor,
-                censor_times_list[0],
-                data_column,
-            )
-        else:
-            this_align = [x[alignment] for x in align_list]
-            etr = fip_psth_multiple_inner_compute(
-                nwb_list, this_align, channel, True, tw, censor, censor_times_list, data_column
-            )
-        fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment, data_column)
+        this_align = [x[alignment] for x in align_list]
+        etr = fip_psth_multiple_inner_compute(
+            nwb_list, this_align, channel, True, tw, censor, censor_times_list, data_column
+        )
+        fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment, data_column, error_type)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -152,6 +143,7 @@ def plot_fip_psth_compare_channels(
     ],
     censor=True,
     data_column="data",
+    error_type="sem",
 ):
     """
     nwb, the nwb object for the session of interest, or a list of nwb objects
@@ -168,6 +160,10 @@ def plot_fip_psth_compare_channels(
     plot_fip_psth(nwb_list, 'goCue_start_time')
     plot_fip_psth(nwb_list, ['goCue_start_time','goCue_start_time'])
     """
+
+    if error_type not in ["sem", "sem_over_sessions"]:
+        raise Exception("Unknown error type")
+
     # Check if nwb is a list, otherwise put it in a list to check
     nwb_list = nwb if isinstance(nwb, list) else [nwb]
 
@@ -213,29 +209,17 @@ def plot_fip_psth_compare_channels(
     # Iterate through channels and plot
     colors = [FIP_COLORS.get(c, "") for c in channels]
     for dex, c in enumerate(channels):
-        if len(nwb_list) == 1:
-            if c in nwb_list[0].df_fip["event"].values:
-                etr = fip_psth_inner_compute(
-                    nwb_list[0],
-                    align_timepoints_list[0],
-                    c,
-                    True,
-                    tw,
-                    censor,
-                    data_column=data_column,
-                )
-        else:
-            include = [c in nwb.df_fip["event"].values for nwb in nwb_list]
-            etr = fip_psth_multiple_inner_compute(
-                [x for dex, x in enumerate(nwb_list) if include[dex]],
-                [x for dex, x in enumerate(align_timepoints_list) if include[dex]],
-                c,
-                True,
-                tw,
-                censor,
-                data_column=data_column,
-            )
-        fip_psth_inner_plot(ax, etr, colors[dex], c, data_column)
+        include = [c in nwb.df_fip["event"].values for nwb in nwb_list]
+        etr = fip_psth_multiple_inner_compute(
+            [x for dex, x in enumerate(nwb_list) if include[dex]],
+            [x for dex, x in enumerate(align_timepoints_list) if include[dex]],
+            c,
+            True,
+            tw,
+            censor,
+            data_column=data_column,
+        )
+        fip_psth_inner_plot(ax, etr, colors[dex], c, data_column, error_type)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -253,7 +237,7 @@ def plot_fip_psth_compare_channels(
     return fig, ax
 
 
-def fip_psth_inner_plot(ax, etr, color, label, data_column):
+def fip_psth_inner_plot(ax, etr, color, label, data_column, error_type="sem"):
     """
     helper function that plots an event triggered response
     ax, the pyplot axis to plot on
@@ -261,14 +245,15 @@ def fip_psth_inner_plot(ax, etr, color, label, data_column):
     color, the line color to plot
     label, the label for the etr
     data_column (string), name of data_column
+    error_type, the error bar type to plot, must be a column in etr
     """
     if color == "":
         cmap = plt.get_cmap("tab20")
         color = cmap(np.random.randint(20))
     ax.fill_between(
         etr.index,
-        etr[data_column] - etr["sem"],
-        etr[data_column] + etr["sem"],
+        etr[data_column] - etr[error_type],
+        etr[data_column] + etr[error_type],
         color=color,
         alpha=0.2,
     )
@@ -322,7 +307,11 @@ def fip_psth_multiple_inner_compute(
         grand_sem = mean_per_ses.sem(axis=1)
         # Combine into a DataFrame
         result = grand_mean.to_frame(name=data_column)
-        result["sem"] = grand_sem
+        result["sem_over_sessions"] = grand_sem
+
+        # Compute SEM collapsing over sessions
+        result["sem"] = etr_all.groupby("time")[data_column].sem()
+
         return result
     else:
         return etr_all
