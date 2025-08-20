@@ -26,8 +26,12 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     """
     Compare the same FIP channel aligned to multiple event types
     nwb, nwb object for the session, or a list of nwbs
-    alignments, either a list of event types in df_events, or a dictionary
-        whose keys are event types and values are a list of timepoints
+    alignments, with one session alignments can be either a list of
+        event types in df_events, or a dictionary whose keys are
+        event types and values are a list of timepoints. With multiple
+        sessions, alignments can be either a list of event types in df_events,
+        or a list of dictionaries whose keys are event types and values are a
+        list of timepoints.
     channel, (str) the name of the FIP channel
     tw, time window for the PSTH
     censor, censor important timepoints before and after aligned timepoints
@@ -67,8 +71,24 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
         raise Exception("Must pass alignments as a list of events, or a dictionary of times")
     elif len(nwb_list) > 1 and (not isinstance(alignments, list)):
         raise Exception(
-            "Must pass alignments as a list of events, or a list of dictionariesof times"
+            "Must pass alignments as a list of events, or a list of dictionaries of times"
         )
+
+    # If we are given a list of dictionaries, ensure all dictionaries have the same keys
+    if (
+        len(nwb_list) > 1
+        and isinstance(alignments, list)
+        and all(isinstance(item, dict) for item in alignments)
+    ):
+        keys = set()
+        for d in alignments:
+            keys.update(list(d.keys()))
+        for index, d in enumerate(alignments):
+            missing = keys - set(d.keys())
+            if len(missing) > 0:
+                raise Exception(
+                    "{} Missing alignment key: {}".format(nwb_list[index].session_id, list(missing))
+                )
 
     if isinstance(alignments, dict):
         # We have a single NWB, given a dictionary of alignments, make it a list and we are done
@@ -202,6 +222,11 @@ def plot_fip_psth_compare_channels(  # NOQA C901
             print("You need to compute the df_events first")
             print("run `nwb.df_events = create_events_df(nwb)`")
             nwb_i.df_events = nu.create_events_df(nwb_i)
+
+        # Add warning if channels are missing
+        missing_channels = [c for c in channels if c not in nwb_i.df_fip["event"].values]
+        if len(missing_channels) > 0:
+            print("{} missing channel {}".format(nwb_i.session_id, missing_channels))
 
     align_timepoints_list = []
     # Generate the alignment timepoints for each session
