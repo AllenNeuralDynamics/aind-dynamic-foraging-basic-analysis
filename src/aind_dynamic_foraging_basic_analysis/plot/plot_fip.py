@@ -129,7 +129,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     return fig, ax
 
 
-def plot_fip_psth_compare_channels(
+def plot_fip_psth_compare_channels(  # NOQA C901
     nwb,
     align,
     tw=[-4, 4],
