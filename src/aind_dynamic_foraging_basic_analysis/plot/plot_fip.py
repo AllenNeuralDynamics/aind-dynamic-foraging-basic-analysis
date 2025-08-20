@@ -272,7 +272,12 @@ def fip_psth_multiple_inner_compute(
     censor_times=None,
     data_column="data",
 ):
-    """ """
+    """
+    Wrapper function for fip_psth_inner_compute that takes a list of NWB files
+    nwb_list, a list of nwb sessions
+    align_timepoints_list, a list of alignments for each session
+    censor_times, can be None, or a list of timepoints for each session
+    """
     # Check that len(nwb_list) = len(align_timepoints_list) = len(censor_times)
     if len(nwb_list) != len(align_timepoints_list):
         raise Exception("length of nwb list and alignments list must match")
