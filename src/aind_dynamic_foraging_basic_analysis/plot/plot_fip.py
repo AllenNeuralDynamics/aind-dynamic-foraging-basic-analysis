@@ -34,6 +34,8 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     extra_colors (dict), a dictionary of extra colors.
         keys should be alignments, or colors are random
     data_column (string), name of data column in nwb.df_fip
+    error_type, (string), either "sem" or "sem_over_sessions" to define
+        the error bar for the PSTH
 
     EXAMPLE
     *******************
@@ -44,6 +46,9 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
         raise Exception("unknown error type")
 
     nwb_list = nwb if isinstance(nwb, list) else [nwb]
+    if len(nwb_list) == 1 and error_type == "sem_over_sessions":
+        raise Exception("Cannot have sem_over_sessions with one session")
+
     for nwb_i in nwb_list:
         if not hasattr(nwb_i, "df_fip"):
             print("You need to compute the df_fip first")
@@ -84,8 +89,9 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     else:
         print(
             "alignments must be either a list of events in nwb.df_events, "
-            + "or a dictionary where each key is an event type, "
-            + "and the value is a list of timepoints"
+            + "or, for a single session, a dictionary where each key is an event type, "
+            + "and the value is a list of timepoints. If multiple sessions are given, "
+            + "you may pass a list of dictionaries"
         )
         return
 
@@ -151,16 +157,18 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     nwb, the nwb object for the session of interest, or a list of nwb objects
     align should either be a string of the name of an event type in nwb.df_events,
         or a list of timepoints. if nwb is a list, then align should be a list containing
-        either the string of the name of an event type, or a list of timepoints.
+        lists of timepoints for each session.
     channels should be a list of channel names (strings)
     censor, censor important timepoints before and after aligned timepoints
     data_column (string), name of data column in nwb.df_fip
+    error_type, (string), either "sem" or "sem_over_sessions" to define
+        the error bar for the PSTH
 
     EXAMPLE
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
     plot_fip_psth(nwb_list, 'goCue_start_time')
-    plot_fip_psth(nwb_list, ['goCue_start_time','goCue_start_time'])
+    plot_fip_psth(nwb_list, [session_1_timepoints, session_2_timepoints, ... ])
     """
 
     if error_type not in ["sem", "sem_over_sessions"]:
@@ -169,8 +177,16 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     # Check if nwb is a list, otherwise put it in a list to check
     nwb_list = nwb if isinstance(nwb, list) else [nwb]
 
+    if len(nwb_list) == 1 and error_type == "sem_over_sessions":
+        raise Exception("Cannot have sem_over_sessions with one session")
     if isinstance(nwb, list) and isinstance(align, list) and (len(nwb) != len(align)):
         raise Exception("NWB list and align list must match")
+    if (
+        isinstance(nwb, list)
+        and isinstance(align, list)
+        and not all(isinstance(item, list) or isinstance(item, np.ndarray) for item in align)
+    ):
+        raise Exception("When using multiple sessions, align must be a list of lists")
     if isinstance(nwb, list) and isinstance(align, str):
         align = [align] * len(nwb)
     if not isinstance(nwb, list):
@@ -247,7 +263,7 @@ def fip_psth_inner_plot(ax, etr, color, label, data_column, error_type="sem"):
     color, the line color to plot
     label, the label for the etr
     data_column (string), name of data_column
-    error_type, the error bar type to plot, must be a column in etr
+    error_type, (string), the error bar type to plot, must be a column in etr
     """
     if color == "":
         cmap = plt.get_cmap("tab20")
