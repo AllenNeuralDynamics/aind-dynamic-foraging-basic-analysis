@@ -68,6 +68,8 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     if isinstance(alignments, dict):
         # We have a single NWB, given a dictionary of alignments, make it a list and we are done
         align_list = [alignments]
+    elif isinstance(alignments, list) and all(isinstance(item, dict) for item in alignments):
+        align_list = alignments
     elif isinstance(alignments, list):
         align_list = []
         for i, nwb_i in enumerate(nwb_list):
