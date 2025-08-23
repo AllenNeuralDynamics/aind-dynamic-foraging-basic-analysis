@@ -7,7 +7,7 @@
 
 import aind_dynamic_foraging_data_utils.nwb_utils as nu
 import aind_dynamic_foraging_models.logistic_regression.model as model
-import aind_dynamic_foraging_basic_analysis.plot.plot_fip as pf
+from aind_dynamic_foraging_data_utils import alignment as an
 import numpy as np
 import pandas as pd
 
@@ -242,7 +242,8 @@ def get_average_signal_window(
     alignment_event,
     offsets,
     channel,
-    data_col='data_z',
+    data_column='data_z',
+    censor=True,
     output_col=None,
 ):
     """
@@ -255,12 +256,13 @@ def get_average_signal_window(
         nwb object with df_fip and df_trials attributes
     alignment_event : str
         The event column in df_trials to align to. must be given in_session, not in_trial
-    offsets : list or tuple of float
+    offsets: list or tuple of float
         [start, end] offsets (in seconds) relative to alignment_event.
     channel : str
         The value in df_fip['event'] to filter for.
-    data_col : str
+    data_column : str
         Column in df_fip to extract (default 'data_z').
+    censor, censor important timepoints before and after aligned timepoints
     output_col : str or None
         Name for the new column. If None, will be generated as
         '<data_col>_<channel>_<start>_<end>_<alignment_event>'.
@@ -287,20 +289,34 @@ def get_average_signal_window(
     # Get output column name
     if output_col is None:
         output_col = (
-            f"{data_col}_{channel}_{offsets[0]}_"
+            f"{data_column}_{channel}_{offsets[0]}_"
             f"{offsets[1]}_{alignment_event.replace('_in_session','')}"
         )
 
-    df_trials = nwb.df_trials.copy()
+    # copy df_trials, drops na values, sort trial by alignment event
+    # sorting needed because censor in event_triggered_response sorts
+    # this allows the trials to be matched with event_times
+    df_trials = nwb.df_trials.dropna(subset=alignment_event, inplace=False)
+    df_trials = df_trials.sort_values(by=alignment_event)
 
-    # get event triggered response. Censor set to FALSE because event_times should match trial #
-    etr = pf.fip_psth_inner_compute(nwb, nwb.df_trials[alignment_event].values,
-                                    channel=channel, average=False, tw=offsets,
-                                    censor=False, data_column=data_col)
+    data = nwb.df_fip.query("event == @channel")
+    align_timepoints = df_trials[alignment_event].values
+
+    etr = an.event_triggered_response(
+        data,
+        "timestamps",
+        data_column,
+        align_timepoints,
+        t_start=offsets[0],
+        t_end=offsets[1],
+        output_sampling_rate=40,
+        censor=censor,
+        censor_times=None,
+    )
 
     avg_activity = etr.groupby("event_number").mean()
     avg_activity['trial'] = df_trials.trial.values
-    avg_activity = avg_activity.rename(columns={data_col: output_col})
+    avg_activity = avg_activity.rename(columns={data_column: output_col})
 
     # Merge on 'trial'
     df_trials = df_trials.merge(avg_activity[['trial', output_col]], on='trial', how='left')
