@@ -237,6 +237,56 @@ def add_intertrial_licking(df_trials, df_licks):
     return df_trials
 
 
+def get_average_signal_window_multi(
+    nwbs,
+    alignment_event,
+    offsets,
+    channel,
+    data_column='data_z',
+    censor=True,
+    output_col=None
+):
+    """
+    Wrapper for get_average_signal_window to process a
+    list of nwb objects and concatenate the results.
+
+    Parameters
+    ----------
+    nwbs : list
+        List of nwb-like objects (each with .df_trials and .df_fip).
+    alignment_event : str
+        The event column in df_trials to align to.
+    offsets : list or tuple of float
+        [start, end] offsets (in seconds) relative to alignment_event.
+    channel : str
+        The value in df_fip['event'] to filter for.
+    data_col : str
+        Column in df_fip to extract (default 'data_z').
+    censor, censor important timepoints before and after aligned timepoints
+    output_col : str or None
+        Name for the new column. If None, will be generated automatically.
+
+    Returns
+    -------
+    pd.DataFrame
+        Concatenated DataFrame of all trials with the new signal window column.
+    """
+    all_trials_avg_signal = []
+    for nwb in nwbs:
+        df_trials = get_average_signal_window(
+            nwb,
+            alignment_event=alignment_event,
+            offsets=offsets,
+            channel=channel,
+            data_column=data_column,
+            censor=censor,
+            output_col=output_col
+        )
+        cols_needed = ['trial', 'ses_idx', df_trials.columns[-1]]
+        all_trials_avg_signal.append(df_trials[cols_needed])
+    return pd.concat(all_trials_avg_signal, ignore_index=True)
+
+
 def get_average_signal_window(
     nwb,
     alignment_event,
