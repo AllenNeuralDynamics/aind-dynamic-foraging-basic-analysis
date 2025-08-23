@@ -273,6 +273,12 @@ def get_average_signal_window(
     df_trial: pd.DataFrame
         DataFrame with a new column containing the mean signal
         in the specified window for each trial.
+
+    EXAMPLE
+    *******************
+    df_trials = get_average_signal_window(nwb, alignment_event='choice_time_in_session',
+                        offsets=[0.33,1],channel='G_0_dff-bright_mc-iso-IRLS',
+                        data_column='data_z_norm')
     """
 
     # Check alignment_event ends with 'in_session'
