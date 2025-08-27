@@ -344,7 +344,7 @@ def get_average_signal_window(
     # Check alignment_event is in df_trials columns
     if alignment_event not in nwb.df_trials.columns:
         raise ValueError(f"alignment_event '{alignment_event}' not found in df_trials columns.")
-    
+
     if channel not in nwb.df_fip.event.unique():
         raise ValueError(f"{channel} channel not found in df_fip.")
 
