@@ -348,7 +348,7 @@ def get_average_signal_window(
     if channel not in nwb.df_fip.event.unique():
         raise ValueError(f"{channel} channel not found in df_fip.")
 
-    if data_column not in nwb.df_trials.columns:
+    if data_column not in nwb.df_fip.columns:
         raise ValueError(f"data column '{data_column}' not found in df_trials columns.")
 
     # Get output column name
