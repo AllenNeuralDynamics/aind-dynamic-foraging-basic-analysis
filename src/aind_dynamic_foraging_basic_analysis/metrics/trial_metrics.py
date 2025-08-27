@@ -338,9 +338,18 @@ def get_average_signal_window(
     if not hasattr(nwb, "df_trials"):
         raise ValueError("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
 
+    if not hasattr(nwb, "df_fip"):
+        raise ValueError("You need to compute df_fip: nwb_utils.create_fib_df(nwb)")
+
     # Check alignment_event is in df_trials columns
     if alignment_event not in nwb.df_trials.columns:
         raise ValueError(f"alignment_event '{alignment_event}' not found in df_trials columns.")
+    
+    if channel not in nwb.df_fip.event.unique():
+        raise ValueError(f"{channel} channel not found in df_fip.")
+
+    if data_column not in nwb.df_trials.columns:
+        raise ValueError(f"data column '{data_column}' not found in df_trials columns.")
 
     # Get output column name
     if output_col is None:
