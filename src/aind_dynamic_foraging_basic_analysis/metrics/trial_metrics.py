@@ -10,6 +10,7 @@ import aind_dynamic_foraging_models.logistic_regression.model as model
 from aind_dynamic_foraging_data_utils import alignment as an
 import numpy as np
 import pandas as pd
+import warnings
 
 import aind_dynamic_foraging_basic_analysis.licks.annotation as a
 
@@ -346,7 +347,8 @@ def get_average_signal_window(
         raise ValueError(f"alignment_event '{alignment_event}' not found in df_trials columns.")
 
     if channel not in nwb.df_fip.event.unique():
-        raise ValueError(f"{channel} channel not found in df_fip.")
+        warnings.warn(f"{channel} channel not found in df_fip. Returning original df_trials.")
+        return nwb.df_trials
 
     if data_column not in nwb.df_fip.columns:
         raise ValueError(f"data column '{data_column}' not found in df_trials columns.")
