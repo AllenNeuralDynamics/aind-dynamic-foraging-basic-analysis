@@ -487,7 +487,7 @@ def plot_metric(df_trials, go_cue_times, metric, ax):
     # plot metrics for this axis
     for m in metric_names:
         if m in df_trials:
-            ax.plot(go_cue_times, df_trials[m], label=m)
+            ax.plot(go_cue_times, df_trials[m], label=m, alpha=0.7)
         else:
             raise Exception("metric not in df_trials: {}".format(m))
 
