@@ -1,6 +1,7 @@
 """
     Defines a dictionary of styles
 """
+import matplotlib.pyplot as plt
 
 # General plotting style
 STYLE = {
@@ -32,3 +33,34 @@ FIP_COLORS = {
     "left_reward_delivery_time": "b",
     "right_reward_delivery_time": "r",
 }
+
+def get_colors(labels,method='random'):
+    if method == 'even':
+        colors = get_n_colors(len(labels))
+    elif method == 'random':
+        colors = get_n_random_colors(len(labels))
+    return {labels[i]:colors[i] for i in range(len(labels))}
+
+def get_n_random_colors(n,cmap_name='hsv'):
+    cmap = plt.get_cmap(cmap_name)
+    offset = np.random.rand()
+    colors = [cmap(np.mod(i / (n)+offset,1)) for i in range(n)]
+    return colors 
+
+def get_n_colors(n, cmap_name='plasma'):
+    """
+    Returns n equally spaced colors from a matplotlib colormap.
+
+    Args:
+        n (int): The number of colors to generate.
+        cmap_name (str): The name of the matplotlib colormap to use (e.g., 'viridis', 'plasma', 'coolwarm').
+
+    Returns:
+        list: A list of RGB tuples representing the equally spaced colors.
+    """
+    cmap = plt.get_cmap(cmap_name)
+    colors = [cmap(i / (n - 1)) for i in range(n)]
+    return colors 
+
+
+
