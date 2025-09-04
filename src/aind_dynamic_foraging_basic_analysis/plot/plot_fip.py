@@ -141,7 +141,14 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
-    ax.set_ylabel("df/f", fontsize=STYLE["axis_fontsize"])
+    if data_column == "data":
+        ylabel = "df/f"
+    elif data_column == "data_z":
+        ylabel = "z-scored df/f"
+    else:
+        # Default to df/f
+        ylabel = "df/f"
+    ax.set_ylabel(ylabel, fontsize=STYLE["axis_fontsize"])
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_xlim(tw)
@@ -266,7 +273,13 @@ def plot_fip_psth_compare_channels(  # NOQA C901
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
-    ax.set_ylabel("df/f", fontsize=STYLE["axis_fontsize"])
+    if data_column == "data":
+        ylabel = "df/f"
+    elif data_column == "data_z":
+        ylabel = "z-scored df/f"
+    else:
+        ylabel = "df/f"
+    ax.set_ylabel(ylabel, fontsize=STYLE["axis_fontsize"])
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_xlim(tw)
