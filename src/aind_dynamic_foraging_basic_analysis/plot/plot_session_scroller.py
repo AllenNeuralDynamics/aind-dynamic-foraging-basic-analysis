@@ -84,7 +84,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     if not hasattr(nwb, "df_events"):
         print("computing df_events first")
-        nwb.df_events = nu.create_events_df(nwb)
+        nwb.df_events = nu.create_df_events(nwb)
         df_events = nwb.df_events
     else:
         df_events = nwb.df_events
