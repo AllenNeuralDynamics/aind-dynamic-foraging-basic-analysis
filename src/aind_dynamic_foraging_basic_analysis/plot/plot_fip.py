@@ -56,12 +56,12 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     for nwb_i in nwb_list:
         if not hasattr(nwb_i, "df_fip"):
             print("You need to compute the df_fip first")
-            print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
-            nwb_i.df_fip = nu.create_fib_df(nwb_i, tidy=True)
+            print("running `nwb.df_fip = create_df_fip(nwb,tidy=True)`")
+            nwb_i.df_fip = nu.create_df_fip(nwb_i, tidy=True)
         if not hasattr(nwb_i, "df_events"):
             print("You need to compute the df_events first")
-            print("run `nwb.df_events = create_events_df(nwb)`")
-            nwb_i.df_events = nu.create_events_df(nwb_i)
+            print("run `nwb.df_events = create_df_events(nwb)`")
+            nwb_i.df_events = nu.create_df_events(nwb_i)
         if channel not in nwb_i.df_fip["event"].values:
             print("channel {} not in df_fip".format(channel))
 
@@ -222,12 +222,12 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     for nwb_i in nwb_list:
         if not hasattr(nwb_i, "df_fip"):
             print("You need to compute the df_fip first")
-            print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
-            nwb_i.df_fip = nu.create_fib_df(nwb_i, tidy=True)
+            print("running `nwb.df_fip = create_df_fip(nwb,tidy=True)`")
+            nwb_i.df_fip = nu.create_df_fip(nwb_i, tidy=True)
         if not hasattr(nwb_i, "df_events"):
             print("You need to compute the df_events first")
-            print("run `nwb.df_events = create_events_df(nwb)`")
-            nwb_i.df_events = nu.create_events_df(nwb_i)
+            print("run `nwb.df_events = create_df_events(nwb)`")
+            nwb_i.df_events = nu.create_df_events(nwb_i)
 
         # Add warning if channels are missing
         missing_channels = [c for c in channels if c not in nwb_i.df_fip["event"].values]
@@ -434,8 +434,8 @@ def plot_histogram(nwb, preprocessed=True, edge_percentile=2, data_column="data"
     """
     if not hasattr(nwb, "df_fip"):
         print("You need to compute the df_fip first")
-        print("running `nwb.df_fip = create_fib_df(nwb,tidy=True)`")
-        nwb.df_fip = nu.create_fib_df(nwb, tidy=True)
+        print("running `nwb.df_fip = create_df_fip(nwb,tidy=True)`")
+        nwb.df_fip = nu.create_df_fip(nwb, tidy=True)
         return
 
     fig, ax = plt.subplots(3, 2, sharex=True)

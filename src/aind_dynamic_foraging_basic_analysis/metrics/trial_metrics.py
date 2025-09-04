@@ -35,7 +35,7 @@ def compute_trial_metrics(nwb):
     """
     if not hasattr(nwb, "df_events"):
         print("computing df_events first")
-        nwb.df_events = nu.create_events_df(nwb)
+        nwb.df_events = nu.create_df_events(nwb)
 
     if not hasattr(nwb, "df_trials"):
         print("computing df_trials")
@@ -340,7 +340,7 @@ def get_average_signal_window(
         raise ValueError("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
 
     if not hasattr(nwb, "df_fip"):
-        raise ValueError("You need to compute df_fip: nwb_utils.create_fib_df(nwb)")
+        raise ValueError("You need to compute df_fip: nwb_utils.create_df_fip(nwb)")
 
     # Check alignment_event is in df_trials columns
     if alignment_event not in nwb.df_trials.columns:

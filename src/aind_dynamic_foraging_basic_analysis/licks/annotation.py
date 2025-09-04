@@ -32,7 +32,7 @@ def annotate_licks(nwb):
     nwb is an object that has df_events as an attribute
     """
     if not hasattr(nwb, "df_events"):
-        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        print("You need to compute df_events: nwb_utils.create_df_events(nwb)")
         return
     nwb.df_licks = annotate_lick_bouts(nwb)
     nwb.df_licks = annotate_artifacts(nwb)
@@ -57,7 +57,7 @@ def annotate_lick_bouts(nwb):
     """
 
     if not hasattr(nwb, "df_events"):
-        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        print("You need to compute df_events: nwb_utils.create_df_events(nwb)")
         return
     df_licks = nwb.df_events.query('event in ["right_lick_time","left_lick_time"]').copy()
     df_licks.reset_index(drop=True, inplace=True)
@@ -90,7 +90,7 @@ def annotate_artifacts(nwb):
     nwb, an object with attributes: df_licks, df_events
     """
     if not hasattr(nwb, "df_events"):
-        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        print("You need to compute df_events: nwb_utils.create_df_events(nwb)")
         return
 
     if not hasattr(nwb, "df_licks"):
@@ -122,7 +122,7 @@ def annotate_rewards(nwb):
     """
 
     if not hasattr(nwb, "df_events"):
-        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        print("You need to compute df_events: nwb_utils.create_df_events(nwb)")
         return
 
     # ensure we have df_licks
@@ -183,7 +183,7 @@ def annotate_cue_response(nwb):
     """
 
     if not hasattr(nwb, "df_events"):
-        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        print("You need to compute df_events: nwb_utils.create_df_events(nwb)")
         return
 
     # ensure we have df_licks
@@ -232,7 +232,7 @@ def annotate_intertrial_choices(nwb):
     """
     # Add lick_bout annotation, and cue_response if not already added
     if not hasattr(nwb, "df_events"):
-        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        print("You need to compute df_events: nwb_utils.create_df_events(nwb)")
         return
     if not hasattr(nwb, "df_licks"):
         nwb.df_licks = annotate_lick_bouts(nwb)
@@ -267,7 +267,7 @@ def annotate_switches(nwb):
     """
     # Add lick_bout annotation, and cue_response if not already added
     if not hasattr(nwb, "df_events"):
-        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        print("You need to compute df_events: nwb_utils.create_df_events(nwb)")
         return
     if not hasattr(nwb, "df_licks"):
         nwb.df_licks = annotate_lick_bouts(nwb)
@@ -337,7 +337,7 @@ def annotate_within_session(nwb):
     """
 
     if not hasattr(nwb, "df_events"):
-        print("You need to compute df_events: nwb_utils.create_events_df(nwb)")
+        print("You need to compute df_events: nwb_utils.create_df_events(nwb)")
         return
 
     # ensure we have df_licks
