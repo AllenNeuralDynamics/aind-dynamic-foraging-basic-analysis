@@ -73,7 +73,7 @@ exclude = '''
 '''
 
 [tool.coverage.run]
-omit = ["*__init__*"]
+omit = ["*__init__*","style"]
 source = ["aind_dynamic_foraging_basic_analysis", "tests"]
 
 [tool.coverage.report]
