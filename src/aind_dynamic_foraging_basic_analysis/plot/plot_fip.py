@@ -5,6 +5,7 @@ Tools for plotting FIP data
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import hierarchical_bootstrap.bootstrap as hb
 from aind_dynamic_foraging_data_utils import alignment as an
 from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
@@ -46,7 +47,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     plot_fip_psth_compare_alignments(nwb,['left_reward_delivery_time',
         'right_reward_delivery_time'],'G_1_preprocessed')
     """
-    if error_type not in ["sem", "sem_over_sessions"]:
+    if error_type not in ["sem", "sem_over_sessions", "hb_sem"]:
         raise Exception("unknown error type")
 
     nwb_list = nwb if isinstance(nwb, list) else [nwb]
@@ -132,12 +133,22 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     colors = {**FIP_COLORS, **extra_colors}
 
     align_label = "Time (s)"
+    etrs = []
     for alignment in align_list[0]:
         this_align = [x[alignment] for x in align_list]
         etr = fip_psth_multiple_inner_compute(
-            nwb_list, this_align, channel, True, tw, censor, censor_times_list, data_column
+            nwb_list,
+            this_align,
+            channel,
+            True,
+            tw,
+            censor,
+            censor_times_list,
+            data_column,
+            compute_hierarchical=error_type == "hb_sem",
         )
         fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment, data_column, error_type)
+        etrs.append(etr)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -159,7 +170,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     else:
         ax.set_title("{} sessions".format(len(nwb_list)), fontsize=STYLE["axis_fontsize"])
     plt.tight_layout()
-    return fig, ax
+    return fig, ax, etrs
 
 
 def plot_fip_psth_compare_channels(  # NOQA C901
@@ -181,7 +192,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     error_type="sem",
 ):
     """
-    nwb, the nwb object for the session of interest, or a list of nwb objects
+    nwb, the nwb object, etrs for the session of interest, or a list of nwb objects
     align should either be a string of the name of an event type in nwb.df_events,
         or a list of timepoints. if nwb is a list, then align should be a list containing
         lists of timepoints for each session.
@@ -198,7 +209,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     plot_fip_psth(nwb_list, [session_1_timepoints, session_2_timepoints, ... ])
     """
 
-    if error_type not in ["sem", "sem_over_sessions"]:
+    if error_type not in ["sem", "sem_over_sessions", "hb_sem"]:
         raise Exception("Unknown error type")
 
     # Check if nwb is a list, otherwise put it in a list to check
@@ -268,6 +279,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
             tw,
             censor,
             data_column=data_column,
+            compute_hierarchical=error_type == "hb_sem",
         )
         fip_psth_inner_plot(ax, etr, colors[dex], c, data_column, error_type)
 
@@ -325,6 +337,7 @@ def fip_psth_multiple_inner_compute(
     censor=True,
     censor_times=None,
     data_column="data",
+    compute_hierarchical=False,
 ):
     """
     Wrapper function for fip_psth_inner_compute that takes a list of NWB files
@@ -373,6 +386,9 @@ def fip_psth_multiple_inner_compute(
         # Compute SEM collapsing over sessions
         result["sem"] = etr_all.groupby("time")[data_column].sem()
 
+        if compute_hierarchical:
+            result = compute_hierarchical_error(result, etr_all, data_column=data_column)
+
         return result
     else:
         return etr_all
@@ -420,6 +436,20 @@ def fip_psth_inner_compute(
         mean["sem"] = sem[data_column]
         return mean
     return etr
+
+
+def compute_hierarchical_error(
+    result, etr_all, levels=["ses_idx"], nboots=1000, data_column="data"
+):
+    print("Warning, this is slow")
+    hb_sem = []
+    for num in result.index.values:
+        bootstraps = hb.bootstrap(
+            etr_all.query("time == @num"), metric=data_column, levels=levels, nboots=nboots
+        )
+        hb_sem.append(bootstraps[data_column + "_sem"])
+    result["hb_sem"] = hb_sem
+    return result
 
 
 def plot_histogram(nwb, preprocessed=True, edge_percentile=2, data_column="data"):
