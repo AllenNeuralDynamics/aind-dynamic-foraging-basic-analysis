@@ -457,7 +457,7 @@ def compute_hierarchical_error(
     You may also speed up this computation by adding more CPUs,
     as this function is optimized for multiprocessing. Additionally,
     you can reduce 'nboots' for faster processing.
-    
+
     See aind_hierarchical_boostrap for more information
     """
 
