@@ -2,10 +2,13 @@
 Tools for plotting FIP data
 """
 
+from functools import partial
+from multiprocessing import Pool
+
+import hierarchical_bootstrap.bootstrap as hb
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import hierarchical_bootstrap.bootstrap as hb
 from aind_dynamic_foraging_data_utils import alignment as an
 from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
@@ -39,7 +42,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     extra_colors (dict), a dictionary of extra colors.
         keys should be alignments, or colors are random
     data_column (string), name of data column in nwb.df_fip
-    error_type, (string), either "sem" or "sem_over_sessions" to define
+    error_type, (string), either "sem", "hb_sem", or "sem_over_sessions" to define
         the error bar for the PSTH
 
     EXAMPLE
@@ -199,7 +202,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     channels should be a list of channel names (strings)
     censor, censor important timepoints before and after aligned timepoints
     data_column (string), name of data column in nwb.df_fip
-    error_type, (string), either "sem" or "sem_over_sessions" to define
+    error_type, (string), either "sem", "hb_sem", or "sem_over_sessions" to define
         the error bar for the PSTH
 
     EXAMPLE
@@ -439,16 +442,29 @@ def fip_psth_inner_compute(
 
 
 def compute_hierarchical_error(
-    result, etr_all, levels=["ses_idx"], nboots=1000, data_column="data"
+    result, etr_all, levels=["ses_idx"], nboots=10000, data_column="data"
 ):
-    print("Warning, this is slow")
-    hb_sem = []
+    print(
+        "Computing hierarchical bootstraps is slow. "
+        "Consider using error_type='sem_over_sessions' until analyses are finalized. "
+        "You may also speed up this computation by adding more CPUs, as this function"
+        "is optimized for multiprocessing. "
+        "Additionally, you can reduce 'nboots' for faster processing."
+    )
+
+    # Set up partial function that wraps other parameters
+    temp_func = partial(hb.bootstrap, metric=data_column, levels=levels, nboots=nboots)
+
+    # Split dataframe by timepoint
+    dfs = []
     for num in result.index.values:
-        bootstraps = hb.bootstrap(
-            etr_all.query("time == @num"), metric=data_column, levels=levels, nboots=nboots
-        )
-        hb_sem.append(bootstraps[data_column + "_sem"])
-    result["hb_sem"] = hb_sem
+        dfs.append(etr_all.query("time == @num"))
+
+    # Run multiprocess pool
+    with Pool() as pool:
+        results = pool.map(temp_func, dfs)
+    result["hb_sem"] = [x["data_sem"] for x in results]
+
     return result
 
 
