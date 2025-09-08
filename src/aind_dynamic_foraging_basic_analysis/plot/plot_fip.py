@@ -5,7 +5,7 @@ Tools for plotting FIP data
 from functools import partial
 from multiprocessing import Pool
 
-import hierarchical_bootstrap.bootstrap as hb
+import aind_hierarchical_bootstrap.bootstrap as hb
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
