@@ -444,13 +444,20 @@ def fip_psth_inner_compute(
 def compute_hierarchical_error(
     result, etr_all, levels=["ses_idx"], nboots=10000, data_column="data"
 ):
-    print(
-        "Computing hierarchical bootstraps is slow. "
-        "Consider using error_type='sem_over_sessions' until analyses are finalized. "
-        "You may also speed up this computation by adding more CPUs, as this function"
-        "is optimized for multiprocessing. "
-        "Additionally, you can reduce 'nboots' for faster processing."
-    )
+    """
+    Computes hierarchical bootstraps at each timepoint.
+    result, summary dataframe
+    etr_al, dataframe with all datapoints
+    levels, list of hierarchy to bootstrap. Slows considerably with each level
+    nboots, number of bootstraps
+    data_column, column to use in etr_all
+
+    Computing hierarchical bootstraps is slow. Consider using
+    error_type='sem_over_sessions' until analyses are finalized.
+    You may also speed up this computation by adding more CPUs,
+    as this function is optimized for multiprocessing. Additionally,
+    you can reduce 'nboots' for faster processing.
+    """
 
     # Set up partial function that wraps other parameters
     temp_func = partial(hb.bootstrap, metric=data_column, levels=levels, nboots=nboots)
