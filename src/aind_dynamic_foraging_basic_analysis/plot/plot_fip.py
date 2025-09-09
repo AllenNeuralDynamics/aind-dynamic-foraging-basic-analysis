@@ -6,6 +6,7 @@ from functools import partial
 from multiprocessing import Pool
 
 import aind_hierarchical_bootstrap.bootstrap as hb
+import aind_hierarchical_bootstrap.stats as hb_stats
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -137,10 +138,11 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     colors = {**FIP_COLORS, **extra_colors}
 
     align_label = "Time (s)"
-    etrs = []
+    etrs = {}
+    bootstraps = {}
     for alignment in align_list[0]:
         this_align = [x[alignment] for x in align_list]
-        etr = fip_psth_multiple_inner_compute(
+        etr, bootstrap = fip_psth_multiple_inner_compute(
             nwb_list,
             this_align,
             channel,
@@ -153,7 +155,21 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
             hierarchical_params=hierarchical_params,
         )
         fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment, data_column, error_type)
-        etrs.append(etr)
+        etrs[alignment] = etr
+        if error_type == "hb_sem":
+            for b in bootstrap:
+                b[alignment] = b[data_column]
+                b["{}_sem".format(alignment)] = b["{}_sem".format(data_column)]
+                b["groups"] = [alignment]
+                del b[data_column]
+                del b["{}_sem".format(data_column)]
+        bootstraps[alignment] = bootstrap
+
+    if error_type == "hb_sem":
+        bootstraps, stats_df = aggregate_bootstrap_statistics(bootstraps)
+        etrs["stats"] = stats_df
+        etrs["bootstraps"] = bootstraps
+        fip_psth_inner_stats_plot(ax, stats_df, "k", threshold=0.3)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -289,6 +305,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
             hierarchical_params=hierarchical_params,
         )
         fip_psth_inner_plot(ax, etr, colors[dex], c, data_column, error_type)
+        # TODO need to add stats here
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -310,6 +327,20 @@ def plot_fip_psth_compare_channels(  # NOQA C901
         ax.set_title("{} sessions".format(len(nwb_list)))
     plt.tight_layout()
     return fig, ax
+
+
+def fip_psth_inner_stats_plot(ax, stats_df, color, threshold=0.05):
+    """
+    Plots markers where a significant threshold is reached
+    """
+    significant = stats_df.query("p < @threshold")
+    ax.plot(
+        significant.index,
+        [ax.get_ylim()[0]] * len(significant),
+        "o",
+        color=color,
+        label="p < {}".format(threshold),
+    )
 
 
 def fip_psth_inner_plot(ax, etr, color, label, data_column, error_type="sem"):
@@ -395,11 +426,13 @@ def fip_psth_multiple_inner_compute(
         result["sem"] = etr_all.groupby("time")[data_column].sem()
 
         if compute_hierarchical:
-            result = compute_hierarchical_error(
+            result, bootstraps = compute_hierarchical_error(
                 result, etr_all, data_column=data_column, **hierarchical_params
             )
+        else:
+            bootstraps = None
 
-        return result
+        return result, bootstraps
     else:
         return etr_all
 
@@ -478,11 +511,53 @@ def compute_hierarchical_error(
 
     # Run multiprocess pool
     with Pool() as pool:
-        results = pool.map(temp_func, dfs)
-    result["hb_sem"] = [x["data_sem"] for x in results]
-    #result['hb_p_value'] = [hb.
+        bootstraps = pool.map(temp_func, dfs)
 
-    return result
+    # Organize results
+    for index, val in enumerate(result.index.values):
+        bootstraps[index]["time"] = val
+    result["hb_sem"] = [x["data_sem"] for x in bootstraps]
+
+    return result, bootstraps
+
+
+def aggregate_bootstrap_statistics(bootstraps):
+    """
+    Computes statistics on bootstrap results across groups (alignments or channels)
+    bootstraps - a dictionary of lists. The keys are the groups to compare,
+        either alignments or channels. The lists are the timepoints of the PSTH
+        The lengths of the lists must be the same for all groups.
+    Returns
+        combined_dicts - a list of dictionaries, one for each timepoint of the PSTH.
+            The dictionary for each timepoint is the merged dictionaries from each group
+        stats_df - a dataframe with statistics results, from aind_hierarchical_bootstrap
+    """
+    # check that the lists are always the same length
+    lens = set()
+    for key in bootstraps:
+        lens.add(len(bootstraps[key]))
+    if len(lens) > 1:
+        raise Exception("Event triggered responses for each alignment are different lengths")
+
+    combined_dicts = []
+    for i in range(lens.pop()):
+        temp = {}
+        for key in bootstraps:
+            temp[key] = bootstraps[key][i][key]
+            temp["{}_sem".format(key)] = bootstraps[key][i]["{}_sem".format(key)]
+        temp["groups"] = list(bootstraps.keys())
+        temp["time"] = bootstraps[key][i]["time"]
+        combined_dicts.append(temp)
+
+    # now compute statistics for each timepoint
+    stats_dfs = []
+    for d in combined_dicts:
+        stats_df = hb_stats.compute_stats(d)
+        stats_df["time"] = d["time"]
+        stats_dfs.append(stats_df)
+    stats_df = pd.concat(stats_dfs).set_index("time", drop=True)
+
+    return combined_dicts, stats_df
 
 
 def plot_histogram(nwb, preprocessed=True, edge_percentile=2, data_column="data"):
