@@ -480,6 +480,7 @@ def compute_hierarchical_error(
     with Pool() as pool:
         results = pool.map(temp_func, dfs)
     result["hb_sem"] = [x["data_sem"] for x in results]
+    #result['hb_p_value'] = [hb.
 
     return result
 
