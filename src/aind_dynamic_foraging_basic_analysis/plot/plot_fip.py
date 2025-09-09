@@ -31,6 +31,8 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
 ):
     """
     Compare the same FIP channel aligned to multiple event types
+
+    ARGS
     nwb, nwb object for the session, or a list of nwbs
     alignments, with one session alignments can be either a list of
         event types in df_events, or a dictionary whose keys are
@@ -46,6 +48,13 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     data_column (string), name of data column in nwb.df_fip
     error_type, (string), either "sem", "hb_sem", or "sem_over_sessions" to define
         the error bar for the PSTH
+    hierarchical_params, (dict), parameters to be passed to compute_hierarchical_error()
+
+    RETURNS
+    fig - matplotlib figure
+    ax - matplotlib axis
+    etrs - dictionary containing PSTH traces for each alignment. If hierarchical
+        bootstrapping is performed, then also contains the bootstraps and statistics dataframe
 
     EXAMPLE
     *******************
@@ -213,6 +222,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     hierarchical_params={},
 ):
     """
+    ARGS
     nwb, the nwb object, etrs for the session of interest, or a list of nwb objects
     align should either be a string of the name of an event type in nwb.df_events,
         or a list of timepoints. if nwb is a list, then align should be a list containing
@@ -222,6 +232,13 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     data_column (string), name of data column in nwb.df_fip
     error_type, (string), either "sem", "hb_sem", or "sem_over_sessions" to define
         the error bar for the PSTH
+    hierarchical_params, (dict), parameters to be passed to compute_hierarchical_error()
+
+    RETURNS
+    fig - matplotlib figure
+    ax - matplotlib axis
+    etrs - dictionary containing PSTH traces for each alignment. If hierarchical
+        bootstrapping is performed, then also contains the bootstraps and statistics dataframe
 
     EXAMPLE
     ********************
