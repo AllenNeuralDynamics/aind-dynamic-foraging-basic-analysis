@@ -169,7 +169,6 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
         bootstraps, stats_df = aggregate_bootstrap_statistics(bootstraps)
         etrs["stats"] = stats_df
         etrs["bootstraps"] = bootstraps
-        fip_psth_inner_stats_plot(ax, stats_df, "k", threshold=0.3)
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -291,9 +290,11 @@ def plot_fip_psth_compare_channels(  # NOQA C901
 
     # Iterate through channels and plot
     colors = [FIP_COLORS.get(c, "") for c in channels]
+    etrs = {}
+    bootstraps = {}
     for dex, c in enumerate(channels):
         include = [c in nwb.df_fip["event"].values for nwb in nwb_list]
-        etr = fip_psth_multiple_inner_compute(
+        etr, bootstrap = fip_psth_multiple_inner_compute(
             [x for dex, x in enumerate(nwb_list) if include[dex]],
             [x for dex, x in enumerate(align_timepoints_list) if include[dex]],
             c,
@@ -305,7 +306,20 @@ def plot_fip_psth_compare_channels(  # NOQA C901
             hierarchical_params=hierarchical_params,
         )
         fip_psth_inner_plot(ax, etr, colors[dex], c, data_column, error_type)
-        # TODO need to add stats here
+        etrs[c] = etr
+        if error_type == "hb_sem":
+            for b in bootstrap:
+                b[c] = b[data_column]
+                b["{}_sem".format(c)] = b["{}_sem".format(data_column)]
+                b["groups"] = [c]
+                del b[data_column]
+                del b["{}_sem".format(data_column)]
+        bootstraps[c] = bootstrap
+
+    if error_type == "hb_sem":
+        bootstraps, stats_df = aggregate_bootstrap_statistics(bootstraps)
+        etrs["stats"] = stats_df
+        etrs["bootstraps"] = bootstraps
 
     plt.legend()
     ax.set_xlabel(align_label, fontsize=STYLE["axis_fontsize"])
@@ -326,21 +340,24 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     else:
         ax.set_title("{} sessions".format(len(nwb_list)))
     plt.tight_layout()
-    return fig, ax
+    return fig, ax, etrs
 
 
 def fip_psth_inner_stats_plot(ax, stats_df, color, threshold=0.05):
     """
     Plots markers where a significant threshold is reached
     """
-    significant = stats_df.query("p < @threshold")
-    ax.plot(
-        significant.index,
-        [ax.get_ylim()[0]] * len(significant),
-        "o",
-        color=color,
-        label="p < {}".format(threshold),
-    )
+    unique_tests = stats_df["name"].unique()
+    for test in unique_tests:
+        significant = stats_df.query("name == @test").query("p < @threshold")
+        ax.plot(
+            significant.index,
+            [ax.get_ylim()[0]] * len(significant),
+            "o",
+            color=color,
+            label="{}: p < {}".format(test, threshold),
+        )
+    plt.legend()
 
 
 def fip_psth_inner_plot(ax, etr, color, label, data_column, error_type="sem"):
