@@ -26,6 +26,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     extra_colors={},
     data_column="data",
     error_type="sem",
+    hierarchical_params = {}
 ):
     """
     Compare the same FIP channel aligned to multiple event types
@@ -149,6 +150,7 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
             censor_times_list,
             data_column,
             compute_hierarchical=error_type == "hb_sem",
+            hierarchical_params = hierarchical_params
         )
         fip_psth_inner_plot(ax, etr, colors.get(alignment, ""), alignment, data_column, error_type)
         etrs.append(etr)
@@ -193,6 +195,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     censor=True,
     data_column="data",
     error_type="sem",
+    hierarchical_params = {}
 ):
     """
     nwb, the nwb object, etrs for the session of interest, or a list of nwb objects
@@ -283,6 +286,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
             censor,
             data_column=data_column,
             compute_hierarchical=error_type == "hb_sem",
+            hierarchical_params = hierarchical_params
         )
         fip_psth_inner_plot(ax, etr, colors[dex], c, data_column, error_type)
 
@@ -341,6 +345,7 @@ def fip_psth_multiple_inner_compute(
     censor_times=None,
     data_column="data",
     compute_hierarchical=False,
+    hierarchical_params = {}
 ):
     """
     Wrapper function for fip_psth_inner_compute that takes a list of NWB files
@@ -390,7 +395,7 @@ def fip_psth_multiple_inner_compute(
         result["sem"] = etr_all.groupby("time")[data_column].sem()
 
         if compute_hierarchical:
-            result = compute_hierarchical_error(result, etr_all, data_column=data_column)
+            result = compute_hierarchical_error(result, etr_all, data_column=data_column, **hierarchical_params)
 
         return result
     else:
