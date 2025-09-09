@@ -58,7 +58,7 @@ def get_colors(labels, cmap_name="hsv", offset=None):
     return {labels[i]: colors[i] for i in range(len(labels))}
 
 
-def get_n_colors(n, cmap_name="plasma", offset=None):
+def get_n_colors(n, cmap_name="hsv", offset=None):
     """
     Returns n equally spaced colors from a matplotlib colormap.
 
