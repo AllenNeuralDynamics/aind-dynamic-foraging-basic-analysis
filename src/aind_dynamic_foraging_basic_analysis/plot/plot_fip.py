@@ -343,9 +343,21 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     return fig, ax, etrs
 
 
-def fip_psth_inner_stats_plot(ax, stats_df, color, threshold=0.05):
+def fip_psth_stats_plot(ax, stats_df, color, threshold=0.05):
     """
     Plots markers where a significant threshold is reached
+
+    Does not perform multiple comparisons testing.
+
+    If multiple unique tests are in the stats_df, each test
+    is plotted separately.
+
+    ARGS
+    ax - axis to plot on
+    stats_df - dataframe of stats results
+    color - color to use as a marker of significance
+    threshold - significance level
+
     """
     unique_tests = stats_df["name"].unique()
     for test in unique_tests:
