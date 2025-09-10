@@ -360,7 +360,7 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     return fig, ax, etrs
 
 
-def fip_psth_stats_plot(ax, stats_df, color, threshold=0.05):
+def fip_psth_stats_plot(ax, stats_df, threshold=0.05):
     """
     Plots markers where a significant threshold is reached
 
@@ -372,20 +372,21 @@ def fip_psth_stats_plot(ax, stats_df, color, threshold=0.05):
     ARGS
     ax - axis to plot on
     stats_df - dataframe of stats results
-    color - color to use as a marker of significance
     threshold - significance level
 
     """
     unique_tests = stats_df["name"].unique()
+    colors = STYLE.get_colors(list(unique_tests), offset=0.25)
     for test in unique_tests:
         significant = stats_df.query("name == @test").query("p < @threshold")
-        ax.plot(
-            significant.index,
-            [ax.get_ylim()[0]] * len(significant),
-            "o",
-            color=color,
-            label="{}: p < {}".format(test, threshold),
-        )
+        if len(significant) > 0:
+            ax.plot(
+                significant.index,
+                [ax.get_ylim()[0]] * len(significant),
+                "o",
+                color=colors[test],
+                label="{}: p < {}".format(test, threshold),
+            )
     plt.legend()
 
 
