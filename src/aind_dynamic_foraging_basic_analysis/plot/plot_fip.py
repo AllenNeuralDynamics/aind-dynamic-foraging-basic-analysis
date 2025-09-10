@@ -377,7 +377,7 @@ def fip_psth_stats_plot(ax, stats_df, threshold=0.05):
 
     """
     unique_tests = stats_df["name"].unique()
-    colors = style.get_colors(list(unique_tests), offset=0.25)
+    colors = style.get_colors(list(unique_tests), offset=0.25, cmap="plasma")
     for test in unique_tests:
         significant = stats_df.query("name == @test").query("p < @threshold")
         if len(significant) > 0:
