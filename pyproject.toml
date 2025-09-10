@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "aind-dynamic-foraging-basic-analysis"
 description = "Generated from aind-library-template"
 license = {text = "MIT"}
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 authors = [
     {name = "Allen Institute for Neural Dynamics"}
 ]
@@ -28,7 +28,9 @@ dependencies = [
     'numpy',
     'pydantic',
     'hdmf_zarr',
-    'aind-dynamic-foraging-data-utils >= 0.1.25'
+    'aind-dynamic-foraging-data-utils >= 0.1.25',
+    'aind-dynamic-foraging-models'
+
 ]
 
 [project.optional-dependencies]
