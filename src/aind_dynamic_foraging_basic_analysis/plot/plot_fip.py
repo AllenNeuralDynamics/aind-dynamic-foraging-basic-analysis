@@ -13,6 +13,7 @@ import pandas as pd
 from aind_dynamic_foraging_data_utils import alignment as an
 from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
+import aind_dynamic_foraging_basic_analysis.plot.style as style
 from aind_dynamic_foraging_basic_analysis.plot.style import FIP_COLORS, STYLE
 
 
@@ -376,7 +377,7 @@ def fip_psth_stats_plot(ax, stats_df, threshold=0.05):
 
     """
     unique_tests = stats_df["name"].unique()
-    colors = STYLE.get_colors(list(unique_tests), offset=0.25)
+    colors = style.get_colors(list(unique_tests), offset=0.25)
     for test in unique_tests:
         significant = stats_df.query("name == @test").query("p < @threshold")
         if len(significant) > 0:
