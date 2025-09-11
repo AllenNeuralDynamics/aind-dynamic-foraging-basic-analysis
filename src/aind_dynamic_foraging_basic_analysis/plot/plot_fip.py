@@ -372,8 +372,21 @@ def fip_psth_stats_plot(ax, stats_df, threshold=0.05):
 
     ARGS
     ax - axis to plot on
-    stats_df - dataframe of stats results
+    stats_df - dataframe of stats results. See aind_hierarchical_bootstrap
+        for more details on the format. This dataframe is returned in the
+        etr dictionary with calls to either plot_fip_psth_compare_alignments
+        or plot_fip_psth_compare_channels. The stats_df will have timepoints
+        in the PSTH as rows. For each timepoint the columns are
+        name - "<group 1>_<group 2>", the two groups being compared
+        group1 - The name of the first group (channel or alignment)
+        group2 - The name of the second group
+        p - the p-value of the comparison
+        nboots - the number of bootstraps used in the comparison
     threshold - significance level
+
+    EXAMPLE
+    fig, ax, etrs = plot_fip_psth_compare_alignments(...)
+    fip_psth_stats_plot(ax, etrs['stats'], threshold=0.05)
 
     """
     unique_tests = stats_df["name"].unique()
