@@ -28,6 +28,14 @@ pip install -e .[dev]
 ```
 
 ## Usage
+
+Example notebooks to test and try different functions of this package (and the data-utils) package can be found here: 
+
+https://codeocean.allenneuraldynamics.org/capsule/6488619/tree
+
+Please duplicate the capsule to test the different functions. 
+
+
 ### Annotate licks
 To create a dataframe of licks that has been annotated with licking bout starts/stops, cue responsive licks, reward triggered licks, and intertrial choices.
 ```
