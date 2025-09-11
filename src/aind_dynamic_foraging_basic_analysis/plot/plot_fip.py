@@ -57,6 +57,23 @@ def plot_fip_psth_compare_alignments(  # NOQA C901
     etrs - dictionary containing PSTH traces for each alignment. If hierarchical
         bootstrapping is performed, then also contains the bootstraps and statistics dataframe
 
+        The stats_df will have timepoints in the PSTH as rows. If more than 2 groups
+        are present, then there will be a row for each timepoint X each combination of groups.
+        For each timepoint the columns are
+        name - "<group 1>_<group 2>", the two groups being compared
+        group1 - The name of the first group (channel or alignment)
+        group2 - The name of the second group
+        p - the p-value of the comparison
+        nboots - the number of bootstraps used in the comparison
+
+        The bootstraps will be a list with the same length as the number of timepoints
+        in the PSTH. For each timepoint, it has a dictionary:
+            <group i> - for each group (channel or alignemtn) the list of bootstrapped means
+                with length = nboots
+            <group i>_sem - the hierarchically computed SEM for that group
+            groups - a list of all the groups present at this timepoint
+            time - the timepoint value
+
     EXAMPLE
     *******************
     plot_fip_psth_compare_alignments(nwb,['left_reward_delivery_time',
@@ -241,6 +258,23 @@ def plot_fip_psth_compare_channels(  # NOQA C901
     etrs - dictionary containing PSTH traces for each alignment. If hierarchical
         bootstrapping is performed, then also contains the bootstraps and statistics dataframe
 
+        The stats_df will have timepoints in the PSTH as rows. If more than 2 groups
+        are present, then there will be a row for each timepoint X each combination of groups.
+        For each timepoint the columns are
+        name - "<group 1>_<group 2>", the two groups being compared
+        group1 - The name of the first group (channel or alignment)
+        group2 - The name of the second group
+        p - the p-value of the comparison
+        nboots - the number of bootstraps used in the comparison
+
+        The bootstraps will be a list with the same length as the number of timepoints
+        in the PSTH. For each timepoint, it has a dictionary:
+            <group i> - for each group (channel or alignemtn) the list of bootstrapped means
+                with length = nboots
+            <group i>_sem - the hierarchically computed SEM for that group
+            groups - a list of all the groups present at this timepoint
+            time - the timepoint value
+
     EXAMPLE
     ********************
     plot_fip_psth(nwb, 'goCue_start_time')
@@ -376,7 +410,9 @@ def fip_psth_stats_plot(ax, stats_df, threshold=0.05):
         for more details on the format. This dataframe is returned in the
         etr dictionary with calls to either plot_fip_psth_compare_alignments
         or plot_fip_psth_compare_channels. The stats_df will have timepoints
-        in the PSTH as rows. For each timepoint the columns are
+        in the PSTH as rows. If more than 2 groups are present, then there will
+        be a row for each timepoint X each combination of groups.
+        For each timepoint the columns are
         name - "<group 1>_<group 2>", the two groups being compared
         group1 - The name of the first group (channel or alignment)
         group2 - The name of the second group
