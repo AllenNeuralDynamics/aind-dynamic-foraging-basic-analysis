@@ -113,6 +113,21 @@ To compare multiple channels to the same event type:
 pf.plot_fip_psth(nwb, 'goCue_start_time')
 ```
 
+### Hierarchical Bootstrapping and significance testing
+If you want to perform hierarchical bootstrapping, then you can select `hb_sem` as the error type
+```
+fig, ax, etrs = plot_fip_psth_compare_alignments(
+    nwbs, 
+    alignments, 
+    channel_name, 
+    error_type='hb_sem',
+    hierarchical_params={'nboots':10000}
+)
+```
+Then add significance with:
+```
+fip_psth_stats_plot(ax, etrs['stats'])`, color='k', threshold=0.05)
+```
 
 ## Contributing
 
