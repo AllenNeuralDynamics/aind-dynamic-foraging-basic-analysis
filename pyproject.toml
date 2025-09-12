@@ -28,7 +28,8 @@ dependencies = [
     'numpy',
     'pydantic',
     'hdmf_zarr',
-    'aind-dynamic-foraging-data-utils >= 0.1.25'
+    'aind-dynamic-foraging-data-utils >= 0.1.25',
+    'aind_hierarchical_bootstrap'
 ]
 
 [project.optional-dependencies]
