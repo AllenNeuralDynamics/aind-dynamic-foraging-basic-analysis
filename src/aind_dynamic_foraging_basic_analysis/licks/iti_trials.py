@@ -1,12 +1,66 @@
 """
 Defines functions for analysis of intertrial licking as if they were trials
-
 """
 
 import numpy as np
 import pandas as pd
 
 import aind_dynamic_foraging_basic_analysis.licks.annotation as annotation
+from aind_dynamic_foraging_models.logistic_regression import fit_logistic_regression
+
+
+def demo_compare_logistic_regression(nwb):
+    """
+    DEV FUNCTION, WILL NOT MERGE
+    """
+    df_trial = nwb.df_trials
+    choice_history = df_trial["animal_response"].values
+    choice_history[choice_history == 2] = np.nan
+    reward_history = (
+        ((df_trial["rewarded_historyL"] == True) + (df_trial["rewarded_historyR"] == True))
+        .astype(int)
+        .values
+    )
+
+    dict_logistic_result = fit_logistic_regression(
+        choice_history,
+        reward_history,
+        logistic_model="Su2022",
+        n_trial_back=15,
+        selected_trial_idx=None,
+        solver="liblinear",
+        penalty="l2",
+        Cs=10,
+        cv=10,
+        n_jobs_cross_validation=-1,
+        n_bootstrap_iters=1000,
+        n_bootstrap_samplesize=None,
+    )
+
+    df_iti_trial = nwb.df_iti_trials
+    choice_history = df_iti_trial["animal_response"].values
+    choice_history[choice_history == 2] = np.nan
+    reward_history = (
+        ((df_iti_trial["rewarded_historyL"] == True) + (df_iti_trial["rewarded_historyR"] == True))
+        .astype(int)
+        .values
+    )
+
+    dict_logistic_result_iti = fit_logistic_regression(
+        choice_history,
+        reward_history,
+        logistic_model="Su2022",
+        n_trial_back=15,
+        selected_trial_idx=None,
+        solver="liblinear",
+        penalty="l2",
+        Cs=10,
+        cv=10,
+        n_jobs_cross_validation=-1,
+        n_bootstrap_iters=1000,
+        n_bootstrap_samplesize=None,
+    )
+    return dict_logistic_result, dict_logistic_result_iti
 
 
 def build_iti_trials_table(nwb):
@@ -159,6 +213,3 @@ def build_iti_trials_table(nwb):
     df_trials.loc[index, to_propagate] = df_trials.loc[index, to_propagate].ffill()
 
     return df_trials
-
-
-# dev
