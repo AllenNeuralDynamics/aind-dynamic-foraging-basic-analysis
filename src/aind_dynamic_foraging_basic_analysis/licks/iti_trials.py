@@ -20,11 +20,12 @@ def build_iti_trials_table(nwb):
     if not 'bout_intertrial_choice' in nwb.df_licks:      
           print("You need to annotate df_licks: annotation.annotate_licks(nwb)")
    
-    iti_trials = nwb.df_licks.query('bout_start and bout_intertrial_choice').copy()
+    iti_licks = nwb.df_licks.query('bout_start and bout_intertrial_choice').copy()
     df_trials = nwb.df_trials.copy()
     
     # Adding trial information for iti_trials
-    iti_trials['animal_response'] = [0.0 if 'left' in x else 1.0 for x in iti_trials['event']]
+    iti_trials = iti_licks[['trial']].copy()
+    iti_trials['animal_response'] = [0.0 if 'left' in x else 1.0 for x in iti_licks['event']]
     iti_trials['bait_left'] = False
     iti_trials['bait_right'] = False
     iti_trials['reward_random_number_left'] = 0
@@ -32,12 +33,12 @@ def build_iti_trials_table(nwb):
     iti_trials['auto_waterL']  = 0
     iti_trials['auto_waterR'] = 0
     iti_trials['laser_on_trial'] = 0
-    iti_trials['goCue_start_time_in_session'] = iti_trials['timestamps']
+    iti_trials['goCue_start_time_in_session'] = iti_licks['timestamps']
     iti_trials['goCue_start_time_in_trial'] = 0
-    iti_trials['reward_outcome_time_in_session'] = iti_trials['timestamps']
+    iti_trials['reward_outcome_time_in_session'] = iti_licks['timestamps']
     iti_trials['reward_outcome_time_in_trial'] = 0
-    iti_trials['goCue_start_time_raw'] = iti_trials['raw_timestamps']
-    iti_trials['choice_time_in_session'] = iti_trials['timestamps']
+    iti_trials['goCue_start_time_raw'] = iti_licks['raw_timestamps']
+    iti_trials['choice_time_in_session'] = iti_licks['timestamps']
     iti_trials['choice_time_in_trial'] = 0
     
 
@@ -50,6 +51,13 @@ def build_iti_trials_table(nwb):
     
     # columns that will be undefined (get NaNs now)
     stay_nans = ['laser_on_trial', 'laser_wavelength', 'laser_location', 'laser_power', 'laser_duration', 'laser_condition', 'laser_condition_probability', 'laser_start', 'laser_start_offset', 'laser_end', 'laser_end_offset', 'laser_protocol', 'laser_frequency', 'laser_rampingdown', 'laser_pulse_duration', 'bonsai_start_time_in_session', 'bonsai_start_time_in_trial', 'bonsai_stop_time_in_session', 'bonsai_stop_time_in_trial', 'delay_start_time_in_session', 'delay_start_time_in_trial', 'reward_time_in_session', 'reward_time_in_trial', 'right_reward_type', 'left_reward_type', 'earned_reward', 'extra_reward']
+    
+    for col in to_propagate:
+        if col in df_trials:
+            iti_trials[col] = np.nan
+    for col in stay_nans:
+        if col in df_trials:
+            iti_trials[col] = np.nan
 
-    return iti_trials, df_trials 
+    return iti_trials, df_trials
 # dev
