@@ -272,7 +272,6 @@ def get_average_signal_window_multi(
     pd.DataFrame
         Concatenated DataFrame of all trials with the new signal window column.
     """
-    all_trials_avg_signal = []
     for nwb in nwbs:
         df_trials = get_average_signal_window(
             nwb,
@@ -283,9 +282,8 @@ def get_average_signal_window_multi(
             censor=censor,
             output_col=output_col
         )
-        cols_needed = ['trial', 'ses_idx', df_trials.columns[-1]]
-        all_trials_avg_signal.append(df_trials[cols_needed])
-    return pd.concat(all_trials_avg_signal, ignore_index=True)
+        nwb.df_trials = df_trials
+    return nwbs
 
 
 def get_average_signal_window(
