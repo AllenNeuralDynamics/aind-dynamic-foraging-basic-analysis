@@ -613,7 +613,7 @@ def compute_hierarchical_error(
     # Organize results
     for index, val in enumerate(result.index.values):
         bootstraps[index]["time"] = val
-    result["hb_sem"] = [x["data_sem"] for x in bootstraps]
+    result["hb_sem"] = [x["{}_sem".format(data_column)] for x in bootstraps]
 
     return result, bootstraps
 
