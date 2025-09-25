@@ -42,7 +42,9 @@ from scipy.stats import kurtosis
 __all__ = ["estimate_snr", "estimate_kurtosis"]
 
 
-def estimate_snr(trace: NDArray[np.floating], fps: float = 20.0) -> Tuple[float, float, NDArray[np.intp]]:
+def estimate_snr(
+    trace: NDArray[np.floating], fps: float = 20.0
+) -> Tuple[float, float, NDArray[np.intp]]:
     """
     Estimate the signal-to-noise ratio (SNR) of a 1D trace.
 
@@ -77,7 +79,9 @@ def estimate_snr(trace: NDArray[np.floating], fps: float = 20.0) -> Tuple[float,
 
     # Noise estimation based on derivative, assuming random noise
     dfdt = np.diff(trace)
-    noise = float(np.std(dfdt) / np.sqrt(2))
+    noise = float(
+        np.std(dfdt) / np.sqrt(2)
+    )
 
     # Peak detection
     peaks, _ = find_peaks(
@@ -128,3 +132,4 @@ def estimate_kurtosis(trace: NDArray[np.floating]) -> float:
 
     # Excess kurtosis (normal distribution = 0)
     return float(kurtosis(trace, fisher=True, bias=False))
+
