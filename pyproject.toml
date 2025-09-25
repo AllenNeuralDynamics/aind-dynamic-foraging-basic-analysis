@@ -29,7 +29,8 @@ dependencies = [
     'pydantic',
     'hdmf_zarr',
     'aind-dynamic-foraging-data-utils >= 0.1.25',
-    'aind_hierarchical_bootstrap'
+    'aind_hierarchical_bootstrap',
+    'aind_dynamic_foraging_models'
 ]
 
 [project.optional-dependencies]
