@@ -205,6 +205,8 @@ def build_iti_trials_table(nwb):
 
     # set rewarded_history to false for all trials after non-cue trials
     index = df_trials[df_trials["cue_trial"] == False].index.values + 1
+    if index[-1] > df_trials.index.values[-1]:
+        index = index[:-1]
     df_trials.loc[index, "rewarded_historyL"] = False
     df_trials.loc[index, "rewarded_historyR"] = False
 
