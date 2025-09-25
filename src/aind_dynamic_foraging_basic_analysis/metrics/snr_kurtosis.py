@@ -1,83 +1,130 @@
-import numpy as np
+"""
+Utilities for signal quality metrics on 1D fluorescence traces.
+
+This module provides:
+- :func:`estimate_snr` — an SNR estimator using a derivative-based noise
+  estimate and peak-based signal estimate.
+- :func:`estimate_kurtosis` — excess kurtosis of the trace distribution.
+
+Notes
+-----
+- The SNR function design was inspired by the AIND-OPhys SLAP2 team.
+- Feed a dF/F preprocessed trace to :func:`estimate_snr`, as the peak
+  height is interpreted from zero.
+- Default sampling frequency (``fps``) is 20 Hz; adjust it if your data
+  differ.
+- NaNs are filled with the median of the trace prior to computation.
+
+Example
+-------
+>>> import numpy as np
+>>> t = np.linspace(0, 10, 200, dtype=float)  # 20 Hz sampling
+>>> y = 0.1 * np.sin(2 * np.pi * 1.0 * t)     # small signal
+>>> snr, noise, peaks = estimate_snr(y)       # doctest: +ELLIPSIS
+>>> isinstance(snr, float) and isinstance(noise, float)
+True
+>>> isinstance(peaks, np.ndarray)
+True
+>>> isinstance(estimate_kurtosis(y), float)
+True
+"""
+
+from __future__ import annotations
+
 import warnings
+from typing import Tuple
+
+import numpy as np
+from numpy.typing import NDArray
 from scipy.signal import find_peaks
 from scipy.stats import kurtosis
 
-# -snr function was inspired by AIND-OPhys SLAP2 team.
-# -for `trace` feed a dF/F preprocessed trace as the function calculate the peak values from zero
-# -so far all FIP sampling frequency has been 20Hz. Modify it when using a different fps.
-# -given the peak finding won't nan, nan will be filled with median of the trace.
+__all__ = ["estimate_snr", "estimate_kurtosis"]
 
-def estimate_snr(trace, fps=20.0):
+
+def estimate_snr(trace: NDArray[np.floating], fps: float = 20.0) -> Tuple[float, float, NDArray[np.intp]]:
     """
-    Estimate the signal-to-noise ratio (SNR) of a trace.
+    Estimate the signal-to-noise ratio (SNR) of a 1D trace.
 
     Parameters
     ----------
-    trace : np.ndarray
-        The input trace.
-    fps : float
-        Frames per second of the trace.
+    trace : numpy.ndarray
+        1D input trace (e.g., dF/F). NaNs will be replaced with the
+        median of ``trace`` before calculation.
+    fps : float, optional
+        Sampling frequency (frames per second), by default ``20.0``.
 
     Returns
     -------
     snr : float
-        Estimated signal-to-noise ratio.
+        Estimated signal-to-noise ratio (dimensionless).
     noise : float
-        Estimated noise level.
-    peaks : np.ndarray
+        Estimated noise level computed from the first difference of the trace
+        (standard deviation of ``diff(trace)`` divided by ``sqrt(2)``).
+    peaks : numpy.ndarray
         Indices of detected peaks in the trace.
+
+    Notes
+    -----
+    - Noise is estimated from the derivative assuming white noise.
+    - Signal is estimated from the 95th percentile of peak amplitudes.
+    - Peak detection uses ``scipy.signal.find_peaks`` with sensible defaults.
+    - If fewer than three peaks are found, ``snr`` and ``peaks`` are set to
+      ``NaN`` and a :class:`warnings.WarningMessage` is issued.
     """
     # Replace NaNs with the median of the trace
     trace = np.nan_to_num(trace, nan=np.nanmedian(trace))
 
     # Noise estimation based on derivative, assuming random noise
     dfdt = np.diff(trace)
-    noise = np.std(dfdt) / np.sqrt(2)
+    noise = float(np.std(dfdt) / np.sqrt(2))
 
-    # Estimate signal as the third peak using scipy's find_peaks
+    # Peak detection
     peaks, _ = find_peaks(
         trace,
-        height=3 * noise,      # Minimum peak height (adjust based on your signal scale)
-        distance=fps * 0.1,    # Minimum number of samples between peaks
-        prominence=0.05,       # How much a peak stands out relative to neighbors
-        width=5                # Optional: minimum width of peak
+        height=3 * noise,     # Minimum peak height (adjust for your scale)
+        distance=fps * 0.1,   # Minimum number of samples between peaks
+        prominence=0.05,      # How much a peak stands out relative to neighbors
+        width=5,              # Optional: minimum width of peak
     )
 
     if len(peaks) < 3:
-        # Warning if not enough peaks are found
-        warnings.warn("Not enough peaks found to estimate SNR. Returning NaN values.")
-        return np.nan, noise, np.nan
+        warnings.warn(
+            "Not enough peaks found to estimate SNR. Returning NaN values.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return float("nan"), noise, np.array(np.nan)
 
-    # Take the 95th percentile of peak amplitudes as the signal
+    # Signal estimate: 95th percentile of detected peak amplitudes
     amplitudes = np.sort(trace[peaks])
-    signal = np.percentile(amplitudes, 95)
+    signal = float(np.percentile(amplitudes, 95))
 
     # Calculate SNR
-    snr = signal / noise
+    snr = float(signal / noise) if noise > 0 else float("inf")
 
     return snr, noise, peaks
 
 
-def estimate_kurtosis(trace):
+def estimate_kurtosis(trace: NDArray[np.floating]) -> float:
     """
-    Estimate the kurtosis of a trace distribution.
+    Compute the **excess kurtosis** of a 1D trace distribution.
 
     Parameters
     ----------
-    trace : np.ndarray
-        The input trace.
+    trace : numpy.ndarray
+        1D input trace. NaNs will be replaced with the median of ``trace``.
 
     Returns
     -------
-    kurt : float
-        Estimated excess kurtosis of the distribution.
-        (Normal distribution = 0, leptokurtic > 0, platykurtic < 0)
+    float
+        Excess kurtosis of the distribution (Fisher definition):
+        - Normal distribution → 0.0
+        - Leptokurtic         → positive
+        - Platykurtic         → negative
     """
     # Replace NaNs with the median of the trace
     trace = np.nan_to_num(trace, nan=np.nanmedian(trace))
 
     # Excess kurtosis (normal distribution = 0)
-    kurt = kurtosis(trace, fisher=True, bias=False)
-
-    return kurt
+    return float(kurtosis(trace, fisher=True, bias=False))
