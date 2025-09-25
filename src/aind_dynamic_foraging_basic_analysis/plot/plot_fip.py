@@ -425,7 +425,7 @@ def fip_psth_stats_plot(ax, stats_df, threshold=0.05):
     fip_psth_stats_plot(ax, etrs['stats'], threshold=0.05)
 
     """
-    unique_tests = stats_df["name"].unique()
+    unique_tests = np.unique(stats_df["name"].values)
     colors = style.get_colors(list(unique_tests), offset=0.25, cmap_name="plasma")
     for test in unique_tests:
         significant = stats_df.query("name == @test").query("p < @threshold")
@@ -613,7 +613,7 @@ def compute_hierarchical_error(
     # Organize results
     for index, val in enumerate(result.index.values):
         bootstraps[index]["time"] = val
-    result["hb_sem"] = [x["data_sem"] for x in bootstraps]
+    result["hb_sem"] = [x["{}_sem".format(data_column)] for x in bootstraps]
 
     return result, bootstraps
 
