@@ -115,37 +115,40 @@ def build_iti_trials_table(nwb):
     iti_trials["choice_time_in_trial"] = 0
 
     # columns we propagate after merge (all get NaNs now)
-    to_propagate = [
-        "base_reward_probability_sum",
-        "reward_probabilityL",
-        "reward_probabilityR",
-        "left_valve_open_time",
-        "right_valve_open_time",
-        "block_beta",
-        "block_min",
-        "block_max",
-        "min_reward_each_block",
-        "delay_beta",
-        "delay_min",
-        "delay_max",
-        "ITI_beta",
-        "ITI_min",
-        "ITI_max",
-        "response_duration",
-        "reward_consumption_duration",
-        "auto_train_engaged",
-        "auto_train_curriculum_name",
-        "auto_train_curriculum_version",
-        "auto_train_curriculum_schema_version",
-        "auto_train_stage",
-        "auto_train_stage_overridden",
-        "lickspout_position_x",
-        "lickspout_position_y",
-        "lickspout_position_z",
-        "reward_size_left",
-        "reward_size_right",
-        "ses_idx",
-    ]
+    to_propagate = set(
+        [
+            "base_reward_probability_sum",
+            "reward_probabilityL",
+            "reward_probabilityR",
+            "left_valve_open_time",
+            "right_valve_open_time",
+            "block_beta",
+            "block_min",
+            "block_max",
+            "min_reward_each_block",
+            "delay_beta",
+            "delay_min",
+            "delay_max",
+            "ITI_beta",
+            "ITI_min",
+            "ITI_max",
+            "response_duration",
+            "reward_consumption_duration",
+            "auto_train_engaged",
+            "auto_train_curriculum_name",
+            "auto_train_curriculum_version",
+            "auto_train_curriculum_schema_version",
+            "auto_train_stage",
+            "auto_train_stage_overridden",
+            "lickspout_position_x",
+            "lickspout_position_y1",
+            "lickspout_position_y2",
+            "lickspout_position_z",
+            "reward_size_left",
+            "reward_size_right",
+            "ses_idx",
+        ]
+    )
 
     # columns that will be undefined as NaN
     stay_nans = [
@@ -180,9 +183,16 @@ def build_iti_trials_table(nwb):
         "delay_duration",
     ]
 
+    to_remove = []
     for col in to_propagate:
         if col in df_trials:
             iti_trials[col] = np.nan
+        else:
+            to_remove.append(col)
+    for col in to_remove:
+        to_propagate.remove(col)
+    to_propagate = list(to_propagate)
+
     for col in stay_nans:
         if col in df_trials:
             iti_trials[col] = np.nan
@@ -206,6 +216,8 @@ def build_iti_trials_table(nwb):
     # set rewarded_history to false for all trials after non-cue trials
     index = df_trials[df_trials["cue_trial"] == False].index.values + 1
     if index[-1] > df_trials.index.values[-1]:
+        # If the last trial as a non-cue trial, then we don't need
+        # to do anything
         index = index[:-1]
     df_trials.loc[index, "rewarded_historyL"] = False
     df_trials.loc[index, "rewarded_historyR"] = False
