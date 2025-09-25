@@ -132,4 +132,3 @@ def estimate_kurtosis(trace: NDArray[np.floating]) -> float:
 
     # Excess kurtosis (normal distribution = 0)
     return float(kurtosis(trace, fisher=True, bias=False))
-
