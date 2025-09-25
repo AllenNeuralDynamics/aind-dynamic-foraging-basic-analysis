@@ -227,3 +227,10 @@ def build_iti_trials_table(nwb):
     df_trials.loc[index, to_propagate] = df_trials.loc[index, to_propagate].ffill()
 
     return df_trials
+
+def stats(iti_trials):
+    num_trials_with_iti_trials = np.sum(iti_trials['cue_trial'].shift(1) & ~iti_trials['cue_trial'])
+    fraction_trials_with_iti_trials = num_trials_with_iti_trials/np.sum(iti_trials['cue_trial'])
+
+    
+##
