@@ -3,8 +3,12 @@ import warnings
 from scipy.signal import find_peaks
 from scipy.stats import kurtosis
 
+# -snr function was inspired by AIND-OPhys SLAP2 team.
+# -for `trace` feed a dF/F preprocessed trace as the function calculate the peak values from zero
+# -so far all FIP sampling frequency has been 20Hz. Modify it when using a different fps.
+# -given the peak finding won't nan, nan will be filled with median of the trace.
 
-def estimate_snr(trace, fps):
+def estimate_snr(trace, fps=20.0):
     """
     Estimate the signal-to-noise ratio (SNR) of a trace.
 
