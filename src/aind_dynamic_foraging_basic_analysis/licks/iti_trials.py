@@ -4,9 +4,9 @@ Defines functions for analysis of intertrial licking as if they were trials
 
 import numpy as np
 import pandas as pd
+from aind_dynamic_foraging_models.logistic_regression import fit_logistic_regression
 
 import aind_dynamic_foraging_basic_analysis.licks.annotation as annotation
-from aind_dynamic_foraging_models.logistic_regression import fit_logistic_regression
 
 
 def demo_compare_logistic_regression(nwb):
@@ -83,11 +83,18 @@ def build_iti_trials_table(nwb):
     iti_licks = nwb.df_licks.query("bout_start and bout_intertrial_choice").copy()
     df_trials = nwb.df_trials.copy()
 
+    df_trials["cue_switch"] = df_trials["animal_response"].shift(1) != df_trials["animal_response"]
+    df_trials.loc[df_trials["animal_response"] == 2, "cue_switch"] = False
+    df_trials.loc[df_trials["animal_response"].shift(1) == 2, "cue_switch"] = False
+
     # Adding trial information for iti_trials
-    iti_trials = iti_licks[["trial"]].copy()
+    iti_trials = iti_licks[["trial", "iti_switch"]].copy()
 
     # Convert labels in licks table to response
     iti_trials["animal_response"] = [0.0 if "left" in x else 1.0 for x in iti_licks["event"]]
+
+    # Define cue switch as always false for ITI trials
+    iti_trials["cue_switch"] = False
 
     # Define baiting as always false for ITI trials
     iti_trials["bait_left"] = False
@@ -226,11 +233,17 @@ def build_iti_trials_table(nwb):
     index = df_trials[df_trials["cue_trial"] == True].index.values
     df_trials.loc[index, to_propagate] = df_trials.loc[index, to_propagate].ffill()
 
+    # Set iti_switch to False for all cue trials
+    df_trials = df_trials.fillna(value=False)
     return df_trials
 
-def stats(iti_trials):
-    num_trials_with_iti_trials = np.sum(iti_trials['cue_trial'].shift(1) & ~iti_trials['cue_trial'])
-    fraction_trials_with_iti_trials = num_trials_with_iti_trials/np.sum(iti_trials['cue_trial'])
 
-    
+def stats(iti_trials):
+    """
+    TODO
+    """
+    num_trials_with_iti_trials = np.sum(iti_trials["cue_trial"].shift(1) & ~iti_trials["cue_trial"])
+    fraction_trials_with_iti_trials = num_trials_with_iti_trials / np.sum(iti_trials["cue_trial"])
+
+
 ##
