@@ -4,7 +4,6 @@ Defines functions for analysis of intertrial licking as if they were trials
 
 import numpy as np
 import pandas as pd
-from aind_dynamic_foraging_models.logistic_regression import fit_logistic_regression
 
 import aind_dynamic_foraging_basic_analysis.licks.annotation as annotation
 
@@ -167,7 +166,7 @@ def build_iti_trials_table(nwb):
     df_trials["rewarded_historyR"] = df_trials["rewarded_historyR"].bfill()
 
     # set rewarded_history to false for all trials after non-cue trials
-    index = df_trials[df_trials["cue_trial"] == False].index.values + 1
+    index = df_trials[df_trials["cue_trial"] == False].index.values + 1  # noqa: E712
     if index[-1] > df_trials.index.values[-1]:
         # If the last trial as a non-cue trial, then we don't need
         # to do anything
@@ -179,7 +178,7 @@ def build_iti_trials_table(nwb):
         df_trials.loc[0, "rewarded_historyL"] = False
 
     # Propagate some columns forward
-    index = df_trials[df_trials["cue_trial"] == True].index.values
+    index = df_trials[df_trials["cue_trial"] == True].index.values  # noqa: E712
     df_trials.loc[index, to_propagate] = df_trials.loc[index, to_propagate].ffill()
 
     # Set iti_switch to False for all cue trials
