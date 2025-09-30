@@ -81,6 +81,8 @@ def get_n_colors(n, cmap_name="hsv", offset=None):
         n_spacing = n
     else:
         n_spacing = n - 1
+    if n_spacing <= 0:
+        n_spacing = 1
 
     # determine offset for mixing up colors
     if offset is None:
