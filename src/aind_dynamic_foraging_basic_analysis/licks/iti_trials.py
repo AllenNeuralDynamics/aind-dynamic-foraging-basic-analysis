@@ -5,8 +5,6 @@ Defines functions for analysis of intertrial licking as if they were trials
 import numpy as np
 import pandas as pd
 
-import aind_dynamic_foraging_basic_analysis.licks.annotation as annotation
-
 
 def build_iti_trials_table(nwb):
     """
