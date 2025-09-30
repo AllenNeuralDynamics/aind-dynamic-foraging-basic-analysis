@@ -73,8 +73,8 @@ def build_iti_trials_table(nwb):
         return
     if (
         (not hasattr(nwb, "df_licks"))
-        or (not "bout_start" in nwb.df_licks)
-        or (not "bout_intertrial_choice" in nwb.df_licks)
+        or ("bout_start" not in nwb.df_licks)
+        or ("bout_intertrial_choice" not in nwb.df_licks)
     ):
         print("You need to annotate df_licks: annotation.annotate_licks(nwb)")
         return
@@ -228,13 +228,22 @@ def build_iti_trials_table(nwb):
         index = index[:-1]
     df_trials.loc[index, "rewarded_historyL"] = False
     df_trials.loc[index, "rewarded_historyR"] = False
+    if ~df_trials.loc[0, "cue_trial"]:
+        df_trials.loc[0, "rewarded_historyL"] = False
+        df_trials.loc[0, "rewarded_historyL"] = False
 
     # Propagate some columns forward
     index = df_trials[df_trials["cue_trial"] == True].index.values
     df_trials.loc[index, to_propagate] = df_trials.loc[index, to_propagate].ffill()
 
     # Set iti_switch to False for all cue trials
-    df_trials = df_trials.fillna(value=False)
+    df_trials["iti_switch"] = df_trials["iti_switch"].fillna(value=False)
+
+    # annotate whether a cue trial has an ITI trial
+    df_trials["has_iti"] = df_trials["cue_trial"] & ~df_trials["cue_trial"].shift(
+        -1, fill_value=False
+    )
+
     return df_trials
 
 
@@ -244,6 +253,13 @@ def stats(iti_trials):
     """
     num_trials_with_iti_trials = np.sum(iti_trials["cue_trial"].shift(1) & ~iti_trials["cue_trial"])
     fraction_trials_with_iti_trials = num_trials_with_iti_trials / np.sum(iti_trials["cue_trial"])
+
+    fraction_trials_with_iti_trials_split_by_previous_reward = iti_trials.groupby("earned_reward")[
+        "has_iti"
+    ].mean()
+    fraction_trials_with_iti_trials_split_by_cue_switch = iti_trials.groupby("cue_switch")[
+        "has_iti"
+    ].mean()
 
 
 ##
