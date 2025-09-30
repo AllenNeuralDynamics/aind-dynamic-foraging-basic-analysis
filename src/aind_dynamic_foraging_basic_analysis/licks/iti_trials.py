@@ -9,60 +9,6 @@ from aind_dynamic_foraging_models.logistic_regression import fit_logistic_regres
 import aind_dynamic_foraging_basic_analysis.licks.annotation as annotation
 
 
-def demo_compare_logistic_regression(nwb):
-    """
-    DEV FUNCTION, WILL NOT MERGE
-    """
-    df_trial = nwb.df_trials
-    choice_history = df_trial["animal_response"].values
-    choice_history[choice_history == 2] = np.nan
-    reward_history = (
-        ((df_trial["rewarded_historyL"] == True) + (df_trial["rewarded_historyR"] == True))
-        .astype(int)
-        .values
-    )
-
-    dict_logistic_result = fit_logistic_regression(
-        choice_history,
-        reward_history,
-        logistic_model="Su2022",
-        n_trial_back=15,
-        selected_trial_idx=None,
-        solver="liblinear",
-        penalty="l2",
-        Cs=10,
-        cv=10,
-        n_jobs_cross_validation=-1,
-        n_bootstrap_iters=1000,
-        n_bootstrap_samplesize=None,
-    )
-
-    df_iti_trial = nwb.df_iti_trials
-    choice_history = df_iti_trial["animal_response"].values
-    choice_history[choice_history == 2] = np.nan
-    reward_history = (
-        ((df_iti_trial["rewarded_historyL"] == True) + (df_iti_trial["rewarded_historyR"] == True))
-        .astype(int)
-        .values
-    )
-
-    dict_logistic_result_iti = fit_logistic_regression(
-        choice_history,
-        reward_history,
-        logistic_model="Su2022",
-        n_trial_back=15,
-        selected_trial_idx=None,
-        solver="liblinear",
-        penalty="l2",
-        Cs=10,
-        cv=10,
-        n_jobs_cross_validation=-1,
-        n_bootstrap_iters=1000,
-        n_bootstrap_samplesize=None,
-    )
-    return dict_logistic_result, dict_logistic_result_iti
-
-
 def build_iti_trials_table(nwb):
     """
     TODO: fill in
@@ -245,21 +191,3 @@ def build_iti_trials_table(nwb):
     )
 
     return df_trials
-
-
-def stats(iti_trials):
-    """
-    TODO
-    """
-    num_trials_with_iti_trials = np.sum(iti_trials["cue_trial"].shift(1) & ~iti_trials["cue_trial"])
-    fraction_trials_with_iti_trials = num_trials_with_iti_trials / np.sum(iti_trials["cue_trial"])
-
-    fraction_trials_with_iti_trials_split_by_previous_reward = iti_trials.groupby("earned_reward")[
-        "has_iti"
-    ].mean()
-    fraction_trials_with_iti_trials_split_by_cue_switch = iti_trials.groupby("cue_switch")[
-        "has_iti"
-    ].mean()
-
-
-##
