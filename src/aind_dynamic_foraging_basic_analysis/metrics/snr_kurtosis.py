@@ -35,6 +35,7 @@ import warnings
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
 from scipy.stats import kurtosis
@@ -42,9 +43,11 @@ from scipy.stats import kurtosis
 __all__ = ["estimate_snr", "estimate_kurtosis"]
 
 
-def estimate_snr(
+
+
+def estimate_trace_snr(
     trace: NDArray[np.floating], fps: float = 20.0
-) -> Tuple[float, float, NDArray[np.intp]]:
+) -> tuple[float, float, NDArray[np.intp]]:
     """
     Estimate the signal-to-noise ratio (SNR) of a 1D trace.
 
@@ -110,7 +113,7 @@ def estimate_snr(
     return snr, noise, peaks
 
 
-def estimate_kurtosis(trace: NDArray[np.floating]) -> float:
+def estimate_trace_kurtosis(trace: NDArray[np.floating]) -> float:
     """
     Compute the **excess kurtosis** of a 1D trace distribution.
 
@@ -132,3 +135,29 @@ def estimate_kurtosis(trace: NDArray[np.floating]) -> float:
 
     # Excess kurtosis (normal distribution = 0)
     return float(kurtosis(trace, fisher=True, bias=False))
+
+
+def estimate_snr_kurtosis(
+    nwb, data_column = 'data',
+    fps: float = 20.0,
+) -> pd.DataFrame
+    """
+    Estimate the signal-to-noise ratio (SNR) and kurtosis given an NWB or list of NWBs
+
+    """
+    nwb_list = nwb if isinstance(nwb, list) else [nwb]
+
+    trial_metrics = []
+    for nwb in nwb_list:
+        df_fip = nwb.df_fip
+        ses_idx = df_fip['ses_idx']
+        for channel in df_fip.event.unique():
+            df_fip_channel_trace = df_fip.query(f'event == {channel}')[data_column].values
+            (snr, noise, peaks) = estimate_trace_snr(df_fip_channel_trace, fps)
+            kurtosis = estimate_trace_kurtosis(df_fip_channel_trace)
+            trial_metrics.append([ses_idx, channel + '_' + data_column, snr, noise, peaks, kurtosis])
+    
+    df_trial_metrics = pd.DataFrame(trial_metrics)
+
+
+    return df_trial_metrics
