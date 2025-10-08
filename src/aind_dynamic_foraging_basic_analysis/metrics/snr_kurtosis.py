@@ -40,7 +40,10 @@ from numpy.typing import NDArray
 from scipy.signal import find_peaks
 from scipy.stats import kurtosis
 
-__all__ = ["estimate_snr", "estimate_kurtosis"]
+from aind_dynamic_foraging_data_utils import nwb_utils as nu
+
+
+__all__ = ["estimate_trace_snr", "estimate_trace_kurtosis"]
 
 
 
@@ -137,7 +140,7 @@ def estimate_trace_kurtosis(trace: NDArray[np.floating]) -> float:
     return float(kurtosis(trace, fisher=True, bias=False))
 
 
-def estimate_snr_kurtosis(
+def estimate_snr_and_kurtosis(
     nwb, data_column = 'data',
     fps: float = 20.0,
 ) -> pd.DataFrame
@@ -148,8 +151,12 @@ def estimate_snr_kurtosis(
     nwb_list = nwb if isinstance(nwb, list) else [nwb]
 
     trial_metrics = []
-    for nwb in nwb_list:
-        df_fip = nwb.df_fip
+    for nwb_i in nwb_list:
+        if not hasattr(nwb_i, "df_fip"):
+            print("You need to compute the df_fip first")
+            print("running `nwb.df_fip = create_df_fip(nwb,tidy=True)`")
+            nwb_i.df_fip = nu.create_df_fip(nwb_i, tidy=True)
+        df_fip = nwb_i.df_fip
         ses_idx = df_fip['ses_idx']
         for channel in df_fip.event.unique():
             df_fip_channel_trace = df_fip.query(f'event == {channel}')[data_column].values
