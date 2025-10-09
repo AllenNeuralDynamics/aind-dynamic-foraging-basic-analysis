@@ -143,28 +143,30 @@ def estimate_trace_kurtosis(trace: NDArray[np.floating]) -> float:
 def estimate_snr_and_kurtosis(
     nwb, data_column = 'data',
     fps: float = 20.0,
-) -> pd.DataFrame
+) -> pd.DataFrame:
     """
     Estimate the signal-to-noise ratio (SNR) and kurtosis given an NWB or list of NWBs
 
     """
     nwb_list = nwb if isinstance(nwb, list) else [nwb]
 
-    trial_metrics = []
+    sess_metrics = []
     for nwb_i in nwb_list:
         if not hasattr(nwb_i, "df_fip"):
             print("You need to compute the df_fip first")
             print("running `nwb.df_fip = create_df_fip(nwb,tidy=True)`")
             nwb_i.df_fip = nu.create_df_fip(nwb_i, tidy=True)
         df_fip = nwb_i.df_fip
-        ses_idx = df_fip['ses_idx']
-        for channel in df_fip.event.unique():
-            df_fip_channel_trace = df_fip.query(f'event == {channel}')[data_column].values
+        ses_idx = df_fip['ses_idx'].unique()[0]
+        all_channels = [channel for channel in df_fip.event.unique() if 
+                        not channel.startswith("FIP") and not channel.startswith("Iso")]
+        processed_signal_channels = [channel for channel in all_channels if channel.endswith('dff-poly_mc-iso-IRLS')]
+        for channel in processed_signal_channels:
+            df_fip_channel_trace = df_fip.query(f"event == '{channel}'")[data_column].values
             (snr, noise, peaks) = estimate_trace_snr(df_fip_channel_trace, fps)
             kurtosis = estimate_trace_kurtosis(df_fip_channel_trace)
-            trial_metrics.append([ses_idx, channel + '_' + data_column, snr, noise, peaks, kurtosis])
-    
-    df_trial_metrics = pd.DataFrame(trial_metrics)
-
-
-    return df_trial_metrics
+            sess_metrics.append([ses_idx, channel + '_' + data_column, snr, noise, peaks, kurtosis])
+    # put together df_sess_metrics
+    df_sess_metrics = pd.DataFrame(sess_metrics, columns=['ses_idx', 'channel', 'SNR',
+                                                            'noise', 'peaks', 'kurtosis'])
+    return df_sess_metrics
