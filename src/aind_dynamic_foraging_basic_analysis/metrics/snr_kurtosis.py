@@ -2,9 +2,10 @@
 Utilities for signal quality metrics on 1D fluorescence traces.
 
 This module provides:
-- :func:`estimate_snr` — an SNR estimator using a derivative-based noise
+- :func:`estimate_trace_snr` — an SNR estimator using a derivative-based noise
   estimate and peak-based signal estimate.
-- :func:`estimate_kurtosis` — excess kurtosis of the trace distribution.
+- :func:`estimate_trace_kurtosis` — excess kurtosis of the trace distribution.
+- :func:`estimate_snr_and_kurtosis` — excess kurtosis of the trace distribution.
 
 Notes
 -----
@@ -44,8 +45,6 @@ from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
 
 __all__ = ["estimate_trace_snr", "estimate_trace_kurtosis"]
-
-
 
 
 def estimate_trace_snr(
@@ -141,7 +140,7 @@ def estimate_trace_kurtosis(trace: NDArray[np.floating]) -> float:
 
 
 def estimate_snr_and_kurtosis(
-    nwb, data_column = 'data',
+    nwb, data_column='data',
     fps: float = 20.0,
 ) -> pd.DataFrame:
     """
@@ -158,9 +157,10 @@ def estimate_snr_and_kurtosis(
             nwb_i.df_fip = nu.create_df_fip(nwb_i, tidy=True)
         df_fip = nwb_i.df_fip
         ses_idx = df_fip['ses_idx'].unique()[0]
-        all_channels = [channel for channel in df_fip.event.unique() if 
+        all_channels = [channel for channel in df_fip.event.unique() if
                         not channel.startswith("FIP") and not channel.startswith("Iso")]
-        processed_signal_channels = [channel for channel in all_channels if channel.endswith('dff-poly_mc-iso-IRLS')]
+        processed_signal_channels = [channel for channel in all_channels if
+                                     channel.endswith('dff-poly_mc-iso-IRLS')]
         for channel in processed_signal_channels:
             df_fip_channel_trace = df_fip.query(f"event == '{channel}'")[data_column].values
             (snr, noise, peaks) = estimate_trace_snr(df_fip_channel_trace, fps)
@@ -168,5 +168,5 @@ def estimate_snr_and_kurtosis(
             sess_metrics.append([ses_idx, channel + '_' + data_column, snr, noise, peaks, kurtosis])
     # put together df_sess_metrics
     df_sess_metrics = pd.DataFrame(sess_metrics, columns=['ses_idx', 'channel', 'SNR',
-                                                            'noise', 'peaks', 'kurtosis'])
+                                                          'noise', 'peaks', 'kurtosis'])
     return df_sess_metrics
