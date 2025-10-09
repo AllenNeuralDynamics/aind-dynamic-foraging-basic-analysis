@@ -5,7 +5,7 @@ This module provides:
 - :func:`estimate_trace_snr` — an SNR estimator using a derivative-based noise
   estimate and peak-based signal estimate.
 - :func:`estimate_trace_kurtosis` — excess kurtosis of the trace distribution.
-- :func:`estimate_snr_and_kurtosis` — excess kurtosis of the trace distribution.
+- :func:`estimate_snr_and_kurtosis` — estimate the SNR and kurtosis using an NWB
 
 Notes
 -----
@@ -33,7 +33,6 @@ True
 from __future__ import annotations
 
 import warnings
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -141,11 +140,30 @@ def estimate_trace_kurtosis(trace: NDArray[np.floating]) -> float:
 
 def estimate_snr_and_kurtosis(
     nwb, data_column='data',
+    process_suffix='dff-poly_mc-iso-IRLS',
     fps: float = 20.0,
 ) -> pd.DataFrame:
     """
-    Estimate the signal-to-noise ratio (SNR) and kurtosis given an NWB or list of NWBs
+    Estimate the signal-to-noise ratio (SNR) and kurtosis given an NWB or list of NWBs.
+    Iso channels will be excluded, and by default, only the preprocessed, motion-corrected
+    channels will be used.
 
+    Parameters
+    ----------
+    nwb:
+        Single or list of nwb or nwb-like object
+    data_column: string, optional
+        The data_column for the df_fip, by default 'data'
+    process_suffix: string, optional
+        The suffix of the channel indicating processing method, by default 'dff-poly_mc-iso-IRLS'
+    fps : float, optional
+        Sampling frequency (frames per second), by default ``20.0``.
+
+    Returns
+    -------
+    df.Dataframe
+        Dataframe with each row a session and channel with columns of estimated
+        signal to noise ratio (SNR), noise, peaks in the trace, and excess kurtosis.
     """
     nwb_list = nwb if isinstance(nwb, list) else [nwb]
 
@@ -160,7 +178,7 @@ def estimate_snr_and_kurtosis(
         all_channels = [channel for channel in df_fip.event.unique() if
                         not channel.startswith("FIP") and not channel.startswith("Iso")]
         processed_signal_channels = [channel for channel in all_channels if
-                                     channel.endswith('dff-poly_mc-iso-IRLS')]
+                                     channel.endswith(process_suffix)]
         for channel in processed_signal_channels:
             df_fip_channel_trace = df_fip.query(f"event == '{channel}'")[data_column].values
             (snr, noise, peaks) = estimate_trace_snr(df_fip_channel_trace, fps)
