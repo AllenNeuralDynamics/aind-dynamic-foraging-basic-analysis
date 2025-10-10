@@ -180,6 +180,7 @@ def estimate_snr_and_kurtosis(
                         not channel.startswith("FIP") and not channel.startswith("Iso")]
         processed_signal_channels = [channel for channel in all_channels if
                                      channel.endswith(process_suffix)]
+        df_fip = df_fip[df_fip["event"].isin(processed_signal_channels)]
         for channel in processed_signal_channels:
             df_fip_channel_trace = df_fip.query(f"event == '{channel}'")[data_column].values
             (snr, noise, peaks) = estimate_trace_snr(df_fip_channel_trace, fps)
