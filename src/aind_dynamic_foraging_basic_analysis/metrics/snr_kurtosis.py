@@ -172,8 +172,9 @@ def estimate_snr_and_kurtosis(
         if not hasattr(nwb_i, "df_fip"):
             print("You need to compute the df_fip first")
             print("running `nwb.df_fip = create_df_fip(nwb,tidy=True)`")
-            nwb_i.df_fip = nu.create_df_fip(nwb_i, tidy=True)
-        df_fip = nwb_i.df_fip
+            df_fip = nu.create_df_fip(nwb_i, tidy=True)
+        else:
+            df_fip = nwb_i.df_fip
         ses_idx = df_fip['ses_idx'].unique()[0]
         all_channels = [channel for channel in df_fip.event.unique() if
                         not channel.startswith("FIP") and not channel.startswith("Iso")]
