@@ -63,6 +63,8 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
 
     plot_list (list of strings), list of annotations and features to plot
 
+    fip (list), FIP channels to plot. Must be present in nwb.df_fip
+
     EXAMPLES:
     plot_foraging_session.plot_session_scroller(nwb)
     """
