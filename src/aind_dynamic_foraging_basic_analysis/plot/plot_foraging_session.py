@@ -35,7 +35,7 @@ def plot_foraging_session_nwb(nwb, **kwargs):
 
     if "side_bias" not in nwb.df_trials:
         fig, axes = plot_foraging_session(
-            [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
+            [np.nan if x == 2 else x for x in nwb.df_trials["choice"].values],
             nwb.df_trials["earned_reward"].values,
             [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
             **kwargs,
@@ -44,7 +44,7 @@ def plot_foraging_session_nwb(nwb, **kwargs):
         if "plot_list" not in kwargs:
             kwargs["plot_list"] = ["choice", "reward_prob", "bias"]
         fig, axes = plot_foraging_session(
-            [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
+            [np.nan if x == 2 else x for x in nwb.df_trials["choice"].values],
             nwb.df_trials["earned_reward"].values,
             [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
             bias=nwb.df_trials["side_bias"].values,
@@ -66,9 +66,9 @@ def plot_foraging_session_nwb(nwb, **kwargs):
         0,
         1.05,
         f"{nwb.session_id}\n"
-        f'Total trials {len(nwb.df_trials)}, ignored {np.sum(nwb.df_trials["animal_response"]==2)},'
-        f' left {np.sum(nwb.df_trials["animal_response"] == 0)},'
-        f' right {np.sum(nwb.df_trials["animal_response"] == 1)}',
+        f'Total trials {len(nwb.df_trials)}, ignored {np.sum(nwb.df_trials["choice"]==2)},'
+        f' left {np.sum(nwb.df_trials["choice"] == 0)},'
+        f' right {np.sum(nwb.df_trials["choice"] == 1)}',
         fontsize=8,
         transform=axes[0].transAxes,
     )
