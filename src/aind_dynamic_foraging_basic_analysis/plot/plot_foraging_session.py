@@ -72,6 +72,7 @@ def plot_foraging_session_nwb(nwb, **kwargs):
         fontsize=8,
         transform=axes[0].transAxes,
     )
+    return fig, axes
 
 
 def plot_foraging_session(  # noqa: C901
