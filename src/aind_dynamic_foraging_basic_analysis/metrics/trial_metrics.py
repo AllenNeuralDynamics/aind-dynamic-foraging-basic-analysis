@@ -384,6 +384,6 @@ def get_average_signal_window(
     avg_activity = avg_activity.rename(columns={data_column: output_col})
 
     # Merge on 'trial'
-    df_trials = df_trials.merge(avg_activity[['trial', output_col]], on='trial', how='left')
+    df_trials = nwb.df_trials.merge(avg_activity[['trial', output_col]], on='trial', how='left')
 
     return df_trials
