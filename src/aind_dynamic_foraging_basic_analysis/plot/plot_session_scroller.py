@@ -513,14 +513,25 @@ def plot_fip(fip_df, channel, ax):
     if fip_df is None:
         raise Exception("Cannot plot FIP, no FIP data")
 
-    if channel not in fip_df["event"].unique():
-        raise Exception("Cannot plot {}, no data".format(channel))
+    if isinstance(channel, list):
+        for sub_channel in channel:
+            if sub_channel not in fip_df["event"].unique():
+                raise Exception("Cannot plot {}, no data".format(sub_channel))
 
-    color = get_fip_color(channel)
-    C = fip_df.query("event == @channel")
-    ax.plot(C.timestamps.values, C.data.values, color)
+            color = get_fip_color(sub_channel)
+            C = fip_df.query("event == @sub_channel")
+            ax.plot(C.timestamps.values, C.data.values, color, label=sub_channel)
+        ax.set_ylabel("multiple", fontsize=12)
+        ax.legend()
+    else:
+        if channel not in fip_df["event"].unique():
+            raise Exception("Cannot plot {}, no data".format(channel))
+
+        color = get_fip_color(channel)
+        C = fip_df.query("event == @channel")
+        ax.plot(C.timestamps.values, C.data.values, color)
+        ax.set_ylabel(channel, fontsize=12)
     ax.axhline(0, color="k", linewidth=0.5, alpha=0.25)
-    ax.set_ylabel(channel, fontsize=12)
 
 
 def get_fip_color(channel):
