@@ -445,7 +445,8 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         ))
 
     # Reward-probability band (needs df_trials and go-cue times) -- shown only in the scroller
-    if df_trials is not None and len(go_cue_times) == len(df_trials):
+    has_band = df_trials is not None and len(go_cue_times) == len(df_trials)
+    if has_band:
         x_doubled = np.repeat(go_cue_times, 2)[1:]
         center = params["probs_center"]
         pR = np.repeat(center + df_trials["reward_probabilityR"].values / 4, 2)[:-1]
@@ -489,17 +490,25 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             y_main_top = bottom + 1.0
 
     # Start zoomed to a readable ~120 s window at the first go cue (like the matplotlib
-    # scroller's default window). The rangeslider scroller below scrubs the whole session and
-    # auto-scales its own y, so the reward-probability band reads at a useful size there.
+    # scroller's default window). The rangeslider scroller below scrubs the whole session;
+    # when a band is present we pin its y to the band region so the probability schedule
+    # fills the scroller (rather than auto-fitting all rows, which leaves it a thin strip).
     t0 = go_cue_times.min() if len(go_cue_times) else x_first
+    if has_band:
+        slider_yaxis = dict(
+            rangemode="fixed",
+            range=[params["probs_center"] - params["probs_half"],
+                   params["probs_center"] + params["probs_half"]],
+        )
+    else:
+        slider_yaxis = dict(rangemode="auto")
     fig.update_layout(
         title=session_id or "Session Scroller",
         xaxis_title="Time (s)",
         yaxis=dict(tickvals=yticks, ticktext=ylabels,
                    range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25]),
         xaxis=dict(range=[t0, t0 + 120],
-                   rangeslider=dict(visible=True, range=[x_first, x_last],
-                                    yaxis=dict(rangemode="auto"))),
+                   rangeslider=dict(visible=True, range=[x_first, x_last], yaxis=slider_yaxis)),
         showlegend=True, height=600, width=1300, template="simple_white",
     )
     return fig
