@@ -322,9 +322,9 @@ def plot_foraging_session_plotly(  # noqa: C901
     # Axes styling to match the matplotlib version
     fig.update_yaxes(
         tickvals=[0, 1, 1.2], ticktext=["Left", "Right", "Ignored"],
-        range=[-0.15, 1.25], row=1, col=1,
+        range=[-0.15, 1.25], fixedrange=True, row=1, col=1,
     )
-    fig.update_yaxes(title_text="p_reward", range=[0, 1], row=2, col=1)
+    fig.update_yaxes(title_text="p_reward", range=[0, 1], fixedrange=True, row=2, col=1)
     fig.update_xaxes(title_text="Trial number", row=2, col=1)
     fig.update_layout(
         width=1300, height=400, template="simple_white",
@@ -335,7 +335,7 @@ def plot_foraging_session_plotly(  # noqa: C901
 
 
 def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
-    df_events, df_trials=None, fip_df=None, adjust_time=True, session_id=None
+    df_events, df_trials=None, fip_df=None, adjust_time=True, session_id=None, smooth_factor=5
 ):
     """Plotly version of :func:`plot_session_scroller.plot_session_scroller` (time-based).
 
@@ -372,33 +372,48 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     if fip_df is not None:
         fip_df = fip_df.copy()
 
+    # nan-safe extent: some events can carry NaN timestamps, and they sort last, so
+    # iloc[0]/iloc[-1] are not reliable -- use nanmin/nanmax.
     if adjust_time:
-        start_time = df_events.iloc[0]["timestamps"]
+        start_time = np.nanmin(df_events["timestamps"])
         df_events["timestamps"] = df_events["timestamps"] - start_time
         if df_trials is not None:
             df_trials["goCue_start_time"] = df_trials["goCue_start_time"] - start_time
         if fip_df is not None:
             fip_df["timestamps"] = fip_df["timestamps"] - start_time
 
-    xmin = df_events.iloc[0]["timestamps"]
-    xmax = df_events.iloc[-1]["timestamps"]
+    xmin = np.nanmin(df_events["timestamps"])
+    xmax = np.nanmax(df_events["timestamps"])
     x_first, x_last = xmin, xmax  # full extent (used for the rangeslider / "home")
 
-    # y-layout. The four behavior rows are stacked contiguously (top -> bottom: right licks,
-    # right reward, left reward, left licks) so a single go-cue line spans all of them. The
-    # reward-probability band lives well above the behavior block, out of the main view -- it
-    # only shows in the rangeslider "scroller" at the bottom (which auto-scales its own y).
+    # y-layout, bottom -> top:
+    #   * event rows in [0, 1]: like the trial-based figure, rewards sit at the outer edges
+    #     with licks just inside -- the right pair (reward outer-top, lick inner) grouped near
+    #     the top, the left pair (lick inner, reward outer-bottom) near the bottom.
+    #   * smoothed overlays in their own band [curve_bottom, curve_top] *above* the events.
+    #   * the reward-probability band sits higher still, out of the main view -- it only shows
+    #     in the rangeslider "scroller" (auto-/band-scaled) below.
+    # One go-cue line per trial spans the event rows.
     params = {
-        "behavior_bottom": 0.0, "behavior_top": 1.0,  # go cue spans this contiguous block
-        "probs_center": 1.7, "probs_half": 0.25,      # band sits high, above the main view
+        "behavior_bottom": 0.0, "behavior_top": 1.0,  # event ticks
+        "curve_bottom": 1.1, "curve_top": 2.1,        # smoothed overlays, above the events
+        "probs_center": 2.6, "probs_half": 0.25,      # band: scroller only, above main view
     }
-    # Row centers (top -> bottom). Event ticks are short marks centered on each row -- 70%
-    # shorter than the 0.25 row spacing -- so the rows read as separate even when busy.
-    row_centers = {"right_lick": 0.875, "right_reward": 0.625,
-                   "left_reward": 0.375, "left_lick": 0.125}
+    # Row centers (top -> bottom): right reward, right lick, left lick, left reward. Event
+    # ticks are short marks (70% shorter than the row spacing) centered on each row.
+    row_centers = {"right_reward": 0.92, "right_lick": 0.78,
+                   "left_lick": 0.22, "left_reward": 0.08}
     tick_half = 0.25 * 0.30 / 2.0
-    yticks = [0.875, 0.625, 0.375, 0.125]  # right licks, right reward, left reward, left licks
-    ylabels = ["right licks", "right reward", "left reward", "left licks"]
+
+    def _to_curve(v):
+        """Map a 0..1 per-trial value into the smoothed-overlay band above the events."""
+        span = params["curve_top"] - params["curve_bottom"]
+        return params["curve_bottom"] + np.asarray(v, dtype=float) * span
+
+    yticks = [0.92, 0.78, 0.22, 0.08,
+              params["curve_bottom"], (params["curve_bottom"] + params["curve_top"]) / 2,
+              params["curve_top"]]
+    ylabels = ["right reward", "right lick", "left lick", "left reward", "0", "0.5", "1"]
 
     fig = go.Figure()
 
@@ -410,12 +425,21 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     go_cue_times = _event_times("goCue_start_time")
     if len(go_cue_times) == 0 and df_trials is not None and "goCue_start_time" in df_trials:
         go_cue_times = df_trials["goCue_start_time"].dropna().values
+    n_tr = len(go_cue_times)
 
     def _trial_of(times):
         """Trial number for each time = how many go cues have started at/before it."""
-        if len(go_cue_times) == 0:
+        if n_tr == 0:
             return np.zeros(len(times), dtype=int)
         return np.searchsorted(go_cue_times, np.asarray(times), side="right")
+
+    # Per-trial choice aligned to the go cues (when df_trials lines up): 0 left, 1 right,
+    # np.nan = ignored. Used for the red ignored go cues and the smoothed-choice overlay.
+    aligned = df_trials is not None and len(df_trials) == n_tr and n_tr > 0
+    choice = None
+    if aligned and "animal_response" in df_trials:
+        choice = df_trials["animal_response"].astype(float).to_numpy().copy()
+        choice[choice == 2] = np.nan
 
     # Licks (gray) and rewards (black): short ticks centered on their rows; hover shows trial
     for name, key, color, width in [
@@ -434,15 +458,21 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             hovertemplate="%{x:.2f}s<br>trial %{customdata}<extra>" + label + "</extra>",
         ))
 
-    if len(go_cue_times):
-        # A single blue line spanning the contiguous behavior block; hover shows trial
-        xs, ys, cd = _vline_hover(go_cue_times, params["behavior_bottom"],
-                                  params["behavior_top"], np.arange(1, len(go_cue_times) + 1))
-        fig.add_trace(go.Scattergl(
-            x=xs, y=ys, customdata=cd, mode="lines",
-            line=dict(color="blue", width=0.75), opacity=0.75, name="go cue",
-            hovertemplate="%{x:.2f}s<br>trial %{customdata}<extra>go cue</extra>",
-        ))
+    if n_tr:
+        # Go-cue lines spanning the event rows only; ignored trials are drawn red.
+        trial_no = np.arange(1, n_tr + 1)
+        ignored = np.isnan(choice) if choice is not None else np.zeros(n_tr, dtype=bool)
+        for mask, gc_color, gname in [(~ignored, "green", "go cue"),
+                                      (ignored, "red", "go cue (ignored)")]:
+            if not mask.any():
+                continue
+            xs, ys, cd = _vline_hover(go_cue_times[mask], params["behavior_bottom"],
+                                      params["behavior_top"], trial_no[mask])
+            fig.add_trace(go.Scattergl(
+                x=xs, y=ys, customdata=cd, mode="lines",
+                line=dict(color=gc_color, width=0.75), opacity=0.75, name=gname,
+                hovertemplate="%{x:.2f}s<br>trial %{customdata}<extra>" + gname + "</extra>",
+            ))
 
     # Reward-probability band (needs df_trials and go-cue times) -- shown only in the scroller
     has_band = df_trials is not None and len(go_cue_times) == len(df_trials)
@@ -452,20 +482,21 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         pR = np.repeat(center + df_trials["reward_probabilityR"].values / 4, 2)[:-1]
         pL = np.repeat(center - df_trials["reward_probabilityL"].values / 4, 2)[:-1]
         base = np.full_like(x_doubled, center, dtype=float)
-        # pR above center (red), pL below center (blue); fill toward the center baseline.
+        # pR above center, pL below center; fill toward the center baseline. Colored to match
+        # the trial figures: left (pL) red, right (pR) blue.
         # go.Scatter (not Scattergl) -- the WebGL trace ignores fill="tonexty".
         fig.add_trace(go.Scatter(x=x_doubled, y=base, mode="lines", line=dict(width=0),
                                  showlegend=False, hoverinfo="skip"))
         fig.add_trace(go.Scatter(x=x_doubled, y=pR, mode="lines", line=dict(width=0),
-                                 fill="tonexty", fillcolor="rgba(255,0,0,0.4)",
+                                 fill="tonexty", fillcolor="rgba(0,0,255,0.4)",
                                  name="pR"))
         fig.add_trace(go.Scatter(x=x_doubled, y=base, mode="lines", line=dict(width=0),
                                  showlegend=False, hoverinfo="skip"))
         fig.add_trace(go.Scatter(x=x_doubled, y=pL, mode="lines", line=dict(width=0),
-                                 fill="tonexty", fillcolor="rgba(0,0,255,0.4)",
+                                 fill="tonexty", fillcolor="rgba(255,0,0,0.4)",
                                  name="pL"))
 
-    y_main_top = params["behavior_top"]  # top of the main (non-scroller) view
+    y_main_top = params["curve_top"]  # top of the main (non-scroller) view
 
     # FIP channels, normalised and stacked above the behavior panel
     if fip_df is not None:
@@ -489,23 +520,60 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             band += 1
             y_main_top = bottom + 1.0
 
+    # Smoothed per-trial overlays, in their own band above the event rows (0..1 mapped into
+    # [curve_bottom, curve_top]) and plotted at the go-cue times. Added last so they sit on
+    # top of the go-cue lines.
+    if n_tr:
+        offset = smooth_factor // 2
+
+        # Reward-probability fraction pR/(pL+pR) -- golden, like the trial-based base color
+        if aligned and {"reward_probabilityL", "reward_probabilityR"} <= set(df_trials.columns):
+            pL = df_trials["reward_probabilityL"].to_numpy()
+            pR = df_trials["reward_probabilityR"].to_numpy()
+            frac = np.divide(pR, pL + pR, out=np.full(n_tr, np.nan), where=(pL + pR) > 0)
+            fig.add_trace(go.Scattergl(x=go_cue_times, y=_to_curve(frac), mode="lines",
+                                       line=dict(color="gold", width=1.5), name="pR/(pL+pR)"))
+
+        # Smoothed choice (black solid)
+        if choice is not None:
+            sm = moving_average(choice, smooth_factor) / (
+                moving_average(~np.isnan(choice), smooth_factor) + 1e-6)
+            sm[sm > 100] = np.nan
+            xs = go_cue_times[offset: offset + len(sm)]
+            fig.add_trace(go.Scattergl(x=xs, y=_to_curve(sm), mode="lines",
+                                       line=dict(color="black", width=1.5),
+                                       name=f"choice (smooth = {smooth_factor})"))
+
+        # Smoothed lick count per trial (black dashed), normalised to [0, 1]
+        lick_times = np.concatenate([_event_times("left_lick_time"),
+                                     _event_times("right_lick_time")])
+        if len(lick_times):
+            counts = np.bincount(_trial_of(lick_times), minlength=n_tr + 1)[1:n_tr + 1]
+            sm = moving_average(counts.astype(float), smooth_factor)
+            top = np.nanmax(sm)
+            if top > 0:
+                sm = sm / top
+            xs = go_cue_times[offset: offset + len(sm)]
+            fig.add_trace(go.Scattergl(x=xs, y=_to_curve(sm), mode="lines",
+                                       line=dict(color="black", width=1.2, dash="dash"),
+                                       name=f"lick count (smooth = {smooth_factor})"))
+
     # Start zoomed to a readable ~120 s window at the first go cue (like the matplotlib
-    # scroller's default window). The rangeslider scroller below scrubs the whole session;
-    # when a band is present we pin its y to the band region so the probability schedule
-    # fills the scroller (rather than auto-fitting all rows, which leaves it a thin strip).
+    # scroller's default window). The rangeslider scroller below scrubs the whole session.
+    # When a band is present, pin the scroller's y to ~2x the band height so the reward-
+    # probability band fills about half the scroller bar (x-dragging is unaffected);
+    # otherwise auto-fit.
     t0 = go_cue_times.min() if len(go_cue_times) else x_first
     if has_band:
-        slider_yaxis = dict(
-            rangemode="fixed",
-            range=[params["probs_center"] - params["probs_half"],
-                   params["probs_center"] + params["probs_half"]],
-        )
+        half = 2 * params["probs_half"]
+        slider_yaxis = dict(rangemode="fixed",
+                            range=[params["probs_center"] - half, params["probs_center"] + half])
     else:
         slider_yaxis = dict(rangemode="auto")
     fig.update_layout(
         title=session_id or "Session Scroller",
         xaxis_title="Time (s)",
-        yaxis=dict(tickvals=yticks, ticktext=ylabels,
+        yaxis=dict(tickvals=yticks, ticktext=ylabels, fixedrange=True,
                    range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25]),
         xaxis=dict(range=[t0, t0 + 120],
                    rangeslider=dict(visible=True, range=[x_first, x_last], yaxis=slider_yaxis)),
