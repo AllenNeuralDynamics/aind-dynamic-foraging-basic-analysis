@@ -54,6 +54,21 @@ def _vlines(segments):
     return xs, ys
 
 
+def _vline_hover(x_arr, y0, y1, hover):
+    """Vertical ticks at ``x_arr`` (each y0->y1) plus a parallel ``customdata`` array.
+
+    Like :func:`_vlines` for a single group, but also threads a per-tick ``hover`` value
+    (repeated on both vertices, ``None`` on the gap) so each tick can surface e.g. its trial
+    number via a ``hovertemplate``.
+    """
+    xs, ys, cd = [], [], []
+    for xi, hi in zip(np.asarray(x_arr), hover):
+        xs += [xi, xi, None]
+        ys += [y0, y1, None]
+        cd += [hi, hi, None]
+    return xs, ys, cd
+
+
 def plot_foraging_session_plotly(  # noqa: C901
     choice_history,
     reward_history,
@@ -370,61 +385,66 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     x_first, x_last = xmin, xmax  # full extent (used for the rangeslider / "home")
 
     # y-layout. The four behavior rows are stacked contiguously (top -> bottom: right licks,
-    # right reward, left reward, left licks) so a single go-cue line spans all of them; the
-    # reward-probability band sits in its own block above, centered on probs_center.
+    # right reward, left reward, left licks) so a single go-cue line spans all of them. The
+    # reward-probability band lives well above the behavior block, out of the main view -- it
+    # only shows in the rangeslider "scroller" at the bottom (which auto-scales its own y).
     params = {
-        "left_lick_bottom": 0.0, "left_lick_top": 0.25,
-        "left_reward_bottom": 0.25, "left_reward_top": 0.5,
-        "right_reward_bottom": 0.5, "right_reward_top": 0.75,
-        "right_lick_bottom": 0.75, "right_lick_top": 1.0,
         "behavior_bottom": 0.0, "behavior_top": 1.0,  # go cue spans this contiguous block
-        "probs_center": 1.4, "probs_half": 0.25,      # band: probs_center +/- probs_half
+        "probs_center": 1.7, "probs_half": 0.25,      # band sits high, above the main view
     }
-    yticks = [
-        0.875, 0.625, 0.375, 0.125,  # right licks, right reward, left reward, left licks
-        params["probs_center"] - params["probs_half"],  # pL = 1
-        params["probs_center"],                         # 0
-        params["probs_center"] + params["probs_half"],  # pR = 1
-    ]
-    ylabels = ["right licks", "right reward", "left reward", "left licks", "pL = 1", "0", "pR = 1"]
+    # Row centers (top -> bottom). Event ticks are short marks centered on each row -- 70%
+    # shorter than the 0.25 row spacing -- so the rows read as separate even when busy.
+    row_centers = {"right_lick": 0.875, "right_reward": 0.625,
+                   "left_reward": 0.375, "left_lick": 0.125}
+    tick_half = 0.25 * 0.30 / 2.0
+    yticks = [0.875, 0.625, 0.375, 0.125]  # right licks, right reward, left reward, left licks
+    ylabels = ["right licks", "right reward", "left reward", "left licks"]
 
     fig = go.Figure()
 
     def _event_times(name):
         return df_events.query("event == @name").timestamps.values
 
-    # Licks (gray, like the scroller when no bout coloring)
-    for name, lo, hi in [
-        ("left_lick_time", params["left_lick_bottom"], params["left_lick_top"]),
-        ("right_lick_time", params["right_lick_bottom"], params["right_lick_top"]),
-    ]:
-        t = _event_times(name)
-        xs, ys = _vlines([(t, lo, hi)])
-        fig.add_trace(go.Scattergl(x=xs, y=ys, mode="lines", line=dict(color="gray", width=1.5),
-                                   name=name.replace("_time", "").replace("_", " ")))
-
-    # Rewards (black)
-    for name, lo, hi in [
-        ("left_reward_delivery_time", params["left_reward_bottom"], params["left_reward_top"]),
-        ("right_reward_delivery_time", params["right_reward_bottom"], params["right_reward_top"]),
-    ]:
-        t = _event_times(name)
-        xs, ys = _vlines([(t, lo, hi)])
-        fig.add_trace(go.Scattergl(x=xs, y=ys, mode="lines", line=dict(color="black", width=2),
-                                   name=name.replace("_delivery_time", "").replace("_", " ")))
-
-    # Go cues: prefer events, fall back to df_trials
+    # Go-cue times define the trial windows (prefer events, fall back to df_trials) so every
+    # event can be tagged with the trial it falls in.
     go_cue_times = _event_times("goCue_start_time")
     if len(go_cue_times) == 0 and df_trials is not None and "goCue_start_time" in df_trials:
         go_cue_times = df_trials["goCue_start_time"].dropna().values
-    if len(go_cue_times):
-        # A single line spanning the contiguous behavior block
-        xs, ys = _vlines([(go_cue_times, params["behavior_bottom"], params["behavior_top"])])
-        fig.add_trace(go.Scattergl(x=xs, y=ys, mode="lines",
-                                   line=dict(color="blue", width=0.75), opacity=0.75,
-                                   name="go cue"))
 
-    # Reward-probability band (needs df_trials and go-cue times)
+    def _trial_of(times):
+        """Trial number for each time = how many go cues have started at/before it."""
+        if len(go_cue_times) == 0:
+            return np.zeros(len(times), dtype=int)
+        return np.searchsorted(go_cue_times, np.asarray(times), side="right")
+
+    # Licks (gray) and rewards (black): short ticks centered on their rows; hover shows trial
+    for name, key, color, width in [
+        ("left_lick_time", "left_lick", "gray", 1.5),
+        ("right_lick_time", "right_lick", "gray", 1.5),
+        ("left_reward_delivery_time", "left_reward", "black", 2),
+        ("right_reward_delivery_time", "right_reward", "black", 2),
+    ]:
+        c = row_centers[key]
+        t = _event_times(name)
+        label = name.replace("_delivery_time", "").replace("_time", "").replace("_", " ")
+        xs, ys, cd = _vline_hover(t, c - tick_half, c + tick_half, _trial_of(t))
+        fig.add_trace(go.Scattergl(
+            x=xs, y=ys, customdata=cd, mode="lines", line=dict(color=color, width=width),
+            name=label,
+            hovertemplate="%{x:.2f}s<br>trial %{customdata}<extra>" + label + "</extra>",
+        ))
+
+    if len(go_cue_times):
+        # A single blue line spanning the contiguous behavior block; hover shows trial
+        xs, ys, cd = _vline_hover(go_cue_times, params["behavior_bottom"],
+                                  params["behavior_top"], np.arange(1, len(go_cue_times) + 1))
+        fig.add_trace(go.Scattergl(
+            x=xs, y=ys, customdata=cd, mode="lines",
+            line=dict(color="blue", width=0.75), opacity=0.75, name="go cue",
+            hovertemplate="%{x:.2f}s<br>trial %{customdata}<extra>go cue</extra>",
+        ))
+
+    # Reward-probability band (needs df_trials and go-cue times) -- shown only in the scroller
     if df_trials is not None and len(go_cue_times) == len(df_trials):
         x_doubled = np.repeat(go_cue_times, 2)[1:]
         center = params["probs_center"]
@@ -444,7 +464,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                                  fill="tonexty", fillcolor="rgba(0,0,255,0.4)",
                                  name="pL"))
 
-    y_top = params["probs_center"] + params["probs_half"]  # top of the plotted content
+    y_main_top = params["behavior_top"]  # top of the main (non-scroller) view
 
     # FIP channels, normalised and stacked above the behavior panel
     if fip_df is not None:
@@ -466,18 +486,20 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             yticks.append(bottom + 0.5)
             ylabels.append(channel)
             band += 1
-            y_top = bottom + 1.0
+            y_main_top = bottom + 1.0
 
     # Start zoomed to a readable ~120 s window at the first go cue (like the matplotlib
-    # scroller's default window), with a rangeslider so the whole session can be scrubbed --
-    # the plotly analog of the scroller's arrow-key panning.
+    # scroller's default window). The rangeslider scroller below scrubs the whole session and
+    # auto-scales its own y, so the reward-probability band reads at a useful size there.
     t0 = go_cue_times.min() if len(go_cue_times) else x_first
     fig.update_layout(
         title=session_id or "Session Scroller",
         xaxis_title="Time (s)",
         yaxis=dict(tickvals=yticks, ticktext=ylabels,
-                   range=[params["behavior_bottom"] - 0.05, y_top + 0.1]),
-        xaxis=dict(range=[t0, t0 + 120], rangeslider=dict(visible=True, range=[x_first, x_last])),
+                   range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25]),
+        xaxis=dict(range=[t0, t0 + 120],
+                   rangeslider=dict(visible=True, range=[x_first, x_last],
+                                    yaxis=dict(rangemode="auto"))),
         showlegend=True, height=600, width=1300, template="simple_white",
     )
     return fig
