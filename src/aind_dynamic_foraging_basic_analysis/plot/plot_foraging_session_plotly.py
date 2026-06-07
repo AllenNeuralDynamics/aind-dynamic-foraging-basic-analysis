@@ -428,9 +428,10 @@ def plot_foraging_session_plotly(  # noqa: C901
                 ticktext.append(str(w))
         fig.update_xaxes(tickvals=tickvals, ticktext=ticktext, row=2, col=1)
     fig.update_layout(
-        width=1300, height=440, template="simple_white",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        margin=dict(l=60, r=20, t=60, b=50),
+        width=1000, height=460, template="simple_white",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                    font=dict(size=9)),
+        margin=dict(l=60, r=20, t=90, b=50),
     )
     return fig
 
@@ -721,11 +722,13 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         fig.update_xaxes(tickvals=tickvals, ticktext=ticktext, row=2, col=1)
 
     fig.update_layout(
-        title=title or "Session Scroller", showlegend=True,
-        height=600, width=1300, template="simple_white",
-        # Legend outside, top-left, horizontal, ~5 entries per row.
+        # Title pinned to the very top-left so it clears the legend below it.
+        title=dict(text=title or "Session Scroller", x=0.0, xanchor="left",
+                   y=0.98, yanchor="top"),
+        showlegend=True, height=620, width=1000, template="simple_white",
+        # Legend outside, top-left, horizontal, compact entries (narrow box).
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                    entrywidthmode="fraction", entrywidth=0.2),
-        margin=dict(l=70, r=20, t=90, b=40),
+                    font=dict(size=9), entrywidthmode="pixels", entrywidth=125),
+        margin=dict(l=70, r=20, t=120, b=40),
     )
     return fig
