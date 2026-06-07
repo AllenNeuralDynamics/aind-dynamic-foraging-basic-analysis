@@ -489,9 +489,8 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     #   * smoothed overlays in their own band [curve_bottom, curve_top] above the events.
     #   * the reward-probability band sits higher still -- it only shows in the rangeslider.
     params = {
-        "behavior_bottom": 0.0, "behavior_top": 1.0,
-        "curve_bottom": 1.1, "curve_top": 2.1,
-        "probs_center": 2.75, "probs_half": 0.25,  # reward-prob lines (scroller), above main
+        "behavior_bottom": 0.0, "behavior_top": 1.0,  # event rows (row 1)
+        "curve_bottom": 1.1, "curve_top": 2.1,        # smoothed overlays (row 1)
     }
     row_centers = {"right_reward": 0.92, "right_lick": 0.78,
                    "left_lick": 0.22, "left_reward": 0.08}
@@ -512,7 +511,10 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     sessions = (list(dict.fromkeys(df_events["session_id"].tolist())) if has_sess else [None])
     shift_each = adjust_time or len(sessions) > 1
 
-    fig = go.Figure()
+    # Same two-panel layout as the trial-based figure: the raster/curves on top (row 1) over a
+    # reward-schedule panel (row 2), with a rangeslider scroller under row 2.
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                        row_heights=[0.85, 0.15], vertical_spacing=0.04)
 
     ev_meta = {
         "left_lick": ("left_lick_time", "gray", 1.5, "left lick"),
@@ -615,29 +617,29 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                 lick_x += [*xsm, None]
                 lick_y += [*_to_curve(sm[: len(xsm)]), None]
 
-        # Reward-probability as two lines (pL red, pR blue), like the trial-based schedule;
-        # values 0..1 mapped into the scroller band and broken at session boundaries.
+        # Reward-probability schedule (pL red, pR blue), drawn as 0..1 lines in the bottom
+        # panel just like the trial-based figure; broken at session boundaries.
         if (tr_s is not None and n_tr and len(tr_s) == n_tr
                 and {"reward_probabilityL", "reward_probabilityR"} <= set(tr_s.columns)):
             has_prob = True
-            lo = params["probs_center"] - params["probs_half"]
-            span = 2 * params["probs_half"]
             probL_x += [*gc, None]
-            probL_y += [*(lo + tr_s["reward_probabilityL"].to_numpy() * span), None]
+            probL_y += [*tr_s["reward_probabilityL"].to_numpy(), None]
             probR_x += [*gc, None]
-            probR_y += [*(lo + tr_s["reward_probabilityR"].to_numpy() * span), None]
+            probR_y += [*tr_s["reward_probabilityR"].to_numpy(), None]
 
         dur = np.nanmax(ts) - t0
         sess_spans.append((cum, dur))
         cum += dur
 
     # --- build one trace per type from the accumulators ---
+    # Row 1: events, go cues, smoothed overlays.
     ht = "%%{x:.2f}s<br>trial %%{customdata[0]}<br>session %%{customdata[1]}<extra>%s</extra>"
     for key, (name, color, width, label) in ev_meta.items():
         a = ev_acc[key]
         fig.add_trace(go.Scattergl(
             x=a["x"], y=a["y"], customdata=a["cd"], mode="lines",
-            line=dict(color=color, width=width), name=label, hovertemplate=ht % label))
+            line=dict(color=color, width=width), name=label, hovertemplate=ht % label),
+            row=1, col=1)
 
     for gname, gcolor in [("go cue", "green"), ("go cue (ignored)", "red")]:
         a = gocue_acc[gname]
@@ -645,28 +647,27 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             fig.add_trace(go.Scattergl(
                 x=a["x"], y=a["y"], customdata=a["cd"], mode="lines",
                 line=dict(color=gcolor, width=0.75), opacity=0.75, name=gname,
-                hovertemplate=ht % gname))
+                hovertemplate=ht % gname), row=1, col=1)
 
-    if has_prob:
-        # pL (red) / pR (blue) as lines, like the trial-based reward schedule (scroller only).
-        # go.Scatter (not Scattergl) -- WebGL traces do not render in the rangeslider.
-        fig.add_trace(go.Scatter(x=probR_x, y=probR_y, mode="lines",
-                                 line=dict(color="blue", width=1.2), name="pR"))
-        fig.add_trace(go.Scatter(x=probL_x, y=probL_y, mode="lines",
-                                 line=dict(color="red", width=1.2), name="pL"))
-
-    # Smoothed overlays on top
     if frac_x:
         fig.add_trace(go.Scattergl(x=frac_x, y=frac_y, mode="lines",
-                                   line=dict(color="gold", width=1.5), name="pR/(pL+pR)"))
+                                   line=dict(color="gold", width=1.5), name="pR/(pL+pR)"),
+                      row=1, col=1)
     if choice_x:
         fig.add_trace(go.Scattergl(x=choice_x, y=choice_y, mode="lines",
                                    line=dict(color="black", width=1.5),
-                                   name=f"choice (smooth = {smooth_factor})"))
+                                   name=f"choice (smooth = {smooth_factor})"), row=1, col=1)
     if lick_x:
         fig.add_trace(go.Scattergl(x=lick_x, y=lick_y, mode="lines",
                                    line=dict(color="black", width=1.2, dash="dash"),
-                                   name=f"lick count (smooth = {smooth_factor})"))
+                                   name=f"lick count (smooth = {smooth_factor})"), row=1, col=1)
+
+    # Row 2: reward-probability schedule (pR blue, pL red), 0..1.
+    if has_prob:
+        fig.add_trace(go.Scattergl(x=probR_x, y=probR_y, mode="lines",
+                                   line=dict(color="blue", width=1), name="pR"), row=2, col=1)
+        fig.add_trace(go.Scattergl(x=probL_x, y=probL_y, mode="lines",
+                                   line=dict(color="red", width=1), name="pL"), row=2, col=1)
 
     y_main_top = params["curve_top"]
 
@@ -680,40 +681,35 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         for channel in fip_channels:
             if channel not in present:
                 continue
-            bottom = params["probs_center"] + params["probs_half"] + 0.1 + band
+            bottom = params["curve_top"] + 0.1 + band
             C = fip_df.query("event == @channel").copy()
             d = C["data"].values - np.nanmin(C["data"].values)
             d = d / np.nanmax(d) + bottom
             color = fip_colors["_".join(channel.split("_")[:2])]
             fig.add_trace(go.Scattergl(x=C.timestamps.values + last_off, y=d, mode="lines",
-                                       line=dict(color=color), name=channel))
+                                       line=dict(color=color), name=channel), row=1, col=1)
             yticks.append(bottom + 0.5)
             ylabels.append(channel)
             band += 1
             y_main_top = bottom + 1.0
 
-    # Thick vertical lines marking session boundaries
+    # Thick vertical lines marking session boundaries (both panels)
     for b in boundaries:
-        fig.add_vline(x=b, line=dict(color="black", width=2))
+        for row in (1, 2):
+            fig.add_vline(x=b, line=dict(color="black", width=2), row=row, col=1)
 
-    # Full extent + initial ~120 s window at the first go cue. The rangeslider scrubs the
-    # whole session(s); when reward-prob lines are present pin the scroller y to their band so
-    # they fill the scroller (x-dragging is unaffected); otherwise auto-fit.
+    # Extent + initial ~120 s window at the first go cue; rangeslider scroller under row 2.
     x_first = 0.0 if shift_each else (first_t0 if first_t0 is not None else 0.0)
     x_last = x_first + cum
     t0_view = first_gc if first_gc is not None else x_first
-    if has_prob:
-        slider_yaxis = dict(
-            rangemode="fixed",
-            range=[params["probs_center"] - params["probs_half"] - 0.05,
-                   params["probs_center"] + params["probs_half"] + 0.05])
-    else:
-        slider_yaxis = dict(rangemode="auto")
 
-    # Multi-session: x tick labels restart at 0 each session.
-    xaxis = dict(range=[t0_view, t0_view + 120],
-                 rangeslider=dict(visible=True, range=[x_first, x_last], yaxis=slider_yaxis))
-    if len(sess_spans) > 1:
+    fig.update_yaxes(tickvals=yticks, ticktext=ylabels, fixedrange=True,
+                     range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25], row=1, col=1)
+    fig.update_yaxes(title_text="p_reward", range=[0, 1], fixedrange=True, row=2, col=1)
+    fig.update_xaxes(range=[t0_view, t0_view + 120], row=1, col=1)
+    fig.update_xaxes(title_text="Time (s)", range=[t0_view, t0_view + 120], row=2, col=1,
+                     rangeslider=dict(visible=True, thickness=0.06, range=[x_first, x_last]))
+    if len(sess_spans) > 1:  # x tick labels restart at 0 each session
         tickvals, ticktext = [], []
         for start, dur in sess_spans:
             step = _nice_step(dur)
@@ -722,14 +718,14 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                 tickvals.append(start + w)
                 ticktext.append(str(int(w)))
                 w += step
-        xaxis.update(tickvals=tickvals, ticktext=ticktext)
+        fig.update_xaxes(tickvals=tickvals, ticktext=ticktext, row=2, col=1)
 
     fig.update_layout(
-        title=title or "Session Scroller",
-        xaxis_title="Time (s)",
-        yaxis=dict(tickvals=yticks, ticktext=ylabels, fixedrange=True,
-                   range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25]),
-        xaxis=xaxis,
-        showlegend=True, height=600, width=1300, template="simple_white",
+        title=title or "Session Scroller", showlegend=True,
+        height=600, width=1300, template="simple_white",
+        # Legend outside, top-left, horizontal, ~5 entries per row.
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                    entrywidthmode="fraction", entrywidth=0.2),
+        margin=dict(l=70, r=20, t=90, b=40),
     )
     return fig

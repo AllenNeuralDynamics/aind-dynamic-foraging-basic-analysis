@@ -122,7 +122,7 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
             pd.concat([e1, e2], ignore_index=True),
             df_trials=pd.concat([t1, t2], ignore_index=True),
         )
-        self.assertEqual(len(fig.layout.shapes), 1)  # one session boundary line
+        self.assertEqual(len(fig.layout.shapes), 2)  # one boundary, drawn in both panels
 
 
 if __name__ == "__main__":
