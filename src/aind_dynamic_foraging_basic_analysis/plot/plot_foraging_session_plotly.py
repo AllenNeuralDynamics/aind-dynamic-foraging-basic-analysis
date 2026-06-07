@@ -543,6 +543,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             boundaries.append(cum)
 
         def _ev(name, _ev=ev_s, _off=off):
+            """Timestamps of events named ``name`` in this session, shifted by ``_off``."""
             return _ev.loc[_ev["event"] == name, "timestamps"].to_numpy() + _off
 
         tr_s = None
@@ -559,6 +560,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             first_gc = gc.min()
 
         def _trial_of(times, _gc=gc, _n=n_tr):
+            """Per-session trial number for each time (# go cues at/before it)."""
             if _n == 0:
                 return np.zeros(len(times), dtype=int)
             return np.searchsorted(_gc, np.asarray(times), side="right")
