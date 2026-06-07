@@ -40,26 +40,13 @@ def _color(c):
     return _MPL_COLORS.get(c, c)
 
 
-def _vlines(segments):
-    """Flatten ``[(x_array, y0, y1), ...]`` into x / y arrays of ``None``-separated segments.
-
-    The standard plotly trick for drawing many vertical line ticks in a single trace: insert
-    ``None`` between each ``(x, y0)->(x, y1)`` pair so plotly lifts the pen between ticks.
-    """
-    xs, ys = [], []
-    for x_arr, y0, y1 in segments:
-        for xi in np.asarray(x_arr):
-            xs += [xi, xi, None]
-            ys += [y0, y1, None]
-    return xs, ys
-
-
 def _vline_hover(x_arr, y0, y1, hover, gap=None):
     """Vertical ticks at ``x_arr`` (each y0->y1) plus a parallel ``customdata`` array.
 
-    Like :func:`_vlines` for a single group, but also threads a per-tick ``hover`` value
-    (repeated on both vertices, ``gap`` on the separator) so each tick can surface e.g. its
-    trial / session via a ``hovertemplate``. Pass ``gap=(None, None)`` for 2-field customdata.
+    Draws many vertical ticks in one trace (``None`` between segments so plotly lifts the pen)
+    and threads a per-tick ``hover`` value (repeated on both vertices, ``gap`` on the separator)
+    so each tick can surface e.g. its trial / session via a ``hovertemplate``. Pass
+    ``gap=(None, None)`` for 2-field customdata.
     """
     xs, ys, cd = [], [], []
     for xi, hi in zip(np.asarray(x_arr), hover):
@@ -71,14 +58,9 @@ def _vline_hover(x_arr, y0, y1, hover, gap=None):
 
 def _nice_step(span, target=4):
     """A round tick step (1/2/5 x 10^k) giving roughly ``target`` ticks across ``span``."""
-    if span <= 0:
-        return 1.0
-    raw = span / target
+    raw = max(span, 1e-9) / target
     mag = 10.0 ** np.floor(np.log10(raw))
-    for m in (1, 2, 5, 10):
-        if m * mag >= raw:
-            return m * mag
-    return 10.0 * mag
+    return next(m * mag for m in (1, 2, 5, 10) if m * mag >= raw)
 
 
 def _session_segments(session_id, n):
@@ -110,7 +92,7 @@ def _broken(x, y, segments):
     return xs, ys
 
 
-def plot_foraging_session_plotly(  # noqa: C901
+def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
     choice_history,
     reward_history,
     p_reward,
