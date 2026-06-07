@@ -54,19 +54,31 @@ def _vlines(segments):
     return xs, ys
 
 
-def _vline_hover(x_arr, y0, y1, hover):
+def _vline_hover(x_arr, y0, y1, hover, gap=None):
     """Vertical ticks at ``x_arr`` (each y0->y1) plus a parallel ``customdata`` array.
 
     Like :func:`_vlines` for a single group, but also threads a per-tick ``hover`` value
-    (repeated on both vertices, ``None`` on the gap) so each tick can surface e.g. its trial
-    number via a ``hovertemplate``.
+    (repeated on both vertices, ``gap`` on the separator) so each tick can surface e.g. its
+    trial / session via a ``hovertemplate``. Pass ``gap=(None, None)`` for 2-field customdata.
     """
     xs, ys, cd = [], [], []
     for xi, hi in zip(np.asarray(x_arr), hover):
         xs += [xi, xi, None]
         ys += [y0, y1, None]
-        cd += [hi, hi, None]
+        cd += [hi, hi, gap]
     return xs, ys, cd
+
+
+def _nice_step(span, target=4):
+    """A round tick step (1/2/5 x 10^k) giving roughly ``target`` ticks across ``span``."""
+    if span <= 0:
+        return 1.0
+    raw = span / target
+    mag = 10.0 ** np.floor(np.log10(raw))
+    for m in (1, 2, 5, 10):
+        if m * mag >= raw:
+            return m * mag
+    return 10.0 * mag
 
 
 def _session_segments(session_id, n):
@@ -479,7 +491,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     params = {
         "behavior_bottom": 0.0, "behavior_top": 1.0,
         "curve_bottom": 1.1, "curve_top": 2.1,
-        "probs_center": 2.6, "probs_half": 0.25,
+        "probs_center": 2.75, "probs_half": 0.25,  # reward-prob lines (scroller), above main
     }
     row_centers = {"right_reward": 0.92, "right_lick": 0.78,
                    "left_lick": 0.22, "left_reward": 0.08}
@@ -512,8 +524,8 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     gocue_acc = {"go cue": {"x": [], "y": [], "cd": []},
                  "go cue (ignored)": {"x": [], "y": [], "cd": []}}
     frac_x, frac_y, choice_x, choice_y, lick_x, lick_y = [], [], [], [], [], []
-    band_x, band_pR, band_pL, band_base = [], [], [], []
-    boundaries, has_band = [], False
+    probL_x, probL_y, probR_x, probR_y = [], [], [], []  # reward-prob lines (scroller)
+    boundaries, sess_spans, has_prob = [], [], False
     cum, first_t0, first_gc, last_off = 0.0, None, None, 0.0
 
     for si, sess in enumerate(sessions):
@@ -554,10 +566,13 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             choice = tr_s["animal_response"].astype(float).to_numpy().copy()
             choice[choice == 2] = np.nan
 
+        sess_disp = "" if sess is None else sess  # shown in (trial, session) hover
+
         for key, (name, _color, _width, _label) in ev_meta.items():
             c = row_centers[key]
             t = _ev(name)
-            xs, ys, cd = _vline_hover(t, c - tick_half, c + tick_half, _trial_of(t))
+            hov = [(int(tr), sess_disp) for tr in _trial_of(t)]
+            xs, ys, cd = _vline_hover(t, c - tick_half, c + tick_half, hov, gap=(None, None))
             ev_acc[key]["x"] += xs
             ev_acc[key]["y"] += ys
             ev_acc[key]["cd"] += cd
@@ -567,8 +582,9 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             ign = np.isnan(choice) if choice is not None else np.zeros(n_tr, dtype=bool)
             for gname, mask in [("go cue", ~ign), ("go cue (ignored)", ign)]:
                 if mask.any():
+                    hov = [(int(tr), sess_disp) for tr in trial_no[mask]]
                     xs, ys, cd = _vline_hover(gc[mask], params["behavior_bottom"],
-                                              params["behavior_top"], trial_no[mask])
+                                              params["behavior_top"], hov, gap=(None, None))
                     gocue_acc[gname]["x"] += xs
                     gocue_acc[gname]["y"] += ys
                     gocue_acc[gname]["cd"] += cd
@@ -599,27 +615,29 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                 lick_x += [*xsm, None]
                 lick_y += [*_to_curve(sm[: len(xsm)]), None]
 
+        # Reward-probability as two lines (pL red, pR blue), like the trial-based schedule;
+        # values 0..1 mapped into the scroller band and broken at session boundaries.
         if (tr_s is not None and n_tr and len(tr_s) == n_tr
                 and {"reward_probabilityL", "reward_probabilityR"} <= set(tr_s.columns)):
-            has_band = True
-            center = params["probs_center"]
-            xd = np.repeat(gc, 2)[1:]
-            pr = np.repeat(center + tr_s["reward_probabilityR"].to_numpy() / 4, 2)[:-1]
-            pl = np.repeat(center - tr_s["reward_probabilityL"].to_numpy() / 4, 2)[:-1]
-            band_x += [*xd, None]
-            band_pR += [*pr, None]
-            band_pL += [*pl, None]
-            band_base += [center] * len(xd) + [None]
+            has_prob = True
+            lo = params["probs_center"] - params["probs_half"]
+            span = 2 * params["probs_half"]
+            probL_x += [*gc, None]
+            probL_y += [*(lo + tr_s["reward_probabilityL"].to_numpy() * span), None]
+            probR_x += [*gc, None]
+            probR_y += [*(lo + tr_s["reward_probabilityR"].to_numpy() * span), None]
 
-        cum += np.nanmax(ts) - t0
+        dur = np.nanmax(ts) - t0
+        sess_spans.append((cum, dur))
+        cum += dur
 
     # --- build one trace per type from the accumulators ---
+    ht = "%%{x:.2f}s<br>trial %%{customdata[0]}<br>session %%{customdata[1]}<extra>%s</extra>"
     for key, (name, color, width, label) in ev_meta.items():
         a = ev_acc[key]
         fig.add_trace(go.Scattergl(
             x=a["x"], y=a["y"], customdata=a["cd"], mode="lines",
-            line=dict(color=color, width=width), name=label,
-            hovertemplate="%{x:.2f}s<br>trial %{customdata}<extra>" + label + "</extra>"))
+            line=dict(color=color, width=width), name=label, hovertemplate=ht % label))
 
     for gname, gcolor in [("go cue", "green"), ("go cue (ignored)", "red")]:
         a = gocue_acc[gname]
@@ -627,18 +645,15 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             fig.add_trace(go.Scattergl(
                 x=a["x"], y=a["y"], customdata=a["cd"], mode="lines",
                 line=dict(color=gcolor, width=0.75), opacity=0.75, name=gname,
-                hovertemplate="%{x:.2f}s<br>trial %{customdata}<extra>" + gname + "</extra>"))
+                hovertemplate=ht % gname))
 
-    if has_band:
-        # pR above center (blue=right), pL below center (red=left); fill to the center base.
-        fig.add_trace(go.Scatter(x=band_x, y=band_base, mode="lines", line=dict(width=0),
-                                 showlegend=False, hoverinfo="skip"))
-        fig.add_trace(go.Scatter(x=band_x, y=band_pR, mode="lines", line=dict(width=0),
-                                 fill="tonexty", fillcolor="rgba(0,0,255,0.4)", name="pR"))
-        fig.add_trace(go.Scatter(x=band_x, y=band_base, mode="lines", line=dict(width=0),
-                                 showlegend=False, hoverinfo="skip"))
-        fig.add_trace(go.Scatter(x=band_x, y=band_pL, mode="lines", line=dict(width=0),
-                                 fill="tonexty", fillcolor="rgba(255,0,0,0.4)", name="pL"))
+    if has_prob:
+        # pL (red) / pR (blue) as lines, like the trial-based reward schedule (scroller only).
+        # go.Scatter (not Scattergl) -- WebGL traces do not render in the rangeslider.
+        fig.add_trace(go.Scatter(x=probR_x, y=probR_y, mode="lines",
+                                 line=dict(color="blue", width=1.2), name="pR"))
+        fig.add_trace(go.Scatter(x=probL_x, y=probL_y, mode="lines",
+                                 line=dict(color="red", width=1.2), name="pL"))
 
     # Smoothed overlays on top
     if frac_x:
@@ -682,24 +697,39 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         fig.add_vline(x=b, line=dict(color="black", width=2))
 
     # Full extent + initial ~120 s window at the first go cue. The rangeslider scrubs the
-    # whole session(s); when a band is present pin the scroller y to ~2x the band height so
-    # it fills about half the scroller bar (x-dragging is unaffected); otherwise auto-fit.
+    # whole session(s); when reward-prob lines are present pin the scroller y to their band so
+    # they fill the scroller (x-dragging is unaffected); otherwise auto-fit.
     x_first = 0.0 if shift_each else (first_t0 if first_t0 is not None else 0.0)
     x_last = x_first + cum
     t0_view = first_gc if first_gc is not None else x_first
-    if has_band:
-        half = 2 * params["probs_half"]
-        slider_yaxis = dict(rangemode="fixed",
-                            range=[params["probs_center"] - half, params["probs_center"] + half])
+    if has_prob:
+        slider_yaxis = dict(
+            rangemode="fixed",
+            range=[params["probs_center"] - params["probs_half"] - 0.05,
+                   params["probs_center"] + params["probs_half"] + 0.05])
     else:
         slider_yaxis = dict(rangemode="auto")
+
+    # Multi-session: x tick labels restart at 0 each session.
+    xaxis = dict(range=[t0_view, t0_view + 120],
+                 rangeslider=dict(visible=True, range=[x_first, x_last], yaxis=slider_yaxis))
+    if len(sess_spans) > 1:
+        tickvals, ticktext = [], []
+        for start, dur in sess_spans:
+            step = _nice_step(dur)
+            w = 0.0
+            while w <= dur:
+                tickvals.append(start + w)
+                ticktext.append(str(int(w)))
+                w += step
+        xaxis.update(tickvals=tickvals, ticktext=ticktext)
+
     fig.update_layout(
         title=title or "Session Scroller",
         xaxis_title="Time (s)",
         yaxis=dict(tickvals=yticks, ticktext=ylabels, fixedrange=True,
                    range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25]),
-        xaxis=dict(range=[t0_view, t0_view + 120],
-                   rangeslider=dict(visible=True, range=[x_first, x_last], yaxis=slider_yaxis)),
+        xaxis=xaxis,
         showlegend=True, height=600, width=1300, template="simple_white",
     )
     return fig
