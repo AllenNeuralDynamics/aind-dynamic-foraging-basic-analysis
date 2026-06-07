@@ -59,6 +59,19 @@ class TestPlotForagingSessionPlotly(unittest.TestCase):
         )
         self.assertIsInstance(fig, go.Figure)
 
+    def test_multi_session(self):
+        """A per-trial session_id concatenates sessions with a boundary line."""
+        n = len(self.choice_history)
+        session_id = np.array(["a"] * n + ["b"] * n)
+        fig = plot_foraging_session_plotly(
+            np.concatenate([self.choice_history, self.choice_history]),
+            np.concatenate([self.reward_history, self.reward_history]),
+            np.concatenate([self.p_reward, self.p_reward], axis=1),
+            session_id=session_id,
+        )
+        # One boundary, drawn as a vertical line (shape) in each of the two rows.
+        self.assertEqual(len(fig.layout.shapes), 2)
+
 
 class TestPlotSessionInTimePlotly(unittest.TestCase):
     """Test the time-based plotly plot with a synthetic events / trials frame."""
@@ -92,11 +105,24 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
     def test_with_trials(self):
         """Supplying df_trials adds the reward-probability band traces."""
         fig = plot_session_in_time_plotly(
-            self.df_events, df_trials=self.df_trials, session_id="unit_test"
+            self.df_events, df_trials=self.df_trials, title="unit_test"
         )
         names = [tr.name for tr in fig.data]
         self.assertIn("pR", names)
         self.assertIn("pL", names)
+
+    def test_multi_session(self):
+        """A session_id column concatenates sessions end-to-end with a boundary line."""
+        e1 = self.df_events.assign(session_id="s1")
+        e2 = self.df_events.assign(session_id="s2", timestamps=self.df_events["timestamps"] + 100)
+        t1 = self.df_trials.assign(session_id="s1")
+        t2 = self.df_trials.assign(session_id="s2",
+                                   goCue_start_time=self.df_trials["goCue_start_time"] + 100)
+        fig = plot_session_in_time_plotly(
+            pd.concat([e1, e2], ignore_index=True),
+            df_trials=pd.concat([t1, t2], ignore_index=True),
+        )
+        self.assertEqual(len(fig.layout.shapes), 1)  # one session boundary line
 
 
 if __name__ == "__main__":
