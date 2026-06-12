@@ -84,7 +84,7 @@ def compute_auroc(nwb, alignment_times, labels, channel, tw, bin_size=0.25, data
 
     # average by bin_centers
     agg_align = (
-        aligns.groupby(["bin_center", "event_number"])[data_col].mean().unstack(["event_number"])
+        aligns.groupby(["bin_center", "event_number"], observed=True)[data_col].mean().unstack(["event_number"])
     )
     # drop any event_number with nan values for any bin_centers.
     agg_align = agg_align.dropna(how="any", axis=1)
