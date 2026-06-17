@@ -5,6 +5,7 @@ This module provides:
 - :func:`estimate_snr` — an SNR estimator using a derivative-based noise
   estimate and peak-based signal estimate.
 - :func:`estimate_kurtosis` — excess kurtosis of the trace distribution.
+- :func:`estimate_skewness` — skewness of the trace distribution.
 
 Notes
 -----
@@ -27,6 +28,8 @@ True
 True
 >>> isinstance(estimate_kurtosis(y), float)
 True
+>>> isinstance(estimate_skewness(y), float)
+True
 """
 
 from __future__ import annotations
@@ -37,9 +40,9 @@ from typing import Tuple
 import numpy as np
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
-from scipy.stats import kurtosis
+from scipy.stats import kurtosis, skew
 
-__all__ = ["estimate_snr", "estimate_kurtosis"]
+__all__ = ["estimate_snr", "estimate_kurtosis", "estimate_skewness"]
 
 
 def estimate_snr(
@@ -132,3 +135,27 @@ def estimate_kurtosis(trace: NDArray[np.floating]) -> float:
 
     # Excess kurtosis (normal distribution = 0)
     return float(kurtosis(trace, fisher=True, bias=False))
+
+
+def estimate_skewness(trace: NDArray[np.floating]) -> float:
+    """
+    Compute the **skewness** of a 1D trace distribution.
+
+    Parameters
+    ----------
+    trace : numpy.ndarray
+        1D input trace. NaNs will be replaced with the median of ``trace``.
+
+    Returns
+    -------
+    float
+        Skewness of the distribution:
+        - Symmetric distribution → 0.0
+        - Right-skewed (positive skew) → positive
+        - Left-skewed (negative skew)  → negative
+    """
+    # Replace NaNs with the median of the trace
+    trace = np.nan_to_num(trace, nan=np.nanmedian(trace))
+
+    # Skewness
+    return float(skew(trace, bias=False))
