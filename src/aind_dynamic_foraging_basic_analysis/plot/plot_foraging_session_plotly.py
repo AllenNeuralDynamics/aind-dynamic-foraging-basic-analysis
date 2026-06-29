@@ -92,6 +92,7 @@ def _broken(x, y, segments):
     return xs, ys
 
 
+
 def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
     choice_history,
     reward_history,
@@ -417,9 +418,41 @@ def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
     )
     return fig
 
+def plot_foraging_session_nwb_plotly(nwb, **kwargs):
+    """
+    Wrapper function that extracts fields
+    """
+
+    if not hasattr(nwb, "df_trials"):
+        print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
+        return
+
+    if "side_bias" not in nwb.df_trials:
+        fig, axes = plot_foraging_session_plotly(
+            [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
+            nwb.df_trials["earned_reward"].values,
+            [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
+            **kwargs,
+        )
+    else:
+        if "plot_list" not in kwargs:
+            kwargs["plot_list"] = ["choice", "reward_prob", "bias"]
+        fig, axes = plot_foraging_session_plotly(
+            [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
+            nwb.df_trials["earned_reward"].values,
+            [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
+            bias=nwb.df_trials["side_bias"].values,
+            bias_lower=[x[0] for x in nwb.df_trials["side_bias_confidence_interval"].values],
+            bias_upper=[x[1] for x in nwb.df_trials["side_bias_confidence_interval"].values],
+            autowater_offered=nwb.df_trials[["auto_waterL", "auto_waterR"]].any(axis=1),
+            **kwargs,
+        )
+
+
+
 
 def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
-    df_events, df_trials=None, fip_df=None, adjust_time=True, title=None, smooth_factor=5
+    nwb, fip = [], adjust_time=True, title=None, smooth_factor=5
 ):
     """Plotly version of :func:`plot_session_scroller.plot_session_scroller` (time-based).
 
@@ -436,18 +469,9 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
 
     Parameters
     ----------
-    df_events : pandas.DataFrame
-        Tidy dataframe of session events (``event`` + ``timestamps``; optional ``session_id``).
-        Recognised events: ``left_lick_time``, ``right_lick_time``, ``left_reward_delivery_time``,
-        ``right_reward_delivery_time`` and ``goCue_start_time``.
-    df_trials : pandas.DataFrame, optional
-        Per-trial dataframe for the reward-probability band / overlays / red ignored go cues
-        (and a fallback source of go-cue times). Uses ``goCue_start_time``,
-        ``reward_probabilityL/R`` and ``animal_response``; go-cue times must share the
-        ``df_events`` time base. Matched per session via ``session_id`` when present.
-    fip_df : pandas.DataFrame, optional
-        Tidy FIP measurements (single-session only); each present channel is normalised and
-        stacked above the behavior panel.
+    nwb, an nwb like object that contains attributes: df_events, session_id
+        and optionally contains attributes fip_df, df_licks
+    fip (list), FIP channels to plot. Must be present in nwb.df_fip
     adjust_time : bool, optional
         If True (default), shift time so the first event is at t = 0 (always shifted when
         concatenating multiple sessions).
@@ -460,11 +484,25 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     -------
     plotly.graph_objects.Figure
     """
-    df_events = df_events.copy()
-    if df_trials is not None:
-        df_trials = df_trials.copy()
-    if fip_df is not None:
-        fip_df = fip_df.copy()
+    if not hasattr(nwb, "df_events"):
+        print("computing df_events first")
+        nwb.df_events = nu.create_df_events(nwb)
+        df_events = nwb.df_events
+    else:
+        df_events = nwb.df_events
+    if hasattr(nwb, "df_fip"):
+        fip_df = nwb.df_fip
+    if hasattr(nwb, "df_licks"):
+        df_licks = nwb.df_licks
+    else:
+        df_licks = None
+    if not hasattr(nwb, "df_trials"):
+        print("computing df_trials")
+        nwb.df_trials = nu.create_df_trials(nwb)
+        df_trials = nwb.df_trials
+    else:
+        df_trials = nwb.df_trials
+
 
     # y-layout, bottom -> top:
     #   * event rows in [0, 1]: rewards at the outer edges, licks inside (right pair near the
@@ -657,9 +695,8 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     y_main_top = params["curve_top"]
 
     # FIP channels (single-session only), normalised and stacked above the behavior panel
-    if fip_df is not None and len(sessions) == 1:
-        fip_channels = ["G_1_preprocessed", "G_2_preprocessed",
-                        "R_1_preprocessed", "R_2_preprocessed"]
+    if fip_df is not None and len(sessions) == 1 and len(fip) > 0:
+        fip_channels = fip
         fip_colors = {"G_1": "green", "G_2": "darkgreen", "R_1": "red", "R_2": "darkred"}
         present = set(fip_df["event"].unique())
         band = 0
