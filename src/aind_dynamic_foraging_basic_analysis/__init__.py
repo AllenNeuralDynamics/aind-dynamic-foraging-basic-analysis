@@ -8,4 +8,6 @@ from .plot.plot_foraging_session_plotly import (  # noqa: F401
     plot_foraging_session_plotly,
     plot_foraging_session_nwb_plotly,
     plot_session_in_time_plotly,
+    plot_session_in_time_nwb_plotly,
+
 )

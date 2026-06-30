@@ -547,7 +547,7 @@ def plot_foraging_session_nwb_plotly(nwb, **kwargs):
     return fig
 
 
-def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
+def plot_session_in_time_nwb_plotly(  # noqa: C901 pragma: no cover
     nwb_list, fip=[], adjust_time=True, title=None, smooth_factor=5
 ):
     """Plotly version of :func:`plot_session_scroller.plot_session_scroller` (time-based).
@@ -566,7 +566,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     Parameters
     ----------
     nwb_list, a list of nwb like object that contains attributes: df_events, session_id
-        and optionally contains attributes fip_df, df_licks
+        and optionally contains attributes df_fip, df_licks
     fip (list), FIP channels to plot. Must be present in nwb.df_fip
     adjust_time : bool, optional
         If True (default), shift time so the first event is at t = 0 (always shifted when
@@ -613,7 +613,61 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     # concatenate (or None if nothing present)
     df_events = pd.concat(events_acc, ignore_index=True) if events_acc else None
     df_trials = pd.concat(trials_acc, ignore_index=True) if trials_acc else None
-    fip_df = pd.concat(fip_acc, ignore_index=True) if fip_acc else None
+    df_fip = pd.concat(fip_acc, ignore_index=True) if fip_acc else None
+
+    return plot_session_in_time_plotly(
+        df_events, df_trials, df_fip, fip=fip,
+        adjust_time=adjust_time, title=title, smooth_factor=smooth_factor
+    )
+
+
+def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
+    df_events, df_trials=None, df_fip=None, fip=[], adjust_time=True, title=None, smooth_factor=5
+):
+    """Plotly version of :func:`plot_session_scroller.plot_session_scroller` (time-based).
+
+    Plots the session in real time (not in trial): left / right licks and rewards as ticks,
+    go cues as vertical lines (red for ignored trials), smoothed overlays above the events,
+    and -- when ``df_trials`` is supplied -- the left / right reward-probability band in the
+    rangeslider "scroller" below.
+
+    Multiple sessions: if ``df_events`` has a ``session_id`` column with more than one
+    session, the sessions are concatenated end-to-end along time in order of appearance
+    (each restarted at the running offset); a thick vertical line marks each boundary and
+    per-trial / smoothed quantities reset per session. ``df_trials`` is matched per session
+    by its own ``session_id`` column when present.
+
+    Parameters
+    ----------
+    df_events : pandas.DataFrame
+        Tidy dataframe of session events (``event`` + ``timestamps``; optional ``session_id``).
+        Recognised events: ``left_lick_time``, ``right_lick_time``, ``left_reward_delivery_time``,
+        ``right_reward_delivery_time`` and ``goCue_start_time``.
+    df_trials : pandas.DataFrame, optional
+        Per-trial dataframe for the reward-probability band / overlays / red ignored go cues
+        (and a fallback source of go-cue times). Uses ``goCue_start_time``,
+        ``reward_probabilityL/R`` and ``animal_response``; go-cue times must share the
+        ``df_events`` time base. Matched per session via ``session_id`` when present.
+    df_fip : pandas.DataFrame, optional
+        Tidy FIP measurements (single-session only); each present channel is normalised and
+        stacked above the behavior panel.
+    adjust_time : bool, optional
+        If True (default), shift time so the first event is at t = 0 (always shifted when
+        concatenating multiple sessions).
+    title : str, optional
+        Figure title.
+    smooth_factor : int, optional
+        Smoothing window for the choice / lick-count overlays, by default 5.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
+    df_events = df_events.copy()
+    if df_trials is not None:
+        df_trials = df_trials.copy()
+    if df_fip is not None:
+        df_fip = df_fip.copy()
 
     # y-layout, bottom -> top:
     #   * event rows in [0, 1]: rewards at the outer edges, licks inside (right pair near the
@@ -882,16 +936,16 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     y_main_top = params["curve_top"]
 
     # FIP channels (single-session only), normalised and stacked above the behavior panel
-    if fip_df is not None and len(sessions) == 1 and len(fip) > 0:
+    if df_fip is not None and len(sessions) == 1 and len(fip) > 0:
         fip_channels = fip
         fip_colors = {"G_1": "green", "G_2": "darkgreen", "R_1": "red", "R_2": "darkred"}
-        present = set(fip_df["event"].unique())
+        present = set(df_fip["event"].unique())
         band = 0
         for channel in fip_channels:
             if channel not in present:
                 continue
             bottom = params["curve_top"] + 0.1 + band
-            C = fip_df.query("event == @channel").copy()
+            C = df_fip.query("event == @channel").copy()
             d = C["data"].values - np.nanmin(C["data"].values)
             d = d / np.nanmax(d) + bottom
             color = fip_colors["_".join(channel.split("_")[:2])]
