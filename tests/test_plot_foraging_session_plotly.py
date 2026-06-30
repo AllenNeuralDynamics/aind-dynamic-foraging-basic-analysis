@@ -5,6 +5,8 @@ To run the test, execute "python -m unittest tests/test_plot_foraging_session_pl
 
 import os
 import unittest
+from types import SimpleNamespace
+
 
 import numpy as np
 import pandas as pd
@@ -98,15 +100,15 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
 
     def test_events_only(self):
         """Works with just an events frame (no probability band)."""
-        fig = plot_session_in_time_plotly(self.df_events)
+        nwb = SimpleNamespace(df_events=self.df_events)
+        fig = plot_session_in_time_plotly([nwb])
         self.assertIsInstance(fig, go.Figure)
         self.assertGreater(len(fig.data), 0)
 
     def test_with_trials(self):
         """Supplying df_trials adds the reward-probability band traces."""
-        fig = plot_session_in_time_plotly(
-            self.df_events, df_trials=self.df_trials, title="unit_test"
-        )
+        nwb = SimpleNamespace(df_events=self.df_events, df_trials=self.df_trials)
+        fig = plot_session_in_time_plotly([nwb], title="unit_test")
         names = [tr.name for tr in fig.data]
         self.assertIn("pR", names)
         self.assertIn("pL", names)
@@ -119,12 +121,11 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
         t2 = self.df_trials.assign(
             session_id="s2", goCue_start_time=self.df_trials["goCue_start_time"] + 100
         )
-        fig = plot_session_in_time_plotly(
-            pd.concat([e1, e2], ignore_index=True),
-            df_trials=pd.concat([t1, t2], ignore_index=True),
-        )
-        self.assertEqual(len(fig.layout.shapes), 2)  # one boundary, drawn in both panels
+        nwb1 = SimpleNamespace(df_events=e1, df_trials=t1)
+        nwb2 = SimpleNamespace(df_events=e2, df_trials=t2)
 
+        fig = plot_session_in_time_plotly([nwb1, nwb2])
+        self.assertEqual(len(fig.layout.shapes), 2)  # one boundary, drawn in both panels
 
 if __name__ == "__main__":
     unittest.main()
