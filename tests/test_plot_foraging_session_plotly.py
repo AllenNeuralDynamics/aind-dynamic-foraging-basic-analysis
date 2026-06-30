@@ -48,6 +48,10 @@ class TestPlotForagingSessionPlotly(unittest.TestCase):
 
     def test_nwb_plot(self):
         """ Tests plotting form nwb works"""
+        # Test we have df_trials
+        nwb = EmptyNWB()
+        del nwb.df_trials
+        plot_foraging_session_nwb_plotly(nwb)
 
         # Test without bias column
         choices = np.array([0, 0, 1, 1, 2, 2])
