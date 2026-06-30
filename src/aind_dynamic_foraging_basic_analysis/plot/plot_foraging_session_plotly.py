@@ -13,6 +13,7 @@ match its matplotlib sibling as closely as plotly allows:
 """
 
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -543,7 +544,7 @@ def plot_foraging_session_nwb_plotly(nwb, **kwargs):
 
 
 def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
-    nwb, fip=[], adjust_time=True, title=None, smooth_factor=5
+    nwb_list, fip=[], adjust_time=True, title=None, smooth_factor=5
 ):
     """Plotly version of :func:`plot_session_scroller.plot_session_scroller` (time-based).
 
@@ -560,7 +561,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
 
     Parameters
     ----------
-    nwb, an nwb like object that contains attributes: df_events, session_id
+    nwb_list, a list of nwb like object that contains attributes: df_events, session_id
         and optionally contains attributes fip_df, df_licks
     fip (list), FIP channels to plot. Must be present in nwb.df_fip
     adjust_time : bool, optional
@@ -575,24 +576,40 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     -------
     plotly.graph_objects.Figure
     """
-    if not hasattr(nwb, "df_events"):
-        print("computing df_events first")
-        nwb.df_events = nu.create_df_events(nwb)
-        df_events = nwb.df_events
-    else:
-        df_events = nwb.df_events
-    if hasattr(nwb, "df_fip"):
-        fip_df = nwb.df_fip
-    if hasattr(nwb, "df_licks"):
-        df_licks = nwb.df_licks
-    else:
-        df_licks = None
-    if not hasattr(nwb, "df_trials"):
-        print("computing df_trials")
-        nwb.df_trials = nu.create_df_trials(nwb)
-        df_trials = nwb.df_trials
-    else:
-        df_trials = nwb.df_trials
+    # accumulate per-session dataframes, always add session_id
+    events_acc = []
+    trials_acc = []
+    fip_acc = []
+    for i, nwb in enumerate(nwb_list):
+        # ensure df_events
+        if not hasattr(nwb, "df_events") or nwb.df_events is None:
+            nwb.df_events = nu.create_df_events(nwb)
+        df_e = nwb.df_events.copy()
+        sid = getattr(nwb, "session_id", i)
+        df_e["session_id"] = sid
+        events_acc.append(df_e)
+
+        # optional fip dataframe
+        if hasattr(nwb, "df_fip") and nwb.df_fip is not None:
+            df_f = nwb.df_fip.copy()
+            df_f["session_id"] = sid
+            fip_acc.append(df_f)
+
+        # ensure df_trials if available / computable
+        if not hasattr(nwb, "df_trials") or nwb.df_trials is None:
+            try:
+                nwb.df_trials = nu.create_df_trials(nwb)
+            except Exception:
+                nwb.df_trials = None
+        if hasattr(nwb, "df_trials") and nwb.df_trials is not None:
+            df_t = nwb.df_trials.copy()
+            df_t["session_id"] = sid
+            trials_acc.append(df_t)
+
+    # concatenate (or None if nothing present)
+    df_events = pd.concat(events_acc, ignore_index=True) if events_acc else None
+    df_trials = pd.concat(trials_acc, ignore_index=True) if trials_acc else None
+    fip_df = pd.concat(fip_acc, ignore_index=True) if fip_acc else None
 
     # y-layout, bottom -> top:
     #   * event rows in [0, 1]: rewards at the outer edges, licks inside (right pair near the
