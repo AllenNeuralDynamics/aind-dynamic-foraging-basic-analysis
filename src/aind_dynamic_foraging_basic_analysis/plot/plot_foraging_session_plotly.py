@@ -524,7 +524,7 @@ def plot_foraging_session_nwb_plotly(nwb, **kwargs):
         return
 
     if "side_bias" not in nwb.df_trials:
-        fig, axes = plot_foraging_session_plotly(
+        fig = plot_foraging_session_plotly(
             [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
             nwb.df_trials["earned_reward"].values,
             [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
@@ -533,7 +533,7 @@ def plot_foraging_session_nwb_plotly(nwb, **kwargs):
     else:
         if "plot_list" not in kwargs:
             kwargs["plot_list"] = ["choice", "reward_prob", "bias"]
-        fig, axes = plot_foraging_session_plotly(
+        fig = plot_foraging_session_plotly(
             [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
             nwb.df_trials["earned_reward"].values,
             [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
