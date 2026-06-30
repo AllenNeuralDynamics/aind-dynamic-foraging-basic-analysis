@@ -25,6 +25,7 @@ class EmptyNWB:
     """
 
     def __init__(self, df_trials=None, df_events=None):
+        """ adds df_trials and df_events"""
         self.df_trials = df_trials
         self.df_events = df_events
 
