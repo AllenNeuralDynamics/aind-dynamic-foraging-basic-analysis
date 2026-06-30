@@ -18,6 +18,7 @@ from aind_dynamic_foraging_basic_analysis import (
 )
 from tests.nwb_io import get_history_from_nwb
 
+
 class EmptyNWB:
     """
     Just an empty class for saving attributes to
@@ -44,7 +45,6 @@ class TestPlotForagingSessionPlotly(unittest.TestCase):
             _,
         ) = get_history_from_nwb(nwb_file)
 
-
     def test_nwb_plot(self):
         """ Tests plotting form nwb works"""
 
@@ -60,7 +60,7 @@ class TestPlotForagingSessionPlotly(unittest.TestCase):
         df["reward_probabilityR"] = pR
         df["auto_waterL"] = [0] * 6
         df["auto_waterR"] = [0] * 6
-        nwb = EmptyNWB(df_trials = df)
+        nwb = EmptyNWB(df_trials=df)
         nwb.session_id = "test"
         plot_foraging_session_nwb_plotly(nwb)
 
@@ -141,7 +141,7 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
 
     def test_events_only(self):
         """Works with just an events frame (no probability band)."""
-        nwb = EmptyNWB(df_events = self.df_events)
+        nwb = EmptyNWB(df_events=self.df_events)
         fig = plot_session_in_time_plotly([nwb])
         self.assertIsInstance(fig, go.Figure)
         self.assertGreater(len(fig.data), 0)

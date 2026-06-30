@@ -544,6 +544,8 @@ def plot_foraging_session_nwb_plotly(nwb, **kwargs):
             **kwargs,
         )
 
+    return fig
+
 
 def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     nwb_list, fip=[], adjust_time=True, title=None, smooth_factor=5
