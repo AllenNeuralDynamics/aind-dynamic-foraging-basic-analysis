@@ -349,7 +349,7 @@ def get_average_signal_window(
     if output_col is None:
         output_col = (
             f"{data_column}_{channel}_{offsets[0]}_"
-            f"{offsets[1]}_{alignment_event.replace('_in_session','')}"
+            f"{offsets[1]}_{alignment_event.replace('_in_session', '')}"
         )
 
     # copy df_trials, drops na values, sort trial by alignment event

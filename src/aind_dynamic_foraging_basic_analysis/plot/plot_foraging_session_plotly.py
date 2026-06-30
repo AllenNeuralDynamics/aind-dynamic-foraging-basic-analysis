@@ -23,6 +23,8 @@ from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
 )
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import moving_average
 from aind_dynamic_foraging_basic_analysis.plot.style import PHOTOSTIM_EPOCH_MAPPING
+from aind_dynamic_foraging_data_utils import nwb_utils as nu
+
 
 # Map the matplotlib single-letter colors used by the matplotlib versions to plotly names,
 # so the two renderings line up. Anything not listed is passed through unchanged.
@@ -752,17 +754,17 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                     moving_average(~np.isnan(choice), smooth_factor) + 1e-6
                 )
                 sm[sm > 100] = np.nan
-                xsm = gc[off_s : off_s + len(sm)]
+                xsm = gc[off_s: off_s + len(sm)]
                 choice_x += [*xsm, None]
                 choice_y += [*_to_curve(sm[: len(xsm)]), None]
             lt = np.concatenate([_ev("left_lick_time"), _ev("right_lick_time")])
             if len(lt):
-                counts = np.bincount(_trial_of(lt), minlength=n_tr + 1)[1 : n_tr + 1]
+                counts = np.bincount(_trial_of(lt), minlength=n_tr + 1)[1: n_tr + 1]
                 sm = moving_average(counts.astype(float), smooth_factor)
                 top = np.nanmax(sm) if len(sm) else 0
                 if top > 0:
                     sm = sm / top
-                xsm = gc[off_s : off_s + len(sm)]
+                xsm = gc[off_s: off_s + len(sm)]
                 lick_x += [*xsm, None]
                 lick_y += [*_to_curve(sm[: len(xsm)]), None]
 

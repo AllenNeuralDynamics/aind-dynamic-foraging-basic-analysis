@@ -127,5 +127,6 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
         fig = plot_session_in_time_plotly([nwb1, nwb2])
         self.assertEqual(len(fig.layout.shapes), 2)  # one boundary, drawn in both panels
 
+
 if __name__ == "__main__":
     unittest.main()
