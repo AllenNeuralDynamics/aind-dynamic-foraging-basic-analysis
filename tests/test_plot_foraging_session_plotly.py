@@ -116,8 +116,9 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
         e1 = self.df_events.assign(session_id="s1")
         e2 = self.df_events.assign(session_id="s2", timestamps=self.df_events["timestamps"] + 100)
         t1 = self.df_trials.assign(session_id="s1")
-        t2 = self.df_trials.assign(session_id="s2",
-                                   goCue_start_time=self.df_trials["goCue_start_time"] + 100)
+        t2 = self.df_trials.assign(
+            session_id="s2", goCue_start_time=self.df_trials["goCue_start_time"] + 100
+        )
         fig = plot_session_in_time_plotly(
             pd.concat([e1, e2], ignore_index=True),
             df_trials=pd.concat([t1, t2], ignore_index=True),
