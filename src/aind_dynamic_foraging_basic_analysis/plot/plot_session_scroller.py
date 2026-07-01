@@ -445,7 +445,7 @@ def plot_session_scroller(  # noqa: C901 pragma: no cover
     return fig, ax
 
 
-def plot_metric(df_trials, go_cue_times, metric, ax):
+def plot_metric(df_trials, go_cue_times, metric, ax):  # pragma: no cover
     """
     Plots a metric from df_trials
 
@@ -505,7 +505,7 @@ def plot_metric(df_trials, go_cue_times, metric, ax):
     ax.set_ylabel(ylabel, fontsize=12)
 
 
-def plot_fip(fip_df, channel, ax):
+def plot_fip(fip_df, channel, ax):  # pragma: no cover
     """
     Plot an FIP channel
     """
@@ -534,7 +534,7 @@ def plot_fip(fip_df, channel, ax):
     ax.axhline(0, color="k", linewidth=0.5, alpha=0.25)
 
 
-def get_fip_color(channel):
+def get_fip_color(channel):  # pragma: no cover
     """
     Gets the color for FIP
     if the channel is defined in style.FIP_COLORS, use that
@@ -548,4 +548,4 @@ def get_fip_color(channel):
     if root in FIP_COLORS:
         return FIP_COLORS.get(root)
 
-    return "k"
+    return "black"

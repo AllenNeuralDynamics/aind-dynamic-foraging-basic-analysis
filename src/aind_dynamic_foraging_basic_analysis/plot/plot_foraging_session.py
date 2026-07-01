@@ -66,7 +66,8 @@ def plot_foraging_session_nwb(nwb, **kwargs):
         0,
         1.05,
         f"{nwb.session_id}\n"
-        f'Total trials {len(nwb.df_trials)}, ignored {np.sum(nwb.df_trials["animal_response"]==2)},'
+        f'Total trials {len(nwb.df_trials)},' +
+        'ignored {np.sum(nwb.df_trials["animal_response"] == 2)},'
         f' left {np.sum(nwb.df_trials["animal_response"] == 0)},'
         f' right {np.sum(nwb.df_trials["animal_response"] == 1)}',
         fontsize=8,

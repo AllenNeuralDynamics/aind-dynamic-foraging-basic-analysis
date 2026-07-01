@@ -6,15 +6,30 @@ To run the test, execute "python -m unittest tests/test_plot_foraging_session_pl
 import os
 import unittest
 
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
 from aind_dynamic_foraging_basic_analysis import (
     plot_foraging_session_plotly,
+    plot_foraging_session_nwb_plotly,
     plot_session_in_time_plotly,
+    plot_session_in_time_nwb_plotly,
+
 )
 from tests.nwb_io import get_history_from_nwb
+
+
+class EmptyNWB:
+    """
+    Just an empty class for saving attributes to
+    """
+
+    def __init__(self, df_trials=None, df_events=None):
+        """ adds df_trials and df_events"""
+        self.df_trials = df_trials
+        self.df_events = df_events
 
 
 class TestPlotForagingSessionPlotly(unittest.TestCase):
@@ -32,6 +47,41 @@ class TestPlotForagingSessionPlotly(unittest.TestCase):
             cls.autowater_offered,
             _,
         ) = get_history_from_nwb(nwb_file)
+
+    def test_nwb_plot(self):
+        """ Tests plotting form nwb works"""
+        # Test we have df_trials
+        nwb = EmptyNWB()
+        del nwb.df_trials
+        plot_foraging_session_nwb_plotly(nwb)
+
+        # Test without bias column
+        choices = np.array([0, 0, 1, 1, 2, 2])
+        rewards = np.array([True, False, True, False, False, False])
+        pL = [0.1] * 6
+        pR = [0.8] * 6
+        df = pd.DataFrame()
+        df["animal_response"] = choices
+        df["earned_reward"] = rewards
+        df["reward_probabilityL"] = pL
+        df["reward_probabilityR"] = pR
+        df["auto_waterL"] = [0] * 6
+        df["auto_waterR"] = [0] * 6
+        nwb = EmptyNWB(df_trials=df)
+        nwb.session_id = "test"
+        plot_foraging_session_nwb_plotly(nwb)
+
+        # Test with bias column
+        nwb.df_trials["side_bias"] = np.array([0, 0, 0.1, 0.1, 0.05, 0.05])
+        nwb.df_trials["side_bias_confidence_interval"] = [
+            [-1, 1],
+            [-1, 1],
+            [-1, 1],
+            [-1, 1],
+            [-1, 1],
+            [-1, 1],
+        ]
+        plot_foraging_session_nwb_plotly(nwb)
 
     def test_returns_figure(self):
         """A plotly Figure is returned with both panels populated."""
@@ -102,11 +152,23 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
         self.assertIsInstance(fig, go.Figure)
         self.assertGreater(len(fig.data), 0)
 
+        # nwb version
+        nwb = EmptyNWB(df_events=self.df_events)
+        fig = plot_session_in_time_nwb_plotly([nwb])
+        self.assertIsInstance(fig, go.Figure)
+        self.assertGreater(len(fig.data), 0)
+
     def test_with_trials(self):
         """Supplying df_trials adds the reward-probability band traces."""
         fig = plot_session_in_time_plotly(
             self.df_events, df_trials=self.df_trials, title="unit_test"
         )
+        names = [tr.name for tr in fig.data]
+        self.assertIn("pR", names)
+        self.assertIn("pL", names)
+        # nwb version
+        nwb = EmptyNWB(df_events=self.df_events, df_trials=self.df_trials)
+        fig = plot_session_in_time_nwb_plotly([nwb], title="unit_test")
         names = [tr.name for tr in fig.data]
         self.assertIn("pR", names)
         self.assertIn("pL", names)
@@ -116,12 +178,19 @@ class TestPlotSessionInTimePlotly(unittest.TestCase):
         e1 = self.df_events.assign(session_id="s1")
         e2 = self.df_events.assign(session_id="s2", timestamps=self.df_events["timestamps"] + 100)
         t1 = self.df_trials.assign(session_id="s1")
-        t2 = self.df_trials.assign(session_id="s2",
-                                   goCue_start_time=self.df_trials["goCue_start_time"] + 100)
+        t2 = self.df_trials.assign(
+            session_id="s2", goCue_start_time=self.df_trials["goCue_start_time"] + 100
+        )
         fig = plot_session_in_time_plotly(
             pd.concat([e1, e2], ignore_index=True),
             df_trials=pd.concat([t1, t2], ignore_index=True),
         )
+        self.assertEqual(len(fig.layout.shapes), 2)  # one boundary, drawn in both panels
+
+        # nwb version
+        nwb1 = EmptyNWB(df_events=e1, df_trials=t1)
+        nwb2 = EmptyNWB(df_events=e2, df_trials=t2)
+        fig = plot_session_in_time_nwb_plotly([nwb1, nwb2])
         self.assertEqual(len(fig.layout.shapes), 2)  # one boundary, drawn in both panels
 
 

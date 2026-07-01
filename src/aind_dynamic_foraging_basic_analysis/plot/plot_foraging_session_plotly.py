@@ -13,6 +13,7 @@ match its matplotlib sibling as closely as plotly allows:
 """
 
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -21,7 +22,10 @@ from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
     PhotostimData,
 )
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import moving_average
+from aind_dynamic_foraging_basic_analysis.plot.plot_session_scroller import get_fip_color
 from aind_dynamic_foraging_basic_analysis.plot.style import PHOTOSTIM_EPOCH_MAPPING
+from aind_dynamic_foraging_data_utils import nwb_utils as nu
+
 
 # Map the matplotlib single-letter colors used by the matplotlib versions to plotly names,
 # so the two renderings line up. Anything not listed is passed through unchanged.
@@ -235,53 +239,95 @@ def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
     # Rewarded (real foraging, autowater excluded): tall black ticks just outside [0, 1]
     xs, ys, cd = _raster(rewarded_excluding_autowater, (1.05, 1.15), (-0.15, -0.05))
     fig.add_trace(
-        go.Scattergl(x=xs, y=ys, customdata=cd, mode="lines", line=dict(color="black", width=1),
-                     name="Rewarded choices", hovertemplate=hovertemplate % "Rewarded choices"),
-        row=1, col=1,
+        go.Scattergl(
+            x=xs,
+            y=ys,
+            customdata=cd,
+            mode="lines",
+            line=dict(color="black", width=1),
+            name="Rewarded choices",
+            hovertemplate=hovertemplate % "Rewarded choices",
+        ),
+        row=1,
+        col=1,
     )
 
     # Unrewarded (real foraging): short gray ticks
     xs, ys, cd = _raster(unrewarded_trials, (1.05, 1.10), (-0.10, -0.05))
     fig.add_trace(
-        go.Scattergl(x=xs, y=ys, customdata=cd, mode="lines", line=dict(color="gray", width=1),
-                     name="Unrewarded choices", hovertemplate=hovertemplate % "Unrewarded choices"),
-        row=1, col=1,
+        go.Scattergl(
+            x=xs,
+            y=ys,
+            customdata=cd,
+            mode="lines",
+            line=dict(color="gray", width=1),
+            name="Unrewarded choices",
+            hovertemplate=hovertemplate % "Unrewarded choices",
+        ),
+        row=1,
+        col=1,
     )
 
     # Ignored trials: red x at the top
     xx, cd = _markers(ignored & ~autowater_ignored)
     fig.add_trace(
-        go.Scattergl(x=xx, y=[1.2] * len(xx), customdata=cd, mode="markers",
-                     marker=dict(symbol="x", color="red", size=4), name="Ignored",
-                     hovertemplate=hovertemplate % "Ignored"),
-        row=1, col=1,
+        go.Scattergl(
+            x=xx,
+            y=[1.2] * len(xx),
+            customdata=cd,
+            mode="markers",
+            marker=dict(symbol="x", color="red", size=4),
+            name="Ignored",
+            hovertemplate=hovertemplate % "Ignored",
+        ),
+        row=1,
+        col=1,
     )
 
     # Autowater collected / ignored
     if autowater_offered is not None:
         xs, ys, cd = _raster(autowater_collected, (1.05, 1.15), (-0.15, -0.05))
         fig.add_trace(
-            go.Scattergl(x=xs, y=ys, customdata=cd, mode="lines",
-                         line=dict(color="royalblue", width=1), name="Autowater collected",
-                         hovertemplate=hovertemplate % "Autowater collected"),
-            row=1, col=1,
+            go.Scattergl(
+                x=xs,
+                y=ys,
+                customdata=cd,
+                mode="lines",
+                line=dict(color="royalblue", width=1),
+                name="Autowater collected",
+                hovertemplate=hovertemplate % "Autowater collected",
+            ),
+            row=1,
+            col=1,
         )
         xx, cd = _markers(autowater_ignored)
         fig.add_trace(
-            go.Scattergl(x=xx, y=[1.2] * len(xx), customdata=cd, mode="markers",
-                         marker=dict(symbol="x", color="royalblue", size=4),
-                         name="Autowater ignored",
-                         hovertemplate=hovertemplate % "Autowater ignored"),
-            row=1, col=1,
+            go.Scattergl(
+                x=xx,
+                y=[1.2] * len(xx),
+                customdata=cd,
+                mode="markers",
+                marker=dict(symbol="x", color="royalblue", size=4),
+                name="Autowater ignored",
+                hovertemplate=hovertemplate % "Autowater ignored",
+            ),
+            row=1,
+            col=1,
         )
 
     # Base reward probability (broken at session boundaries)
     if "reward_prob" in plot_list:
         xs, ys = _broken(np.arange(n_trials) + 1, p_reward_fraction, segments)
         fig.add_trace(
-            go.Scattergl(x=xs, y=ys, mode="lines",
-                         line=dict(color=_color(base_color), width=1.5), name="Base rew. prob."),
-            row=1, col=1,
+            go.Scattergl(
+                x=xs,
+                y=ys,
+                mode="lines",
+                line=dict(color=_color(base_color), width=1.5),
+                name="Base rew. prob.",
+            ),
+            row=1,
+            col=1,
         )
 
     def _smoothed_trace(num, den):
@@ -300,18 +346,30 @@ def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
     if "choice" in plot_list:
         xs, ys = _smoothed_trace(choice_history, ~np.isnan(choice_history))
         fig.add_trace(
-            go.Scattergl(x=xs, y=ys, mode="lines", line=dict(color="black", width=1.5),
-                         name=f"Choice (smooth = {smooth_factor})"),
-            row=1, col=1,
+            go.Scattergl(
+                x=xs,
+                y=ys,
+                mode="lines",
+                line=dict(color="black", width=1.5),
+                name=f"Choice (smooth = {smooth_factor})",
+            ),
+            row=1,
+            col=1,
         )
 
     # Finished ratio (only meaningful if there are ignored trials)
     if "finished" in plot_list and np.sum(np.isnan(choice_history)):
         xs, ys = _smoothed_trace(~np.isnan(choice_history), None)
         fig.add_trace(
-            go.Scattergl(x=xs, y=ys, mode="lines", line=dict(color="magenta", width=0.8),
-                         name=f"Finished (smooth = {smooth_factor})"),
-            row=1, col=1,
+            go.Scattergl(
+                x=xs,
+                y=ys,
+                mode="lines",
+                line=dict(color="magenta", width=0.8),
+                name=f"Finished (smooth = {smooth_factor})",
+            ),
+            row=1,
+            col=1,
         )
 
     # Bias trace + confidence band (broken at session boundaries)
@@ -325,20 +383,37 @@ def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
         xb, y_bias = _broken(xx, bias, segments)
         # go.Scatter (not Scattergl) for the filled band -- Scattergl ignores fill.
         fig.add_trace(
-            go.Scatter(x=xb_up, y=y_up, mode="lines", line=dict(width=0),
-                       showlegend=False, hoverinfo="skip"),
-            row=1, col=1,
+            go.Scatter(
+                x=xb_up,
+                y=y_up,
+                mode="lines",
+                line=dict(width=0),
+                showlegend=False,
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
         )
         fig.add_trace(
-            go.Scatter(x=xb_lo, y=y_lo, mode="lines", line=dict(width=0),
-                       fill="tonexty", fillcolor="rgba(0,128,0,0.25)",
-                       showlegend=False, hoverinfo="skip"),
-            row=1, col=1,
+            go.Scatter(
+                x=xb_lo,
+                y=y_lo,
+                mode="lines",
+                line=dict(width=0),
+                fill="tonexty",
+                fillcolor="rgba(0,128,0,0.25)",
+                showlegend=False,
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
         )
         fig.add_trace(
-            go.Scattergl(x=xb, y=y_bias, mode="lines", line=dict(color="green", width=1.5),
-                         name="bias"),
-            row=1, col=1,
+            go.Scattergl(
+                x=xb, y=y_bias, mode="lines", line=dict(color="green", width=1.5), name="bias"
+            ),
+            row=1,
+            col=1,
         )
 
     # Valid (engaged) range
@@ -349,9 +424,15 @@ def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
     # Fitted model overlay
     if fitted_data is not None:
         fig.add_trace(
-            go.Scattergl(x=np.arange(n_trials), y=fitted_data, mode="lines",
-                         line=dict(width=1.5), name="model"),
-            row=1, col=1,
+            go.Scattergl(
+                x=np.arange(n_trials),
+                y=fitted_data,
+                mode="lines",
+                line=dict(width=1.5),
+                name="model",
+            ),
+            row=1,
+            col=1,
         )
 
     # Photostim markers
@@ -363,27 +444,35 @@ def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
         else:
             colors = "darkcyan"
         fig.add_trace(
-            go.Scattergl(x=trial, y=np.ones_like(trial, dtype=float) + 0.4, mode="markers",
-                         marker=dict(symbol="triangle-down", size=power * 2,
-                                     color="rgba(0,0,0,0)",
-                                     line=dict(color=colors, width=0.5)),
-                         name="photostim"),
-            row=1, col=1,
+            go.Scattergl(
+                x=trial,
+                y=np.ones_like(trial, dtype=float) + 0.4,
+                mode="markers",
+                marker=dict(
+                    symbol="triangle-down",
+                    size=power * 2,
+                    color="rgba(0,0,0,0)",
+                    line=dict(color=colors, width=0.5),
+                ),
+                name="photostim",
+            ),
+            row=1,
+            col=1,
         )
 
     # == Reward schedule (bottom panel; broken at session boundaries) ==
     xx = np.arange(n_trials) + 1
     xr, y_pr = _broken(xx, p_reward[1, :], segments)
     fig.add_trace(
-        go.Scattergl(x=xr, y=y_pr, mode="lines", line=dict(color="blue", width=1),
-                     name="p_right"),
-        row=2, col=1,
+        go.Scattergl(x=xr, y=y_pr, mode="lines", line=dict(color="blue", width=1), name="p_right"),
+        row=2,
+        col=1,
     )
     xl, y_pl = _broken(xx, p_reward[0, :], segments)
     fig.add_trace(
-        go.Scattergl(x=xl, y=y_pl, mode="lines", line=dict(color="red", width=1),
-                     name="p_left"),
-        row=2, col=1,
+        go.Scattergl(x=xl, y=y_pl, mode="lines", line=dict(color="red", width=1), name="p_left"),
+        row=2,
+        col=1,
     )
 
     # Thick vertical lines marking session boundaries (between trials b and b+1)
@@ -393,14 +482,19 @@ def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
 
     # Axes styling to match the matplotlib version
     fig.update_yaxes(
-        tickvals=[0, 1, 1.2], ticktext=["Left", "Right", "Ignored"],
-        range=[-0.15, 1.25], fixedrange=True, row=1, col=1,
+        tickvals=[0, 1, 1.2],
+        ticktext=["Left", "Right", "Ignored"],
+        range=[-0.15, 1.25],
+        fixedrange=True,
+        row=1,
+        col=1,
     )
     fig.update_yaxes(title_text="p_reward", range=[0, 1], fixedrange=True, row=2, col=1)
     # Bottom x-axis: a rangeslider scroller (drag to pan/zoom), and -- for multiple sessions --
     # tick labels that restart at 0 each session.
-    fig.update_xaxes(title_text="Trial number", row=2, col=1,
-                     rangeslider=dict(visible=True, thickness=0.08))
+    fig.update_xaxes(
+        title_text="Trial number", row=2, col=1, rangeslider=dict(visible=True, thickness=0.08)
+    )
     if len(segments) > 1:
         step = 250
         tickvals, ticktext = [], []
@@ -410,16 +504,126 @@ def plot_foraging_session_plotly(  # noqa: C901 pragma: no cover
                 ticktext.append(str(w))
         fig.update_xaxes(tickvals=tickvals, ticktext=ticktext, row=2, col=1)
     fig.update_layout(
-        width=1000, height=460, template="simple_white",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                    font=dict(size=9)),
+        width=1000,
+        height=460,
+        template="simple_white",
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(size=9)
+        ),
         margin=dict(l=60, r=20, t=90, b=50),
     )
     return fig
 
 
+def plot_foraging_session_nwb_plotly(nwb, **kwargs):
+    """
+    Wrapper function that extracts fields
+    """
+
+    if not hasattr(nwb, "df_trials"):
+        print("You need to compute df_trials: nwb_utils.create_trials_df(nwb)")
+        return
+
+    if "side_bias" not in nwb.df_trials:
+        fig = plot_foraging_session_plotly(
+            [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
+            nwb.df_trials["earned_reward"].values,
+            [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
+            **kwargs,
+        )
+    else:
+        if "plot_list" not in kwargs:
+            kwargs["plot_list"] = ["choice", "reward_prob", "bias"]
+        fig = plot_foraging_session_plotly(
+            [np.nan if x == 2 else x for x in nwb.df_trials["animal_response"].values],
+            nwb.df_trials["earned_reward"].values,
+            [nwb.df_trials["reward_probabilityL"], nwb.df_trials["reward_probabilityR"]],
+            bias=nwb.df_trials["side_bias"].values,
+            bias_lower=[x[0] for x in nwb.df_trials["side_bias_confidence_interval"].values],
+            bias_upper=[x[1] for x in nwb.df_trials["side_bias_confidence_interval"].values],
+            autowater_offered=nwb.df_trials[["auto_waterL", "auto_waterR"]].any(axis=1),
+            **kwargs,
+        )
+
+    return fig
+
+
+def plot_session_in_time_nwb_plotly(  # noqa: C901 pragma: no cover
+    nwb_list, fip=[], adjust_time=True, title=None, smooth_factor=5
+):
+    """Plotly version of :func:`plot_session_scroller.plot_session_scroller` (time-based).
+
+    Plots the session in real time (not in trial): left / right licks and rewards as ticks,
+    go cues as vertical lines (red for ignored trials), smoothed overlays above the events,
+    and -- when ``df_trials`` is supplied -- the left / right reward-probability band in the
+    rangeslider "scroller" below.
+
+    Multiple sessions: if ``df_events`` has a ``session_id`` column with more than one
+    session, the sessions are concatenated end-to-end along time in order of appearance
+    (each restarted at the running offset); a thick vertical line marks each boundary and
+    per-trial / smoothed quantities reset per session. ``df_trials`` is matched per session
+    by its own ``session_id`` column when present.
+
+    Parameters
+    ----------
+    nwb_list, a list of nwb like object that contains attributes: df_events, session_id
+        and optionally contains attributes df_fip, df_licks
+    fip (list), FIP channels to plot. Must be present in nwb.df_fip
+    adjust_time : bool, optional
+        If True (default), shift time so the first event is at t = 0 (always shifted when
+        concatenating multiple sessions).
+    title : str, optional
+        Figure title.
+    smooth_factor : int, optional
+        Smoothing window for the choice / lick-count overlays, by default 5.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
+    # accumulate per-session dataframes, always add session_id
+    events_acc = []
+    trials_acc = []
+    fip_acc = []
+    for i, nwb in enumerate(nwb_list):
+        # ensure df_events
+        if not hasattr(nwb, "df_events") or nwb.df_events is None:
+            nwb.df_events = nu.create_df_events(nwb)
+        df_e = nwb.df_events.copy()
+        sid = getattr(nwb, "session_id", i)
+        df_e["session_id"] = sid
+        events_acc.append(df_e)
+
+        # optional fip dataframe
+        if hasattr(nwb, "df_fip") and nwb.df_fip is not None:
+            df_f = nwb.df_fip.copy()
+            df_f["session_id"] = sid
+            fip_acc.append(df_f)
+
+        # ensure df_trials if available / computable
+        if not hasattr(nwb, "df_trials") or nwb.df_trials is None:
+            try:
+                nwb.df_trials = nu.create_df_trials(nwb)
+            except Exception:
+                nwb.df_trials = None
+        if hasattr(nwb, "df_trials") and nwb.df_trials is not None:
+            df_t = nwb.df_trials.copy()
+            df_t["session_id"] = sid
+            trials_acc.append(df_t)
+
+    # concatenate (or None if nothing present)
+    df_events = pd.concat(events_acc, ignore_index=True) if events_acc else None
+    df_trials = pd.concat(trials_acc, ignore_index=True) if trials_acc else None
+    df_fip = pd.concat(fip_acc, ignore_index=True) if fip_acc else None
+
+    return plot_session_in_time_plotly(
+        df_events, df_trials, df_fip, fip=fip,
+        adjust_time=adjust_time, title=title, smooth_factor=smooth_factor
+    )
+
+
 def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
-    df_events, df_trials=None, fip_df=None, adjust_time=True, title=None, smooth_factor=5
+    df_events, df_trials=None, df_fip=None, fip=[], adjust_time=True, title=None, smooth_factor=5
 ):
     """Plotly version of :func:`plot_session_scroller.plot_session_scroller` (time-based).
 
@@ -445,7 +649,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         (and a fallback source of go-cue times). Uses ``goCue_start_time``,
         ``reward_probabilityL/R`` and ``animal_response``; go-cue times must share the
         ``df_events`` time base. Matched per session via ``session_id`` when present.
-    fip_df : pandas.DataFrame, optional
+    df_fip : pandas.DataFrame, optional
         Tidy FIP measurements (single-session only); each present channel is normalised and
         stacked above the behavior panel.
     adjust_time : bool, optional
@@ -463,8 +667,8 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     df_events = df_events.copy()
     if df_trials is not None:
         df_trials = df_trials.copy()
-    if fip_df is not None:
-        fip_df = fip_df.copy()
+    if df_fip is not None:
+        df_fip = df_fip.copy()
 
     # y-layout, bottom -> top:
     #   * event rows in [0, 1]: rewards at the outer edges, licks inside (right pair near the
@@ -472,11 +676,12 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     #   * smoothed overlays in their own band [curve_bottom, curve_top] above the events.
     #   * the reward-probability band sits higher still -- it only shows in the rangeslider.
     params = {
-        "behavior_bottom": 0.0, "behavior_top": 1.0,  # event rows (row 1)
-        "curve_bottom": 1.1, "curve_top": 2.1,        # smoothed overlays (row 1)
+        "behavior_bottom": 0.0,
+        "behavior_top": 1.0,  # event rows (row 1)
+        "curve_bottom": 1.1,
+        "curve_top": 2.1,  # smoothed overlays (row 1)
     }
-    row_centers = {"right_reward": 0.92, "right_lick": 0.78,
-                   "left_lick": 0.22, "left_reward": 0.08}
+    row_centers = {"right_reward": 0.92, "right_lick": 0.78, "left_lick": 0.22, "left_reward": 0.08}
     tick_half = 0.25 * 0.30 / 2.0
 
     def _to_curve(v):
@@ -484,20 +689,27 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         span = params["curve_top"] - params["curve_bottom"]
         return params["curve_bottom"] + np.asarray(v, dtype=float) * span
 
-    yticks = [0.92, 0.78, 0.22, 0.08,
-              params["curve_bottom"], (params["curve_bottom"] + params["curve_top"]) / 2,
-              params["curve_top"]]
+    yticks = [
+        0.92,
+        0.78,
+        0.22,
+        0.08,
+        params["curve_bottom"],
+        (params["curve_bottom"] + params["curve_top"]) / 2,
+        params["curve_top"],
+    ]
     ylabels = ["right reward", "right lick", "left lick", "left reward", "0", "0.5", "1"]
 
     # Sessions in order of appearance; concatenate end-to-end along time when more than one.
     has_sess = "session_id" in df_events.columns
-    sessions = (list(dict.fromkeys(df_events["session_id"].tolist())) if has_sess else [None])
+    sessions = list(dict.fromkeys(df_events["session_id"].tolist())) if has_sess else [None]
     shift_each = adjust_time or len(sessions) > 1
 
     # Same two-panel layout as the trial-based figure: the raster/curves on top (row 1) over a
     # reward-schedule panel (row 2), with a rangeslider scroller under row 2.
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                        row_heights=[0.85, 0.15], vertical_spacing=0.04)
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, row_heights=[0.85, 0.15], vertical_spacing=0.04
+    )
 
     ev_meta = {
         "left_lick": ("left_lick_time", "gray", 1.5, "left lick"),
@@ -506,8 +718,10 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         "right_reward": ("right_reward_delivery_time", "black", 2, "right reward"),
     }
     ev_acc = {k: {"x": [], "y": [], "cd": []} for k in ev_meta}
-    gocue_acc = {"go cue": {"x": [], "y": [], "cd": []},
-                 "go cue (ignored)": {"x": [], "y": [], "cd": []}}
+    gocue_acc = {
+        "go cue": {"x": [], "y": [], "cd": []},
+        "go cue (ignored)": {"x": [], "y": [], "cd": []},
+    }
     frac_x, frac_y, choice_x, choice_y, lick_x, lick_y = [], [], [], [], [], []
     probL_x, probL_y, probR_x, probR_y = [], [], [], []  # reward-prob lines (scroller)
     boundaries, sess_spans, has_prob = [], [], False
@@ -530,8 +744,11 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
 
         tr_s = None
         if df_trials is not None:
-            tr_s = (df_trials[df_trials["session_id"] == sess]
-                    if (sess is not None and "session_id" in df_trials.columns) else df_trials)
+            tr_s = (
+                df_trials[df_trials["session_id"] == sess]
+                if (sess is not None and "session_id" in df_trials.columns)
+                else df_trials
+            )
 
         gc = _ev("goCue_start_time")
         if len(gc) == 0 and tr_s is not None and "goCue_start_time" in tr_s.columns:
@@ -570,8 +787,13 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             for gname, mask in [("go cue", ~ign), ("go cue (ignored)", ign)]:
                 if mask.any():
                     hov = [(int(tr), sess_disp) for tr in trial_no[mask]]
-                    xs, ys, cd = _vline_hover(gc[mask], params["behavior_bottom"],
-                                              params["behavior_top"], hov, gap=(None, None))
+                    xs, ys, cd = _vline_hover(
+                        gc[mask],
+                        params["behavior_bottom"],
+                        params["behavior_top"],
+                        hov,
+                        gap=(None, None),
+                    )
                     gocue_acc[gname]["x"] += xs
                     gocue_acc[gname]["y"] += ys
                     gocue_acc[gname]["cd"] += cd
@@ -586,14 +808,15 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                 frac_y += [*_to_curve(frac), None]
             if choice is not None:
                 sm = moving_average(choice, smooth_factor) / (
-                    moving_average(~np.isnan(choice), smooth_factor) + 1e-6)
+                    moving_average(~np.isnan(choice), smooth_factor) + 1e-6
+                )
                 sm[sm > 100] = np.nan
                 xsm = gc[off_s: off_s + len(sm)]
                 choice_x += [*xsm, None]
                 choice_y += [*_to_curve(sm[: len(xsm)]), None]
             lt = np.concatenate([_ev("left_lick_time"), _ev("right_lick_time")])
             if len(lt):
-                counts = np.bincount(_trial_of(lt), minlength=n_tr + 1)[1:n_tr + 1]
+                counts = np.bincount(_trial_of(lt), minlength=n_tr + 1)[1: n_tr + 1]
                 sm = moving_average(counts.astype(float), smooth_factor)
                 top = np.nanmax(sm) if len(sm) else 0
                 if top > 0:
@@ -604,8 +827,12 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
 
         # Reward-probability schedule (pL red, pR blue), drawn as 0..1 lines in the bottom
         # panel just like the trial-based figure; broken at session boundaries.
-        if (tr_s is not None and n_tr and len(tr_s) == n_tr
-                and {"reward_probabilityL", "reward_probabilityR"} <= set(tr_s.columns)):
+        if (
+            tr_s is not None
+            and n_tr
+            and len(tr_s) == n_tr
+            and {"reward_probabilityL", "reward_probabilityR"} <= set(tr_s.columns)
+        ):
             has_prob = True
             probL_x += [*gc, None]
             probL_y += [*tr_s["reward_probabilityL"].to_numpy(), None]
@@ -621,58 +848,118 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     ht = "%%{x:.2f}s<br>trial %%{customdata[0]}<br>session %%{customdata[1]}<extra>%s</extra>"
     for key, (name, color, width, label) in ev_meta.items():
         a = ev_acc[key]
-        fig.add_trace(go.Scattergl(
-            x=a["x"], y=a["y"], customdata=a["cd"], mode="lines",
-            line=dict(color=color, width=width), name=label, hovertemplate=ht % label),
-            row=1, col=1)
+        fig.add_trace(
+            go.Scattergl(
+                x=a["x"],
+                y=a["y"],
+                customdata=a["cd"],
+                mode="lines",
+                line=dict(color=color, width=width),
+                name=label,
+                hovertemplate=ht % label,
+            ),
+            row=1,
+            col=1,
+        )
 
     for gname, gcolor in [("go cue", "green"), ("go cue (ignored)", "red")]:
         a = gocue_acc[gname]
         if a["x"]:
-            fig.add_trace(go.Scattergl(
-                x=a["x"], y=a["y"], customdata=a["cd"], mode="lines",
-                line=dict(color=gcolor, width=0.75), opacity=0.75, name=gname,
-                hovertemplate=ht % gname), row=1, col=1)
+            fig.add_trace(
+                go.Scattergl(
+                    x=a["x"],
+                    y=a["y"],
+                    customdata=a["cd"],
+                    mode="lines",
+                    line=dict(color=gcolor, width=0.75),
+                    opacity=0.75,
+                    name=gname,
+                    hovertemplate=ht % gname,
+                ),
+                row=1,
+                col=1,
+            )
 
     if frac_x:
-        fig.add_trace(go.Scattergl(x=frac_x, y=frac_y, mode="lines",
-                                   line=dict(color="gold", width=1.5), name="pR/(pL+pR)"),
-                      row=1, col=1)
+        fig.add_trace(
+            go.Scattergl(
+                x=frac_x,
+                y=frac_y,
+                mode="lines",
+                line=dict(color="gold", width=1.5),
+                name="pR/(pL+pR)",
+            ),
+            row=1,
+            col=1,
+        )
     if choice_x:
-        fig.add_trace(go.Scattergl(x=choice_x, y=choice_y, mode="lines",
-                                   line=dict(color="black", width=1.5),
-                                   name=f"choice (smooth = {smooth_factor})"), row=1, col=1)
+        fig.add_trace(
+            go.Scattergl(
+                x=choice_x,
+                y=choice_y,
+                mode="lines",
+                line=dict(color="black", width=1.5),
+                name=f"choice (smooth = {smooth_factor})",
+            ),
+            row=1,
+            col=1,
+        )
     if lick_x:
-        fig.add_trace(go.Scattergl(x=lick_x, y=lick_y, mode="lines",
-                                   line=dict(color="black", width=1.2, dash="dash"),
-                                   name=f"lick count (smooth = {smooth_factor})"), row=1, col=1)
+        fig.add_trace(
+            go.Scattergl(
+                x=lick_x,
+                y=lick_y,
+                mode="lines",
+                line=dict(color="black", width=1.2, dash="dash"),
+                name=f"lick count (smooth = {smooth_factor})",
+            ),
+            row=1,
+            col=1,
+        )
 
     # Row 2: reward-probability schedule (pR blue, pL red), 0..1.
     if has_prob:
-        fig.add_trace(go.Scattergl(x=probR_x, y=probR_y, mode="lines",
-                                   line=dict(color="blue", width=1), name="pR"), row=2, col=1)
-        fig.add_trace(go.Scattergl(x=probL_x, y=probL_y, mode="lines",
-                                   line=dict(color="red", width=1), name="pL"), row=2, col=1)
+        fig.add_trace(
+            go.Scattergl(
+                x=probR_x, y=probR_y, mode="lines", line=dict(color="blue", width=1), name="pR"
+            ),
+            row=2,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scattergl(
+                x=probL_x, y=probL_y, mode="lines", line=dict(color="red", width=1), name="pL"
+            ),
+            row=2,
+            col=1,
+        )
 
     y_main_top = params["curve_top"]
 
     # FIP channels (single-session only), normalised and stacked above the behavior panel
-    if fip_df is not None and len(sessions) == 1:
-        fip_channels = ["G_1_preprocessed", "G_2_preprocessed",
-                        "R_1_preprocessed", "R_2_preprocessed"]
-        fip_colors = {"G_1": "green", "G_2": "darkgreen", "R_1": "red", "R_2": "darkred"}
-        present = set(fip_df["event"].unique())
+    if df_fip is not None and len(sessions) == 1 and len(fip) > 0:
+        fip_channels = fip
+        present = set(df_fip["event"].unique())
         band = 0
         for channel in fip_channels:
             if channel not in present:
                 continue
             bottom = params["curve_top"] + 0.1 + band
-            C = fip_df.query("event == @channel").copy()
+            C = df_fip.query("event == @channel").copy()
             d = C["data"].values - np.nanmin(C["data"].values)
             d = d / np.nanmax(d) + bottom
-            color = fip_colors["_".join(channel.split("_")[:2])]
-            fig.add_trace(go.Scattergl(x=C.timestamps.values + last_off, y=d, mode="lines",
-                                       line=dict(color=color), name=channel), row=1, col=1)
+            color = get_fip_color(channel)
+            fig.add_trace(
+                go.Scattergl(
+                    x=C.timestamps.values + last_off,
+                    y=d,
+                    mode="lines",
+                    line=dict(color=color),
+                    name=channel,
+                ),
+                row=1,
+                col=1,
+            )
             yticks.append(bottom + 0.5)
             ylabels.append(channel)
             band += 1
@@ -688,12 +975,23 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     x_last = x_first + cum
     t0_view = first_gc if first_gc is not None else x_first
 
-    fig.update_yaxes(tickvals=yticks, ticktext=ylabels, fixedrange=True,
-                     range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25], row=1, col=1)
+    fig.update_yaxes(
+        tickvals=yticks,
+        ticktext=ylabels,
+        fixedrange=True,
+        range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25],
+        row=1,
+        col=1,
+    )
     fig.update_yaxes(title_text="p_reward", range=[0, 1], fixedrange=True, row=2, col=1)
     fig.update_xaxes(range=[t0_view, t0_view + 120], row=1, col=1)
-    fig.update_xaxes(title_text="Time (s)", range=[t0_view, t0_view + 120], row=2, col=1,
-                     rangeslider=dict(visible=True, thickness=0.06, range=[x_first, x_last]))
+    fig.update_xaxes(
+        title_text="Time (s)",
+        range=[t0_view, t0_view + 120],
+        row=2,
+        col=1,
+        rangeslider=dict(visible=True, thickness=0.06, range=[x_first, x_last]),
+    )
     if len(sess_spans) > 1:  # x tick labels restart at 0 each session
         tickvals, ticktext = [], []
         for start, dur in sess_spans:
@@ -707,12 +1005,22 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
 
     fig.update_layout(
         # Title pinned to the very top-left so it clears the legend below it.
-        title=dict(text=title or "Session Scroller", x=0.0, xanchor="left",
-                   y=0.98, yanchor="top"),
-        showlegend=True, height=620, width=1000, template="simple_white",
+        title=dict(text=title or "Session Scroller", x=0.0, xanchor="left", y=0.98, yanchor="top"),
+        showlegend=True,
+        height=620,
+        width=1000,
+        template="simple_white",
         # Legend outside, top-left, horizontal, compact entries (narrow box).
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                    font=dict(size=9), entrywidthmode="pixels", entrywidth=125),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            font=dict(size=9),
+            entrywidthmode="pixels",
+            entrywidth=125,
+        ),
         margin=dict(l=70, r=20, t=120, b=40),
     )
     return fig
