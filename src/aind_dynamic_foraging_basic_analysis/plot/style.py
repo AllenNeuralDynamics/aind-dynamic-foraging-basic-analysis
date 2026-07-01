@@ -26,14 +26,14 @@ PHOTOSTIM_EPOCH_MAPPING = {
 
 # Colorscheme for FIP channels
 FIP_COLORS = {
-    "G": "g",
-    "R": "r",
+    "G": "green",
+    "R": "red",
     "Iso": "gray",
-    "goCue_start_time": "b",
-    "left_lick_time": "m",
-    "right_lick_time": "r",
-    "left_reward_delivery_time": "b",
-    "right_reward_delivery_time": "r",
+    "goCue_start_time": "blue",
+    "left_lick_time": "magenta",
+    "right_lick_time": "red",
+    "left_reward_delivery_time": "blue",
+    "right_reward_delivery_time": "red",
 }
 
 

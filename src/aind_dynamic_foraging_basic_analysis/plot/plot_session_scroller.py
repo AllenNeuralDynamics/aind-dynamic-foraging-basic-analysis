@@ -548,4 +548,4 @@ def get_fip_color(channel):
     if root in FIP_COLORS:
         return FIP_COLORS.get(root)
 
-    return "k"
+    return "black"

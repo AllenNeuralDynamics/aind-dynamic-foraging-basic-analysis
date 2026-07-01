@@ -22,6 +22,7 @@ from aind_dynamic_foraging_basic_analysis.data_model.foraging_session import (
     PhotostimData,
 )
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import moving_average
+from aind_dynamic_foraging_basic_analysis.plot.plot_session_scroller import get_fip_color
 from aind_dynamic_foraging_basic_analysis.plot.style import PHOTOSTIM_EPOCH_MAPPING
 from aind_dynamic_foraging_data_utils import nwb_utils as nu
 
@@ -938,7 +939,6 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     # FIP channels (single-session only), normalised and stacked above the behavior panel
     if df_fip is not None and len(sessions) == 1 and len(fip) > 0:
         fip_channels = fip
-        fip_colors = {"G_1": "green", "G_2": "darkgreen", "R_1": "red", "R_2": "darkred"}
         present = set(df_fip["event"].unique())
         band = 0
         for channel in fip_channels:
@@ -948,7 +948,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             C = df_fip.query("event == @channel").copy()
             d = C["data"].values - np.nanmin(C["data"].values)
             d = d / np.nanmax(d) + bottom
-            color = fip_colors["_".join(channel.split("_")[:2])]
+            color = get_fip_color(channel)
             fig.add_trace(
                 go.Scattergl(
                     x=C.timestamps.values + last_off,
