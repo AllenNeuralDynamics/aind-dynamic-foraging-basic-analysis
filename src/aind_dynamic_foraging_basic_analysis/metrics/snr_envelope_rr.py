@@ -29,6 +29,16 @@ small, consistent linear bias in its SNR estimate at high true SNR;
 for that bias (see ``bias_correction`` below and
 ``fit_bias_correction_from_benchmark``).
 
+This module is **self-contained**: it has no dependency on
+``bwnm_signal_utils`` or any other file in the benchmark repo (only
+``numpy`` and ``scipy``), so it can be copied into another project on
+its own. It inlines the subset of the envelope-decomposition machinery
+that Env+RR actually exercises (valley-tracked or ALS tonic baseline +
+rise-rate gated detection); the benchmark repo's
+``bwnm_signal_utils.py`` additionally supports other detection methods
+(``two_gate``, ``als_ceiling``, ``matched_filter``) and distribution-
+fitting utilities not needed here, and is unaffected by this module.
+
 Class API
 ---------
 :class:`EnvelopeRRSNR`
@@ -48,11 +58,6 @@ Notes
 - Default sampling frequency (``fps``) is 20 Hz; adjust it if your data
   differ.
 - NaNs are filled with the median of the trace prior to computation.
-- This class wraps
-  :func:`bwnm_signal_utils.estimate_snr_components_envelope`; see that
-  module's ``ENVELOPE_CONFIG`` for the full set of tunable parameters
-  (envelope smoothing windows, ALS baseline alternative, etc.), any of
-  which can be overridden via the ``config`` argument here.
 
 Example
 -------
@@ -79,8 +84,8 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple
 
 import numpy as np
-from bwnm_signal_utils import ENVELOPE_CONFIG, estimate_snr_components_envelope
 from numpy.typing import NDArray
+from scipy import interpolate, signal, stats
 
 __all__ = ["EnvelopeRRSNR", "EnvelopeRRResult"]
 
@@ -95,6 +100,225 @@ _TUNED_DEFAULTS = {
     "lower_smooth_window": 11,  # 0.55 s at 20 fps
     "rise_window": 5,  # 0.25 s at 20 fps
 }
+
+# Remaining envelope-decomposition parameters that aren't fps-scaled tuned
+# hyperparameters above, but still have sensible fixed defaults. Any of
+# these can be overridden via the `config` argument to EnvelopeRRSNR.
+_DEFAULT_CONFIG: Dict = {
+    "interp_kind": "pchip",  # 'pchip' or 'linear' envelope interpolation
+    "tonic_method": "envelope",  # 'envelope' (valley-tracked) or 'als'
+    "als_lam": 1e7,  # ALS smoothness (only if tonic_method='als')
+    "als_p": 0.01,  # ALS asymmetry, rides under peaks
+    "als_n_iter": 10,
+    "midpoint_window": 101,  # smoothing window for the midpoint reference curve
+    "midpoint_polyorder": 1,
+    "lower_order": 2,  # local-minimum order for valley detection
+    "upper_min_distance": 3,  # min spacing enforced by find_peaks on the residual
+}
+
+
+# ======================================================================
+# Private helpers: envelope decomposition + rise-rate peak detection.
+# Inlined and trimmed from bwnm_signal_utils.py to keep this module
+# dependency-free; only the code paths EnvelopeRRSNR actually exercises
+# (tonic_method in {'envelope', 'als'}, rise-rate detection) are kept.
+# ======================================================================
+
+
+def _moving_average(
+    x: NDArray[np.floating], window: int, polyorder: int = 1
+) -> NDArray[np.floating]:
+    """Savitzky-Golay smoothed reference curve, used as the midpoint."""
+    window = window if window % 2 == 1 else window + 1
+    window = min(window, len(x) if len(x) % 2 == 1 else len(x) - 1)
+    return signal.savgol_filter(x, window_length=window, polyorder=polyorder)
+
+
+def _interpolate_envelope(idx_anchored, val_anchored, n, interp_kind: str = "pchip"):
+    """Interpolate anchor points (e.g. tonic valleys) to a full-length curve."""
+    query = np.arange(n)
+    if interp_kind == "linear":
+        return np.interp(query, idx_anchored, val_anchored)
+    elif interp_kind == "pchip":
+        return interpolate.PchipInterpolator(idx_anchored, val_anchored, extrapolate=True)(query)
+    else:
+        raise ValueError(f"Unknown interp_kind: {interp_kind!r}. Use 'linear' or 'pchip'.")
+
+
+def _lower_envelope(x, midpoint, smooth_window, order, min_distance, interp_kind="pchip"):
+    """Valley-tracked tonic (slow baseline) envelope beneath ``x``."""
+    if smooth_window % 2 == 0:
+        smooth_window += 1
+    x_smooth = signal.savgol_filter(x, window_length=smooth_window, polyorder=3)
+
+    minima_idx = signal.argrelmin(x_smooth, order=order)[0]
+    if len(minima_idx) > 0:
+        minima_idx = minima_idx[x[minima_idx] < midpoint[minima_idx]]
+
+    if len(minima_idx) > 1:
+        filtered = [minima_idx[0]]
+        for idx in minima_idx[1:]:
+            if idx - filtered[-1] >= min_distance:
+                filtered.append(idx)
+        minima_idx = np.array(filtered)
+
+    if len(minima_idx) < 2:
+        return np.full_like(x, np.min(x), dtype=float), minima_idx
+
+    idx_anchored = np.concatenate([[0], minima_idx, [len(x) - 1]])
+    val_anchored = x[idx_anchored]
+    return _interpolate_envelope(idx_anchored, val_anchored, len(x), interp_kind), minima_idx
+
+
+def _als_baseline(y, lam: float = 1e7, p: float = 0.01, n_iter: int = 10):
+    """Asymmetric Least Squares (ALS) smooth curve, ridden under peaks
+    when ``p`` is small (the alternative tonic baseline to the
+    valley-tracked envelope above; ``tonic_method='als'``)."""
+    from scipy import sparse
+    from scipy.sparse.linalg import spsolve
+
+    L = len(y)
+    D = sparse.diags([1, -2, 1], [0, -1, -2], shape=(L, L - 2), dtype=float)
+    D = lam * D.dot(D.transpose())
+    w = np.ones(L)
+    z = y.copy()
+    for _ in range(n_iter):
+        W = sparse.spdiags(w, 0, L, L)
+        z = spsolve((W + D).tocsc(), w * y)
+        w = p * (y > z) + (1 - p) * (y < z)
+    return z
+
+
+def _detect_peaks_rise_rate(residual, candidates, sigma, rise_window: int = 3):
+    """Reject candidate peaks whose approach isn't fast enough to be a
+    real transient onset (vs. a slow drift crossing threshold)."""
+    if len(candidates) < 5:
+        return candidates
+
+    slopes = []
+    for idx in candidates:
+        lo = max(0, idx - rise_window)
+        window = residual[lo:idx]
+        if len(window) >= 2:
+            slopes.append(float(np.mean(np.diff(window))))
+        else:
+            slopes.append(0.0)
+    slopes = np.array(slopes)
+
+    lower = slopes[slopes <= np.median(slopes)]
+    if len(lower) >= 5:
+        _, sigma_slope = stats.norm.fit(lower)
+        slope_thresh = max(sigma_slope * 3.0, sigma * 0.1)
+    else:
+        slope_thresh = np.percentile(slopes, 50)
+
+    return candidates[slopes > slope_thresh]
+
+
+def _decompose_envelope_rr(x: NDArray[np.floating], config: Dict) -> Dict:
+    """Tonic/phasic decomposition + rise-rate gated peak detection.
+
+    Trimmed, self-contained equivalent of
+    ``bwnm_signal_utils.estimate_snr_components_envelope`` with
+    ``detection_method`` fixed to ``'rise_rate'`` (the only mode
+    :class:`EnvelopeRRSNR` uses). Returns the same key set that
+    ``EnvelopeRRSNR`` and ``EnvelopeRRResult`` read.
+    """
+    cfg = config
+
+    midpoint = _moving_average(
+        x,
+        window=cfg["midpoint_window"],
+        polyorder=cfg["midpoint_polyorder"],
+    )
+
+    tonic_method = cfg.get("tonic_method", "envelope")
+    if tonic_method == "als":
+        tonic = _als_baseline(
+            x,
+            lam=cfg.get("als_lam", 1e7),
+            p=cfg.get("als_p", 0.01),
+            n_iter=cfg.get("als_n_iter", 10),
+        )
+        tonic_minima = np.array([], dtype=int)
+    elif tonic_method == "envelope":
+        tonic, tonic_minima = _lower_envelope(
+            x,
+            midpoint,
+            cfg["lower_smooth_window"],
+            cfg["lower_order"],
+            cfg["lower_min_distance"],
+            interp_kind=cfg["interp_kind"],
+        )
+    else:
+        raise ValueError(f"tonic_method must be 'envelope' or 'als'; got {tonic_method!r}.")
+
+    residual = x - tonic
+
+    neg_res = residual[residual < 0]
+    if len(neg_res) >= 20:
+        reflected = np.abs(neg_res)
+        q75r, q25r = float(np.percentile(reflected, 75)), float(np.percentile(reflected, 25))
+        sigma_iqr = (q75r - q25r) / 1.349
+    else:
+        sigma_iqr = float(np.std(residual[residual <= np.median(residual)]))
+
+    if len(tonic_minima) >= 5:
+        n = len(residual)
+        mid_idx = ((tonic_minima[:-1] + tonic_minima[1:]) // 2).astype(int)
+        mid_idx = mid_idx[(mid_idx >= 0) & (mid_idx < n)]
+        sigma_minima = float(np.std(residual[mid_idx])) if len(mid_idx) >= 5 else sigma_iqr
+    else:
+        sigma_minima = sigma_iqr
+
+    sigma_fit = sigma_iqr
+    thresh = cfg["peak_threshold_sd"] * sigma_fit
+
+    raw_peaks, _ = signal.find_peaks(
+        residual,
+        height=thresh,
+        distance=cfg.get("upper_min_distance", 3),
+    )
+    event_maxima = _detect_peaks_rise_rate(
+        residual,
+        raw_peaks,
+        sigma_fit,
+        rise_window=cfg.get("rise_window", 3),
+    )
+    event_maxima = np.asarray(event_maxima, dtype=int)
+    event_maxima = event_maxima[(event_maxima >= 0) & (event_maxima < len(residual))]
+    peak_amps = residual[event_maxima] if len(event_maxima) > 0 else np.array([])
+
+    if len(peak_amps) > 0:
+        phasic_p95 = float(np.percentile(peak_amps, 95))
+        phasic_median = float(np.median(peak_amps))
+        phasic_sd = float(np.std(peak_amps))
+    else:
+        phasic_p95 = phasic_median = phasic_sd = 0.0
+
+    return {
+        "tonic": tonic,
+        "tonic_minima": tonic_minima,
+        "event_maxima": event_maxima,
+        "midpoint": midpoint,
+        "residual": residual,
+        "peak_amps": peak_amps,
+        "noise_sigma": float(sigma_fit),
+        "noise_sigma_iqr": float(sigma_iqr),
+        "noise_sigma_minima": float(sigma_minima),
+        "peak_threshold": float(thresh),
+        "detection_method": "rise_rate",
+        "tonic_method": tonic_method,
+        "tonic_range": float(np.ptp(tonic)),
+        "phasic_p95": phasic_p95,
+        "phasic_median": phasic_median,
+        "phasic_amplitude": phasic_sd,
+        "phasic_snr_p95": float(phasic_p95 / sigma_fit) if sigma_fit > 0 else float("nan"),
+        "phasic_snr_median": float(phasic_median / sigma_fit) if sigma_fit > 0 else float("nan"),
+        "phasic_snr_sd": float(phasic_sd / sigma_fit) if sigma_fit > 0 else float("nan"),
+        "tonic_snr_sd": float(np.ptp(tonic) / sigma_fit) if sigma_fit > 0 else float("nan"),
+        "config": cfg,
+    }
 
 
 @dataclass
@@ -164,11 +388,13 @@ class EnvelopeRRSNR:
         correct a consistent linear bias without re-running the
         benchmark on new data.
     config : dict, optional
-        Overrides merged on top of the tuned window defaults below (which
-        are themselves merged onto
-        :data:`bwnm_signal_utils.ENVELOPE_CONFIG`). Anything not
-        overridden here uses the tuned/scaled value; see that module for
-        the full parameter list.
+        Overrides merged on top of the tuned window defaults (fps-scaled
+        ``lower_min_distance``, ``lower_smooth_window``, ``rise_window``)
+        and the fixed defaults in this module (envelope interpolation,
+        ALS baseline, midpoint smoothing, etc.) -- see
+        ``_DEFAULT_CONFIG`` in this file for the full list. Notably,
+        pass ``config={'tonic_method': 'als'}`` to swap the valley-
+        tracked tonic baseline for an Asymmetric Least Squares fit.
 
     Notes
     -----
@@ -199,18 +425,7 @@ class EnvelopeRRSNR:
         bias_correction: Optional[Tuple[float, float]] = None,
         config: Optional[Dict] = None,
     ) -> None:
-        """Construct the estimator and resolve its configuration.
-
-        Merges the tuned window defaults (fps-scaled via
-        :meth:`scale_window`) onto ``ENVELOPE_CONFIG``, then applies any
-        user-supplied ``config`` overrides on top. See the class
-        docstring for parameter descriptions.
-
-        Raises
-        ------
-        ValueError
-            If ``signal_statistic`` is not ``'median'`` or ``'p95'``.
-        """
+        """Construct an estimator; see the class docstring for parameter details."""
         if signal_statistic not in ("median", "p95"):
             raise ValueError(
                 f"signal_statistic must be 'median' or 'p95', got {signal_statistic!r}."
@@ -228,7 +443,7 @@ class EnvelopeRRSNR:
             "rise_window": self.scale_window(_TUNED_DEFAULTS["rise_window"], fps),
         }
         self.config = {
-            **ENVELOPE_CONFIG,
+            **_DEFAULT_CONFIG,
             "fps": fps,
             "peak_threshold_sd": peak_threshold_sd,
             **scaled_defaults,
@@ -304,12 +519,7 @@ class EnvelopeRRSNR:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            raw = estimate_snr_components_envelope(
-                trace,
-                detection_method="rise_rate",
-                peak_threshold_sd=self.peak_threshold_sd,
-                config=self.config,
-            )
+            raw = _decompose_envelope_rr(trace, self.config)
 
         snr_key = "phasic_snr_p95" if self.signal_statistic == "p95" else "phasic_snr_median"
         sig_key = "phasic_p95" if self.signal_statistic == "p95" else "phasic_median"
@@ -456,13 +666,7 @@ class EnvelopeRRSNR:
         return self.result_.residual
 
     def _check_fitted(self) -> None:
-        """Raise if `.fit()` has not yet been called on this instance.
-
-        Raises
-        ------
-        RuntimeError
-            If ``self.result_`` is still ``None``.
-        """
+        """Raise RuntimeError if fit()/estimate()/decompose() hasn't been called yet."""
         if self.result_ is None:
             raise RuntimeError(
                 "This EnvelopeRRSNR instance has not been fit yet. "
@@ -511,3 +715,240 @@ class EnvelopeRRSNR:
         ok = np.isfinite(true_snr) & np.isfinite(snr_est)
         slope, intercept = np.polyfit(true_snr[ok], snr_est[ok], 1)
         return float(slope), float(intercept)
+
+
+# ======================================================================
+# Self-test
+#
+# Runs a synthetic (numpy-only, no external dependencies) sanity check
+# of the public API: `python snr_envelope_rr.py`. This is a quick
+# correctness smoke test, not a substitute for the full benchmark in
+# BWNM_Signal_Quality_Benchmark.ipynb -- it checks that the class
+# behaves as documented, not that its SNR estimates are accurate.
+# ======================================================================
+
+
+def _make_synthetic_trace(
+    n_samples: int = 3000,
+    fps: float = 20.0,
+    n_events: int = 40,
+    event_amp: float = 0.15,
+    noise_sigma: float = 0.01,
+    drift_amp: float = 0.05,
+    seed: int = 0,
+) -> NDArray[np.floating]:
+    """Build a synthetic dF/F-like trace: slow sinusoidal drift (tonic)
+    + sparse exponential-decay transients (phasic) + Gaussian noise."""
+    rng = np.random.default_rng(seed)
+    t = np.arange(n_samples) / fps
+
+    tonic = drift_amp * np.sin(2 * np.pi * t / (n_samples / fps / 2))
+
+    trace = tonic.copy()
+    event_starts = rng.choice(
+        np.arange(int(0.5 * fps), n_samples - int(2 * fps)), size=n_events, replace=False
+    )
+    decay_kernel = event_amp * np.exp(-np.arange(int(1.5 * fps)) / (0.3 * fps))
+    for start in event_starts:
+        end = min(start + len(decay_kernel), n_samples)
+        trace[start:end] += decay_kernel[: end - start]
+
+    trace += noise_sigma * rng.standard_normal(n_samples)
+    return trace
+
+
+def _run_case(name: str, fn) -> Tuple[str, bool, str]:
+    """Run one self-test case, capturing pass/fail (and any exception) by name."""
+    try:
+        fn()
+        return (name, True, "")
+    except Exception as exc:  # noqa: BLE001 - want to catch/report everything here
+        return (name, False, f"{type(exc).__name__}: {exc}")
+
+
+def _case_fit_basic(trace: NDArray[np.floating]) -> None:
+    """fit() should return a well-formed result with at least one detected peak."""
+    result = EnvelopeRRSNR().fit(trace)
+    assert isinstance(result.snr, float)
+    assert isinstance(result.noise, float) and result.noise > 0
+    assert isinstance(result.peaks, np.ndarray)
+    assert len(result.peaks) > 0, "expected to detect at least one event"
+    assert result.tonic.shape == trace.shape
+    assert result.residual.shape == trace.shape
+
+
+def _case_estimate_matches_fit(trace: NDArray[np.floating]) -> None:
+    """estimate()'s one-shot tuple should match a separate fit() call exactly."""
+    est = EnvelopeRRSNR()
+    result = est.fit(trace)
+    snr, noise, peaks = est.estimate(trace)
+    assert snr == result.snr
+    assert noise == result.noise
+    assert np.array_equal(peaks, result.peaks)
+
+
+def _case_decompose_with_and_without_trace(trace: NDArray[np.floating]) -> None:
+    """decompose() with vs. without a trace argument should agree, and tonic+phasic
+    should reconstruct the original trace."""
+    est = EnvelopeRRSNR()
+    tonic1, phasic1 = est.decompose(trace)
+    tonic2, phasic2 = est.decompose()  # reuse last fit, no recompute
+    assert np.array_equal(tonic1, tonic2)
+    assert np.array_equal(phasic1, phasic2)
+    assert np.allclose(trace, tonic1 + phasic1), "trace should equal tonic + phasic"
+
+
+def _case_not_fitted_raises() -> None:
+    """Accessing a result property before any fit() call should raise RuntimeError."""
+    est = EnvelopeRRSNR()
+    try:
+        _ = est.snr_
+    except RuntimeError:
+        return
+    raise AssertionError("expected RuntimeError before any fit")
+
+
+def _case_invalid_signal_statistic_raises() -> None:
+    """An unrecognized signal_statistic should raise ValueError at construction."""
+    try:
+        EnvelopeRRSNR(signal_statistic="bogus")
+    except ValueError:
+        return
+    raise AssertionError("expected ValueError for invalid signal_statistic")
+
+
+def _case_scale_window_reference_fps_is_identity() -> None:
+    """scale_window() at the 20 fps reference rate should return its input unchanged."""
+    for base in (5, 11, 20):
+        assert EnvelopeRRSNR.scale_window(base, fps=20.0) == base
+
+
+def _case_scale_window_doubles_at_2x_fps() -> None:
+    """scale_window() should double sample counts when fps doubles."""
+    assert EnvelopeRRSNR.scale_window(20, fps=40.0) == 40
+    assert EnvelopeRRSNR.scale_window(5, fps=40.0) == 10
+
+
+def _case_scale_window_make_odd() -> None:
+    """scale_window(make_odd=True) should always return an odd result."""
+    assert EnvelopeRRSNR.scale_window(11, fps=40.0, make_odd=True) % 2 == 1
+
+
+def _case_fps_scaling_reaches_config() -> None:
+    """Window params in the resolved config should scale with fps; peak_threshold_sd
+    should not."""
+    cfg20 = EnvelopeRRSNR(fps=20.0).config
+    cfg40 = EnvelopeRRSNR(fps=40.0).config
+    assert cfg20["lower_min_distance"] * 2 == cfg40["lower_min_distance"]
+    assert cfg20["rise_window"] * 2 == cfg40["rise_window"]
+    # peak_threshold_sd is not a window -- must NOT scale with fps
+    assert cfg20["peak_threshold_sd"] == cfg40["peak_threshold_sd"]
+
+
+def _case_config_override_takes_precedence() -> None:
+    """An explicit config override should win over the fps-scaled tuned default."""
+    est = EnvelopeRRSNR(config={"rise_window": 999})
+    assert est.config["rise_window"] == 999
+
+
+def _case_bias_correction_applied(trace: NDArray[np.floating]) -> None:
+    """snr_corrected should equal (snr - intercept) / slope for the configured correction."""
+    slope, intercept = 0.8, 2.0
+    est = EnvelopeRRSNR(bias_correction=(slope, intercept))
+    result = est.fit(trace)
+    assert result.snr_corrected is not None
+    expected = (result.snr - intercept) / slope
+    assert abs(result.snr_corrected - expected) < 1e-9
+
+
+def _case_fit_bias_correction_from_benchmark_recovers_known_fit() -> None:
+    """fit_bias_correction_from_benchmark() should exactly recover a noiseless linear fit."""
+    true_snr = np.array([5.0, 10.0, 20.0, 40.0])
+    snr_est = 0.8 * true_snr + 2.0  # exact, noiseless linear relationship
+    slope, intercept = EnvelopeRRSNR.fit_bias_correction_from_benchmark(true_snr, snr_est)
+    assert abs(slope - 0.8) < 1e-9
+    assert abs(intercept - 2.0) < 1e-9
+
+
+def _case_als_tonic_method_runs(trace: NDArray[np.floating]) -> None:
+    """The tonic_method='als' config override should run end-to-end without error."""
+    result = EnvelopeRRSNR(config={"tonic_method": "als"}).fit(trace)
+    assert isinstance(result.snr, float)
+    assert result.tonic.shape == trace.shape
+
+
+def _case_no_peaks_gives_nan_snr_with_warning() -> None:
+    """Pure-noise input with an unreachable threshold should give NaN snr + a warning."""
+    flat = 0.001 * np.random.default_rng(1).standard_normal(500)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = EnvelopeRRSNR(peak_threshold_sd=100.0).fit(flat)
+    assert np.isnan(result.snr)
+    assert any(issubclass(w.category, RuntimeWarning) for w in caught)
+
+
+def _case_doctests_pass() -> None:
+    """All doctests embedded in this module's docstrings should pass."""
+    import doctest
+
+    this_module = __import__(__name__)
+    fail_count, _ = doctest.testmod(this_module, optionflags=doctest.ELLIPSIS)
+    assert fail_count == 0, f"{fail_count} doctest(s) failed"
+
+
+def _self_test() -> bool:
+    """Run all self-test cases; print PASS/FAIL per case. Returns True iff every
+    case passed."""
+    trace = _make_synthetic_trace()
+
+    cases = [
+        ("fit() returns sane result", lambda: _case_fit_basic(trace)),
+        ("estimate() matches fit()", lambda: _case_estimate_matches_fit(trace)),
+        (
+            "decompose() with/without trace agree",
+            lambda: _case_decompose_with_and_without_trace(trace),
+        ),
+        ("accessing result before fit() raises", _case_not_fitted_raises),
+        ("invalid signal_statistic raises", _case_invalid_signal_statistic_raises),
+        (
+            "scale_window() is identity at reference fps",
+            _case_scale_window_reference_fps_is_identity,
+        ),
+        ("scale_window() doubles at 2x fps", _case_scale_window_doubles_at_2x_fps),
+        ("scale_window() forces odd when requested", _case_scale_window_make_odd),
+        ("fps scaling reaches resolved config", _case_fps_scaling_reaches_config),
+        ("explicit config override takes precedence", _case_config_override_takes_precedence),
+        ("bias_correction is applied correctly", lambda: _case_bias_correction_applied(trace)),
+        (
+            "fit_bias_correction_from_benchmark recovers fit",
+            _case_fit_bias_correction_from_benchmark_recovers_known_fit,
+        ),
+        ("tonic_method='als' override runs", lambda: _case_als_tonic_method_runs(trace)),
+        (
+            "no detected peaks -> NaN snr + RuntimeWarning",
+            _case_no_peaks_gives_nan_snr_with_warning,
+        ),
+        ("module doctests pass", _case_doctests_pass),
+    ]
+    results = [_run_case(name, fn) for name, fn in cases]
+
+    name_width = max(len(name) for name, _, _ in results)
+    n_passed = 0
+    for name, passed, detail in results:
+        status = "PASS" if passed else "FAIL"
+        line = f"  [{status}] {name:<{name_width}}"
+        if detail:
+            line += f"  -- {detail}"
+        print(line)
+        n_passed += int(passed)
+
+    print(f"\n{n_passed}/{len(results)} checks passed.")
+    return n_passed == len(results)
+
+
+if __name__ == "__main__":
+    import sys as _sys
+
+    print(f"Running self-test for {__name__} ...\n")
+    ok = _self_test()
+    _sys.exit(0 if ok else 1)
