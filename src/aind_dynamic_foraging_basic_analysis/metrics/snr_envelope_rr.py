@@ -79,9 +79,8 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple
 
 import numpy as np
-from numpy.typing import NDArray
-
 from bwnm_signal_utils import ENVELOPE_CONFIG, estimate_snr_components_envelope
+from numpy.typing import NDArray
 
 __all__ = ["EnvelopeRRSNR", "EnvelopeRRResult"]
 
@@ -91,10 +90,10 @@ __all__ = ["EnvelopeRRSNR", "EnvelopeRRResult"]
 # real-world duration at a different fps.
 _REFERENCE_FPS = 20.0
 _TUNED_DEFAULTS = {
-    "peak_threshold_sd":   1.5,
-    "lower_min_distance":  20,   # 1.00 s at 20 fps
-    "lower_smooth_window": 11,   # 0.55 s at 20 fps
-    "rise_window":         5,    # 0.25 s at 20 fps
+    "peak_threshold_sd": 1.5,
+    "lower_min_distance": 20,  # 1.00 s at 20 fps
+    "lower_smooth_window": 11,  # 0.55 s at 20 fps
+    "rise_window": 5,  # 0.25 s at 20 fps
 }
 
 
@@ -130,13 +129,13 @@ class EnvelopeRRResult:
         with any overrides).
     """
 
-    snr:           float
-    noise:         float
-    peaks:         NDArray[np.intp]
-    tonic:         NDArray[np.floating]
-    residual:      NDArray[np.floating]
-    signal:        float
-    config:        Dict = field(repr=False)
+    snr: float
+    noise: float
+    peaks: NDArray[np.intp]
+    tonic: NDArray[np.floating]
+    residual: NDArray[np.floating]
+    signal: float
+    config: Dict = field(repr=False)
     snr_corrected: Optional[float] = None
 
 
@@ -200,22 +199,33 @@ class EnvelopeRRSNR:
         bias_correction: Optional[Tuple[float, float]] = None,
         config: Optional[Dict] = None,
     ) -> None:
+        """Construct the estimator and resolve its configuration.
+
+        Merges the tuned window defaults (fps-scaled via
+        :meth:`scale_window`) onto ``ENVELOPE_CONFIG``, then applies any
+        user-supplied ``config`` overrides on top. See the class
+        docstring for parameter descriptions.
+
+        Raises
+        ------
+        ValueError
+            If ``signal_statistic`` is not ``'median'`` or ``'p95'``.
+        """
         if signal_statistic not in ("median", "p95"):
             raise ValueError(
                 f"signal_statistic must be 'median' or 'p95', got {signal_statistic!r}."
             )
-        self.fps               = fps
+        self.fps = fps
         self.peak_threshold_sd = peak_threshold_sd
-        self.signal_statistic  = signal_statistic
-        self.bias_correction   = bias_correction
+        self.signal_statistic = signal_statistic
+        self.bias_correction = bias_correction
 
         scaled_defaults = {
-            "lower_min_distance":  self.scale_window(
-                _TUNED_DEFAULTS["lower_min_distance"], fps),
+            "lower_min_distance": self.scale_window(_TUNED_DEFAULTS["lower_min_distance"], fps),
             "lower_smooth_window": self.scale_window(
-                _TUNED_DEFAULTS["lower_smooth_window"], fps, make_odd=True),
-            "rise_window":         self.scale_window(
-                _TUNED_DEFAULTS["rise_window"], fps),
+                _TUNED_DEFAULTS["lower_smooth_window"], fps, make_odd=True
+            ),
+            "rise_window": self.scale_window(_TUNED_DEFAULTS["rise_window"], fps),
         }
         self.config = {
             **ENVELOPE_CONFIG,
@@ -302,10 +312,10 @@ class EnvelopeRRSNR:
             )
 
         snr_key = "phasic_snr_p95" if self.signal_statistic == "p95" else "phasic_snr_median"
-        sig_key = "phasic_p95"     if self.signal_statistic == "p95" else "phasic_median"
+        sig_key = "phasic_p95" if self.signal_statistic == "p95" else "phasic_median"
 
         peaks = np.asarray(raw["event_maxima"], dtype=int)
-        snr   = float(raw[snr_key])
+        snr = float(raw[snr_key])
         noise = float(raw["noise_sigma"])
         signal = float(raw[sig_key])
 
@@ -334,9 +344,7 @@ class EnvelopeRRSNR:
         )
         return self.result_
 
-    def estimate(
-        self, trace: NDArray[np.floating]
-    ) -> Tuple[float, float, NDArray[np.intp]]:
+    def estimate(self, trace: NDArray[np.floating]) -> Tuple[float, float, NDArray[np.intp]]:
         """One-shot functional interface: ``fit`` and return a 3-tuple.
 
         Mirrors the ``(snr, noise, peaks)`` return signature of a plain
@@ -448,6 +456,13 @@ class EnvelopeRRSNR:
         return self.result_.residual
 
     def _check_fitted(self) -> None:
+        """Raise if `.fit()` has not yet been called on this instance.
+
+        Raises
+        ------
+        RuntimeError
+            If ``self.result_`` is still ``None``.
+        """
         if self.result_ is None:
             raise RuntimeError(
                 "This EnvelopeRRSNR instance has not been fit yet. "
@@ -492,7 +507,7 @@ class EnvelopeRRSNR:
         >>> estimator = EnvelopeRRSNR(bias_correction=(slope, intercept))
         """
         true_snr = np.asarray(true_snr, dtype=float)
-        snr_est  = np.asarray(snr_est,  dtype=float)
+        snr_est = np.asarray(snr_est, dtype=float)
         ok = np.isfinite(true_snr) & np.isfinite(snr_est)
         slope, intercept = np.polyfit(true_snr[ok], snr_est[ok], 1)
         return float(slope), float(intercept)
