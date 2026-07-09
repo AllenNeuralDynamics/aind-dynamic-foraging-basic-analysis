@@ -21,23 +21,11 @@ sample derivative and signal from raw peak heights, it:
    95th percentile) divided by the estimated noise floor.
 
 This is the "Env+RR" method benchmarked against a derivative-based
-estimator across a synthetic SNR sweep in
-``BWNM_Signal_Quality_Benchmark.ipynb``. That benchmark found Env+RR
-detects events at least as well as the derivative method, but with a
-small, consistent linear bias in its SNR estimate at high true SNR;
-:class:`EnvelopeRRSNR` can optionally apply the fitted linear correction
-for that bias (see ``bias_correction`` below and
+estimator across a synthetic SNR sweep. Env+RR detects events at least as well
+as the derivative method, but with a small, consistent linear bias in its
+SNR estimate at high true SNR; :class:`EnvelopeRRSNR` can optionally apply the
+fitted linear correction for that bias (see ``bias_correction`` below and
 ``fit_bias_correction_from_benchmark``).
-
-This module is **self-contained**: it has no dependency on
-``bwnm_signal_utils`` or any other file in the benchmark repo (only
-``numpy`` and ``scipy``), so it can be copied into another project on
-its own. It inlines the subset of the envelope-decomposition machinery
-that Env+RR actually exercises (valley-tracked or ALS tonic baseline +
-rise-rate gated detection); the benchmark repo's
-``bwnm_signal_utils.py`` additionally supports other detection methods
-(``two_gate``, ``als_ceiling``, ``matched_filter``) and distribution-
-fitting utilities not needed here, and is unaffected by this module.
 
 Class API
 ---------
@@ -118,10 +106,7 @@ _DEFAULT_CONFIG: Dict = {
 
 
 # ======================================================================
-# Private helpers: envelope decomposition + rise-rate peak detection.
-# Inlined and trimmed from bwnm_signal_utils.py to keep this module
-# dependency-free; only the code paths EnvelopeRRSNR actually exercises
-# (tonic_method in {'envelope', 'als'}, rise-rate detection) are kept.
+# Private helpers
 # ======================================================================
 
 
@@ -216,14 +201,7 @@ def _detect_peaks_rise_rate(residual, candidates, sigma, rise_window: int = 3):
 
 
 def _decompose_envelope_rr(x: NDArray[np.floating], config: Dict) -> Dict:
-    """Tonic/phasic decomposition + rise-rate gated peak detection.
-
-    Trimmed, self-contained equivalent of
-    ``bwnm_signal_utils.estimate_snr_components_envelope`` with
-    ``detection_method`` fixed to ``'rise_rate'`` (the only mode
-    :class:`EnvelopeRRSNR` uses). Returns the same key set that
-    ``EnvelopeRRSNR`` and ``EnvelopeRRResult`` read.
-    """
+    """Tonic/phasic decomposition + rise-rate gated peak detection."""
     cfg = config
 
     midpoint = _moving_average(
@@ -373,9 +351,8 @@ class EnvelopeRRSNR:
     peak_threshold_sd : float, optional
         Detection threshold for candidate phasic peaks, in units of the
         estimated noise sigma. Defaults to ``1.5``, a value tuned by
-        grid search in ``BWNM_Signal_Quality_Benchmark.ipynb``. This is
-        a unitless sigma multiplier, so it does *not* scale with
-        ``fps``.
+        grid search in synthetic SNR sweep. This is a unitless sigma
+        multiplier, so it does *not* scale with ``fps``.
     signal_statistic : {'median', 'p95'}, optional
         Which statistic of the suprathreshold peak amplitudes to use as
         the SNR numerator, by default ``'median'``.
@@ -685,8 +662,7 @@ class EnvelopeRRSNR:
 
         Convenience wrapper around ``numpy.polyfit`` for the common case
         of correcting a consistent linear bias identified by sweeping
-        known SNR levels (e.g. via
-        ``BWNM_Signal_Quality_Benchmark.ipynb``, Figure 2).
+        known SNR levels.
 
         Parameters
         ----------
@@ -722,9 +698,8 @@ class EnvelopeRRSNR:
 #
 # Runs a synthetic (numpy-only, no external dependencies) sanity check
 # of the public API: `python snr_envelope_rr.py`. This is a quick
-# correctness smoke test, not a substitute for the full benchmark in
-# BWNM_Signal_Quality_Benchmark.ipynb -- it checks that the class
-# behaves as documented, not that its SNR estimates are accurate.
+# smoke test, checks that the class behaves as documented, not that its
+# SNR estimates are accurate.
 # ======================================================================
 
 
