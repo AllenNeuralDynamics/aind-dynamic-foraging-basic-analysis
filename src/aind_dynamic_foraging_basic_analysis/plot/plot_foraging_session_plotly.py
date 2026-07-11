@@ -940,30 +940,64 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     if df_fip is not None and len(sessions) == 1 and len(fip) > 0:
         fip_channels = fip
         present = set(df_fip["event"].unique())
-        band = 0
+        band = 0.0
+        fip_gap = 0.5
         for channel in fip_channels:
             if channel not in present:
                 continue
-            bottom = params["curve_top"] + 0.1 + band
             C = df_fip.query("event == @channel").copy()
-            d = C["data"].values - np.nanmin(C["data"].values)
-            d = d / np.nanmax(d) + bottom
+            vals = C["data"].astype(float).to_numpy()
+            if vals.size == 0 or np.all(np.isnan(vals)):
+                continue
+            vmin = np.nanmin(vals)
+            vmax = np.nanmax(vals)
+            span = vmax - vmin
+            # avoid zero-span stacking problems for constant signals
+            if np.isnan(span) or span == 0:
+                span = 1.0
+            
+            if span < 0.04:
+                vmin = -0.05
+                vmax = 0.05
+                span = 0.1
+
+            # place this channel so its minimum maps to `base`, preserving original scale
+            base = params["curve_top"] + 0.1 + band
+            offset = base - vmin
+            d = vals + offset
+
             color = get_fip_color(channel)
+            custom = np.stack([C.timestamps.values, vals], axis=-1)
+            hover = f"%{{customdata[0]:.2f}}s %{{customdata[1]:.3f}} <extra>{channel}</extra>"
+
             fig.add_trace(
                 go.Scattergl(
                     x=C.timestamps.values + last_off,
                     y=d,
+                    customdata = custom,
                     mode="lines",
+                    hovertemplate=hover,
                     line=dict(color=color),
                     name=channel,
                 ),
                 row=1,
                 col=1,
             )
-            yticks.append(bottom + 0.5)
-            ylabels.append(channel)
-            band += 1
-            y_main_top = bottom + 1.0
+
+            # use three ticks: bottom (vmin), center (channel name), top (vmax)
+            yticks.extend([base + 0.0, base + span / 2.0, base + span])
+            ylabels.extend(
+                [
+                    f"{vmin:.2f}",
+                    f"{channel.split('_dff')[0]}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",
+                    f"{vmax:.2f}",
+                ]
+            )
+
+            # advance band by the display span (not raw span) plus a small gap to avoid overlap
+            band += span + fip_gap
+            y_main_top = base + span + 0.25
+
 
     # Thick vertical lines marking session boundaries (both panels)
     for b in boundaries:
@@ -1007,7 +1041,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         # Title pinned to the very top-left so it clears the legend below it.
         title=dict(text=title or "Session Scroller", x=0.0, xanchor="left", y=0.98, yanchor="top"),
         showlegend=True,
-        height=620,
+        height=620 + (50 * len(fip) if df_fip is not None and len(fip) > 0 else 0),
         width=1000,
         template="simple_white",
         # Legend outside, top-left, horizontal, compact entries (narrow box).
