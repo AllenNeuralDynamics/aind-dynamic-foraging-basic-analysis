@@ -956,10 +956,6 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             if np.isnan(span) or span == 0:
                 span = 1.0
             
-            if span < 0.04:
-                vmin = -0.05
-                vmax = 0.05
-                span = 0.1
 
             # place this channel so its minimum maps to `base`, preserving original scale
             base = params["curve_top"] + 0.1 + band
@@ -985,11 +981,11 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             )
 
             # use three ticks: bottom (vmin), center (channel name), top (vmax)
-            yticks.extend([base + 0.0, base + span / 2.0, base + span])
+            yticks.extend([base - vmin, base + span / 2.0, base + span])
             ylabels.extend(
                 [
-                    f"{vmin:.2f}",
-                    f"{channel.split('_dff')[0]}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",
+                    f"0.0",
+                    f"{channel.split('_dff')[0]}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",
                     f"{vmax:.2f}",
                 ]
             )
