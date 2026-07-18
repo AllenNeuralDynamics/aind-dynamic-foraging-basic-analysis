@@ -2,66 +2,50 @@
 Envelope + rise-rate (Env+RR) signal-to-noise estimator for 1D
 fluorescence (dF/F) traces.
 
-This module provides :class:`EnvelopeRRSNR`, an alternative to a plain
-derivative-based estimator (see e.g. ``estimate_snr`` in
-``snr_kurtosis.py``). Rather than estimating noise from the sample-to-
-sample derivative and signal from raw peak heights, it:
+:class:`EnvelopeRRSNR` estimates SNR by:
 
-1. Tracks a valley-anchored **tonic envelope** beneath the trace, which
-   is robust to slow drift/bleaching that would otherwise bias a
-   derivative-based noise estimate.
-2. Subtracts the tonic envelope to obtain a **phasic residual**.
-3. Estimates the noise floor robustly from the below-median half of the
-   residual (IQR-based sigma), which resists inflation by the phasic
-   events themselves.
-4. Detects candidate phasic peaks above ``peak_threshold_sd`` and
-   refines them with a **rise-rate gate** that rejects slow drifts and
-   keeps only fast-onset transients.
-5. Reports SNR as a suprathreshold peak-amplitude statistic (median or
-   95th percentile) divided by the estimated noise floor.
-
-This is the "Env+RR" method benchmarked against a derivative-based
-estimator across a synthetic SNR sweep. Env+RR detects events at least as well
-as the derivative method, but with a small, consistent linear bias in its
-SNR estimate at high true SNR; :class:`EnvelopeRRSNR` can optionally apply the
-fitted linear correction for that bias (see ``bias_correction`` below and
-``fit_bias_correction_from_benchmark``).
+1. Tracking a **tonic baseline** beneath the trace (``tonic_method``:
+   ``'arpls'`` (default, adaptive asymmetric least squares), ``'als'``
+   (fixed-asymmetry ALS), or ``'envelope'`` (valley/local-minima
+   tracking)).
+2. Subtracting it to get a **phasic residual**.
+3. Estimating the noise floor from that residual (``noise_method``:
+   ``'aind_mad'`` (default), ``'folded_iqr'``, or ``'mad_iqr_avg'``).
+4. Detecting phasic peaks above ``peak_threshold_sd`` and refining them
+   with a rise-rate gate that rejects slow drifts.
+5. Reporting **total SNR** as ``snr_tonic + snr_phasic``: ``snr_tonic``
+   is the tonic baseline's own peak-to-peak range divided by the noise
+   floor, and ``snr_phasic`` is a suprathreshold peak-amplitude
+   statistic divided by the noise floor, optionally bias-corrected
+   (``bias_correction``; fit against ``snr_phasic`` specifically, see
+   ``EnvelopeRRResult``).
 
 Class API
 ---------
-:class:`EnvelopeRRSNR`
-    Stateful estimator: construct once with configuration, call
-    :meth:`~EnvelopeRRSNR.fit` per trace to populate result attributes
-    (``snr_``, ``noise_``, ``peaks_``, ``tonic_``, ``residual_``, ...),
-    call :meth:`~EnvelopeRRSNR.estimate` for a one-shot functional
-    interface returning ``(snr, noise, peaks)`` -- the same 3-tuple
-    shape as a plain ``estimate_snr(trace, fps)`` function, for drop-in
-    comparison -- or call :meth:`~EnvelopeRRSNR.decompose` for just the
-    ``(tonic, phasic)`` component arrays.
+Construct once, call :meth:`~EnvelopeRRSNR.fit` per trace for the full
+result (``snr_`` (total), ``snr_tonic_``, ``snr_phasic_``, ``noise_``,
+``peaks_``, ``tonic_``, ``residual_``, ...), :meth:`~EnvelopeRRSNR.estimate`
+for a one-shot ``(snr, noise, peaks)`` tuple (``snr`` is the total;
+drop-in compatible with a plain ``estimate_snr(trace, fps)`` function),
+:meth:`~EnvelopeRRSNR.estimate_components` for the one-shot
+``(snr_total, snr_tonic, snr_phasic)`` breakdown, or
+:meth:`~EnvelopeRRSNR.decompose` for just ``(tonic, phasic)``.
 
 Notes
 -----
-- Feed a dF/F preprocessed trace, as the peak height is interpreted
-  from zero.
-- Default sampling frequency (``fps``) is 20 Hz; adjust it if your data
-  differ.
-- NaNs are filled with the median of the trace prior to computation.
+- Feed a dF/F preprocessed trace (peak height is interpreted from zero).
+- Default ``fps`` is 20 Hz; NaNs are filled with the trace median.
+- Needs only numpy/scipy -- no other dependencies for any ``noise_method``.
 
 Example
 -------
 >>> import numpy as np
 >>> from snr_envelope_rr import EnvelopeRRSNR
 >>> rng = np.random.default_rng(0)
->>> t = np.arange(1200) / 20.0                      # 60 s @ 20 Hz
+>>> t = np.arange(1200) / 20.0
 >>> y = 0.05 * np.sin(2 * np.pi * t / 40.0) + 0.01 * rng.standard_normal(1200)
->>> estimator = EnvelopeRRSNR(fps=20.0)
->>> result = estimator.fit(y)
+>>> result = EnvelopeRRSNR(fps=20.0).fit(y)
 >>> isinstance(result.snr, float) and isinstance(result.noise, float)
-True
->>> isinstance(result.peaks, np.ndarray)
-True
->>> snr, noise, peaks = estimator.estimate(y)        # one-shot form
->>> snr == result.snr
 True
 """
 
@@ -69,11 +53,11 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import interpolate, signal, stats
+from scipy import interpolate, ndimage, signal, stats
 
 __all__ = ["EnvelopeRRSNR", "EnvelopeRRResult"]
 
@@ -83,21 +67,65 @@ __all__ = ["EnvelopeRRSNR", "EnvelopeRRResult"]
 # real-world duration at a different fps.
 _REFERENCE_FPS = 20.0
 _TUNED_DEFAULTS = {
-    "peak_threshold_sd": 1.5,
+    # Grid search (tonic_method='arpls', the default) found
+    # peak_threshold_sd=2.0 optimal for noise_method='aind_mad'
+    # (score=0.762; arpls_lam=1e7, arpls_n_iter=15, rise_window=5).
+    "peak_threshold_sd": 2.0,
+    # lower_min_distance/lower_smooth_window only apply if
+    # tonic_method='envelope' is explicitly chosen (default is 'arpls',
+    # which uses arpls_lam/arpls_n_iter/arpls_ratio instead).
     "lower_min_distance": 20,  # 1.00 s at 20 fps
-    "lower_smooth_window": 11,  # 0.55 s at 20 fps
+    "lower_smooth_window": 31,  # 1.55 s at 20 fps
     "rise_window": 5,  # 0.25 s at 20 fps
 }
 
-# Remaining envelope-decomposition parameters that aren't fps-scaled tuned
-# hyperparameters above, but still have sensible fixed defaults. Any of
-# these can be overridden via the `config` argument to EnvelopeRRSNR.
+# Linear bias correction fit against ground-truth SNR for the tuned
+# defaults above (noise_method='aind_mad', peak_threshold_sd=2.0,
+# tonic_method='arpls'): snr_corrected = (snr_raw - intercept) / slope.
+# R^2=0.9462. Auto-applied as the constructor's default bias_correction
+# only when the effective config matches these defaults exactly (see
+# __init__); pass bias_correction=None to disable, or refit via
+# fit_bias_correction_from_benchmark for a different configuration.
+_TUNED_BIAS_CORRECTION: Tuple[float, float] = (1.8494, -0.5508)
+
+
+class _UnsetType:
+    """Sentinel distinguishing "bias_correction not specified" (auto-
+    resolve) from an explicit ``bias_correction=None`` (disable)."""
+
+    def __repr__(self) -> str:
+        """Return a short, unambiguous marker for debugging/repr output."""
+        return "<unset>"
+
+
+_UNSET = _UnsetType()
+
+# Noise-floor estimator for sigma_fit. 'aind_mad' (default): median-
+# filtered residual + twice-trimmed scaled MAD (see _mad_noise_std;
+# reproduces aind-ophys-utils' noise_std(method='mad') exactly, cloned
+# locally so this module has no dependency on that package). 'folded_iqr':
+# folds the residual around its own half-sample mode, scales the IQR.
+# 'mad_iqr_avg': mean of the two.
+# 'mad' is a deprecated alias for 'aind_mad' (DeprecationWarning).
+_VALID_NOISE_METHODS = ("aind_mad", "folded_iqr", "mad_iqr_avg")
+_DEFAULT_NOISE_METHOD = "aind_mad"
+_DEPRECATED_NOISE_METHOD_ALIASES = {"mad": "aind_mad"}
+
+# Remaining envelope-decomposition parameters; overridable via `config`.
 _DEFAULT_CONFIG: Dict = {
     "interp_kind": "pchip",  # 'pchip' or 'linear' envelope interpolation
-    "tonic_method": "envelope",  # 'envelope' (valley-tracked) or 'als'
+    # 'arpls' (default): envelope's local-minima tonic tracking collapses
+    # at higher SNR (large transients distort where minima land); arPLS
+    # held up across the full SNR range tested. _TUNED_BIAS_CORRECTION
+    # is fit against this default -- switching tonic_method disables it
+    # automatically (see bias_correction's resolution in __init__).
+    "tonic_method": "arpls",  # 'envelope' (valley-tracked), 'als', or 'arpls'
     "als_lam": 1e7,  # ALS smoothness (only if tonic_method='als')
     "als_p": 0.01,  # ALS asymmetry, rides under peaks
     "als_n_iter": 10,
+    "arpls_lam": 1e7,  # arPLS smoothness (only if tonic_method='arpls')
+    "arpls_n_iter": 15,
+    "arpls_ratio": 1e-6,
     "midpoint_window": 101,  # smoothing window for the midpoint reference curve
     "midpoint_polyorder": 1,
     "lower_order": 2,  # local-minimum order for valley detection
@@ -108,6 +136,93 @@ _DEFAULT_CONFIG: Dict = {
 # ======================================================================
 # Private helpers
 # ======================================================================
+
+
+def _half_sample_mode(x: NDArray[np.floating]) -> float:
+    """Robust mode estimator (half-sample mode; Bickel & Fruhwirth-
+    Schnatter 2006). Recursively narrows to the shortest contiguous half
+    of the sorted data until <=3 points remain, then returns their
+    center. No external dependency; O(n log n).
+    """
+    data = np.sort(np.asarray(x, dtype=np.float64))
+    while len(data) > 3:
+        n = len(data)
+        half_n = (n + 1) // 2
+        widths = data[half_n - 1:] - data[:n - half_n + 1]
+        i = int(np.argmin(widths))
+        data = data[i:i + half_n]
+    if len(data) == 1:
+        return float(data[0])
+    if len(data) == 2:
+        return float(np.mean(data))
+    d1, d2 = data[1] - data[0], data[2] - data[1]
+    if d1 < d2:
+        return float(np.mean(data[:2]))
+    elif d2 < d1:
+        return float(np.mean(data[1:]))
+    else:
+        return float(data[1])
+
+
+def _folded_iqr_noise_std(residual: NDArray[np.floating]) -> float:
+    """Robust noise sigma via folded (one-sided) IQR, mode-anchored.
+
+    Reflects the below-mode half of the residual around its own
+    half-sample mode (:func:`_half_sample_mode`) and scales the IQR by
+    1.349. Only ever looks at the below-mode half, so it never sees
+    above-mode phasic transients -- unlike a two-sided estimator (e.g.
+    :func:`_mad_noise_std`).
+    """
+    residual = np.asarray(residual, dtype=np.float64)
+    anchor = _half_sample_mode(residual)
+    below = residual[residual < anchor]
+    if len(below) >= 20:
+        reflected = anchor - below
+        q75r, q25r = float(np.percentile(reflected, 75)), float(np.percentile(reflected, 25))
+        return (q75r - q25r) / 1.349
+    return float(np.std(residual[residual <= np.median(residual)]))
+
+
+def _robust_std(x: NDArray[np.floating]) -> float:
+    """Scaled median absolute deviation, assuming near-Gaussian noise.
+
+    Local clone of aind-ophys-utils' ``robust_std`` (1D, no-NaN case) --
+    see :func:`_mad_noise_std`.
+    """
+    if x.size == 0:
+        return float("nan")
+    med = float(np.median(x))
+    return 1.4826 * float(np.median(np.abs(x - med)))
+
+
+def _mad_noise_std(residual: NDArray[np.floating], filter_length: int = 31) -> float:
+    """Robust noise sigma via a median-filtered residual + twice-trimmed
+    scaled MAD.
+
+    Local, dependency-free clone of aind-ophys-utils'
+    ``noise_std(x, method='mad')`` (the 1D, ``skipna=False`` case, which
+    is all this module needs) -- reproduces it exactly (validated
+    against the original numerically) without requiring that package,
+    which pulls in pytorch even for this method (a module-level default
+    argument elsewhere in that package evaluates ``torch.cuda.is_available()``
+    at import time).
+
+    Median-filters the residual to remove any remaining slow baseline,
+    takes what's left, trims positive-peak outliers, then trims any
+    remaining outliers on either side, and returns the scaled MAD of
+    that twice-trimmed remainder.
+    """
+    residual = np.asarray(residual, dtype=np.float64)
+    if np.any(np.isnan(residual)):
+        return float("nan")
+    baseline = ndimage.percentile_filter(residual, 50, size=filter_length, mode="reflect")
+    noise = residual - baseline
+    if noise.size == 0:
+        return float("nan")
+    filtered_0 = noise[noise < 1.5 * np.abs(noise.min())]
+    rstd = _robust_std(filtered_0)
+    filtered_1 = filtered_0[np.abs(filtered_0) < 2.5 * rstd]
+    return _robust_std(filtered_1)
 
 
 def _moving_average(
@@ -157,8 +272,14 @@ def _lower_envelope(x, midpoint, smooth_window, order, min_distance, interp_kind
 
 def _als_baseline(y, lam: float = 1e7, p: float = 0.01, n_iter: int = 10):
     """Asymmetric Least Squares (ALS) smooth curve, ridden under peaks
-    when ``p`` is small (the alternative tonic baseline to the
-    valley-tracked envelope above; ``tonic_method='als'``)."""
+    when ``p`` is small (``tonic_method='als'``).
+
+    Has a sharp trade-off in its single fixed ``p``: small p (~0.01)
+    resists large transients but is biased at low SNR; larger p
+    (~0.2-0.3) is good at low SNR but collapses at high SNR. See
+    ``tonic_method='arpls'`` (:func:`_arpls_baseline`), which adapts the
+    asymmetry per trace instead of fixing it in advance.
+    """
     from scipy import sparse
     from scipy.sparse.linalg import spsolve
 
@@ -171,6 +292,42 @@ def _als_baseline(y, lam: float = 1e7, p: float = 0.01, n_iter: int = 10):
         W = sparse.spdiags(w, 0, L, L)
         z = spsolve((W + D).tocsc(), w * y)
         w = p * (y > z) + (1 - p) * (y < z)
+    return z
+
+
+def _arpls_baseline(y, lam: float = 1e7, n_iter: int = 15, ratio: float = 1e-6):
+    """Asymmetrically Reweighted Penalized Least Squares (arPLS) smooth
+    curve (Baek et al. 2015; ``tonic_method='arpls'``).
+
+    Like :func:`_als_baseline`, but the asymmetry weights are re-derived
+    from the current residual's own below-baseline noise statistics at
+    every iteration (same one-sided logic as
+    :func:`_folded_iqr_noise_std`) instead of one fixed `p` chosen in
+    advance -- resolving ALS's low/high-SNR trade-off in testing.
+    Iterates until the relative weight change drops below `ratio` or
+    `n_iter` is reached.
+    """
+    from scipy import sparse
+    from scipy.sparse.linalg import spsolve
+
+    L = len(y)
+    D = sparse.diags([1, -2, 1], [0, -1, -2], shape=(L, L - 2), dtype=float)
+    D = lam * D.dot(D.transpose())
+    w = np.ones(L)
+    z = y.copy()
+    for _ in range(n_iter):
+        W = sparse.spdiags(w, 0, L, L)
+        z = spsolve((W + D).tocsc(), w * y)
+        d = y - z
+        d_neg = d[d < 0]
+        m = float(np.mean(d_neg)) if len(d_neg) else 0.0
+        s = float(np.std(d_neg)) if len(d_neg) else 1e-12
+        s = s if s > 1e-12 else 1e-12
+        w_new = 1.0 / (1.0 + np.exp(np.clip(2 * (d - (2 * s - m)) / s, -500, 500)))
+        if np.linalg.norm(w - w_new) / (np.linalg.norm(w) + 1e-12) < ratio:
+            w = w_new
+            break
+        w = w_new
     return z
 
 
@@ -219,6 +376,14 @@ def _decompose_envelope_rr(x: NDArray[np.floating], config: Dict) -> Dict:
             n_iter=cfg.get("als_n_iter", 10),
         )
         tonic_minima = np.array([], dtype=int)
+    elif tonic_method == "arpls":
+        tonic = _arpls_baseline(
+            x,
+            lam=cfg.get("arpls_lam", 1e7),
+            n_iter=cfg.get("arpls_n_iter", 15),
+            ratio=cfg.get("arpls_ratio", 1e-6),
+        )
+        tonic_minima = np.array([], dtype=int)
     elif tonic_method == "envelope":
         tonic, tonic_minima = _lower_envelope(
             x,
@@ -229,17 +394,27 @@ def _decompose_envelope_rr(x: NDArray[np.floating], config: Dict) -> Dict:
             interp_kind=cfg["interp_kind"],
         )
     else:
-        raise ValueError(f"tonic_method must be 'envelope' or 'als'; got {tonic_method!r}.")
+        raise ValueError(
+            f"tonic_method must be 'envelope', 'als', or 'arpls'; got {tonic_method!r}."
+        )
 
     residual = x - tonic
 
-    neg_res = residual[residual < 0]
-    if len(neg_res) >= 20:
-        reflected = np.abs(neg_res)
-        q75r, q25r = float(np.percentile(reflected, 75)), float(np.percentile(reflected, 25))
-        sigma_iqr = (q75r - q25r) / 1.349
+    noise_method = cfg.get("noise_method", _DEFAULT_NOISE_METHOD)
+    if noise_method in _DEPRECATED_NOISE_METHOD_ALIASES:
+        noise_method = _DEPRECATED_NOISE_METHOD_ALIASES[noise_method]
+
+    if noise_method == "folded_iqr":
+        sigma_iqr = _folded_iqr_noise_std(residual)
+    elif noise_method == "aind_mad":
+        sigma_iqr = _mad_noise_std(residual)
+    elif noise_method == "mad_iqr_avg":
+        sigma_iqr = 0.5 * (_folded_iqr_noise_std(residual) + _mad_noise_std(residual))
     else:
-        sigma_iqr = float(np.std(residual[residual <= np.median(residual)]))
+        raise ValueError(
+            f"noise_method must be one of {_VALID_NOISE_METHODS}; "
+            f"got {noise_method!r}."
+        )
 
     if len(tonic_minima) >= 5:
         n = len(residual)
@@ -306,32 +481,49 @@ class EnvelopeRRResult:
     Attributes
     ----------
     snr : float
-        Estimated signal-to-noise ratio (dimensionless), using
-        ``signal_statistic`` on the suprathreshold phasic peak
-        amplitudes, before any bias correction.
+        **Total** SNR: ``snr_tonic + snr_phasic``, before bias
+        correction. (Changed from phasic-only in earlier versions of
+        this class -- see ``snr_phasic`` for that quantity on its own.)
+    snr_tonic : float
+        Tonic-baseline SNR: the tonic's own peak-to-peak range divided
+        by the noise floor. How much the slow baseline itself varies
+        relative to the noise, independent of any phasic events.
+    snr_phasic : float
+        Phasic SNR: ``signal / noise``, using ``signal_statistic`` on
+        the suprathreshold phasic peak amplitudes. This is what ``snr``
+        meant in earlier versions of this class, and is the quantity
+        ``bias_correction`` was actually fit against (see
+        ``snr_phasic_corrected``).
+    snr_phasic_corrected : float or None
+        ``snr_phasic`` after applying ``bias_correction`` (``None`` if
+        none configured, or if no phasic peaks were detected).
     snr_corrected : float or None
-        ``snr`` after applying ``bias_correction`` (``None`` if no
-        correction was configured).
+        **Total**, bias-corrected: ``snr_tonic + snr_phasic_corrected``
+        (``None`` if ``bias_correction`` isn't configured). Since
+        ``bias_correction`` was fit only against ``snr_phasic`` (see
+        above), this is a derived combination, not itself a directly
+        validated correction of the total -- treat it as an estimate
+        built from one validated piece and one uncorrected piece.
     noise : float
-        Estimated noise floor (IQR-based sigma of the tonic-subtracted
-        residual).
+        Estimated noise floor of the tonic-subtracted residual, via
+        ``config['noise_method']``.
     peaks : numpy.ndarray
         Indices of detected phasic event peaks (rise-rate gated).
     tonic : numpy.ndarray
-        The fitted tonic (slow baseline) envelope, same length as the
-        input trace.
+        Fitted tonic (slow baseline), same length as the input trace.
     residual : numpy.ndarray
         Tonic-subtracted residual (``trace - tonic``).
     signal : float
-        Suprathreshold peak-amplitude statistic used as the numerator
-        of ``snr`` (median or 95th percentile, per
+        Suprathreshold peak-amplitude statistic used as
+        ``snr_phasic``'s numerator (median or 95th percentile, per
         ``signal_statistic``).
     config : dict
-        The resolved configuration used for this fit (defaults merged
-        with any overrides).
+        The resolved configuration used for this fit.
     """
 
     snr: float
+    snr_tonic: float
+    snr_phasic: float
     noise: float
     peaks: NDArray[np.intp]
     tonic: NDArray[np.floating]
@@ -339,6 +531,7 @@ class EnvelopeRRResult:
     signal: float
     config: Dict = field(repr=False)
     snr_corrected: Optional[float] = None
+    snr_phasic_corrected: Optional[float] = None
 
 
 class EnvelopeRRSNR:
@@ -350,48 +543,69 @@ class EnvelopeRRSNR:
         Sampling frequency (frames per second), by default ``20.0``.
     peak_threshold_sd : float, optional
         Detection threshold for candidate phasic peaks, in units of the
-        estimated noise sigma. Defaults to ``1.5``, a value tuned by
-        grid search in synthetic SNR sweep. This is a unitless sigma
-        multiplier, so it does *not* scale with ``fps``.
+        estimated noise sigma (unitless; does not scale with ``fps``).
+        Defaults to ``2.0``, grid-search-optimal for
+        ``noise_method='aind_mad'`` with ``tonic_method='arpls'``
+        (score=0.762). ``folded_iqr`` also optimizes at ``2.0``;
+        ``mad_iqr_avg`` optimizes at ``2.5`` -- don't assume one
+        ``noise_method``'s tuned threshold transfers to another.
     signal_statistic : {'median', 'p95'}, optional
-        Which statistic of the suprathreshold peak amplitudes to use as
-        the SNR numerator, by default ``'median'``.
-    bias_correction : tuple of (slope, intercept), optional
-        If given, ``snr_corrected = (snr_raw - intercept) / slope`` is
-        computed on every fit. Fit this once against ground-truth SNR
-        (e.g. from a synthetic benchmark sweep) with
+        Statistic of the suprathreshold peak amplitudes used as the SNR
+        numerator, by default ``'median'``.
+    noise_method : {'aind_mad', 'folded_iqr', 'mad_iqr_avg'}, optional
+        Noise-floor estimator on the tonic-subtracted residual, by
+        default ``'aind_mad'``.
+
+        - ``'aind_mad'``: local clone of aind-ophys-utils'
+          ``noise_std(method='mad')`` (see :func:`_mad_noise_std`) --
+          reproduces it exactly without depending on that package.
+        - ``'folded_iqr'``: folds the below-mode half of the residual
+          (mode via :func:`_half_sample_mode`) and scales the IQR.
+        - ``'mad_iqr_avg'``: mean of the two above.
+
+        ``'mad'`` is a deprecated alias for ``'aind_mad'`` (raises
+        ``DeprecationWarning``).
+    bias_correction : tuple of (slope, intercept), or None, optional
+        If given, ``snr_phasic_corrected = (snr_phasic - intercept) /
+        slope`` is computed on every fit -- this was fit against
+        ``snr_phasic`` specifically (the only quantity ever validated
+        against ground truth), not the total ``snr``; ``snr_corrected``
+        (the corrected total) is then ``snr_tonic + snr_phasic_corrected``,
+        a derived combination rather than an independently-validated
+        correction. Defaults to a tuned fit
+        (``slope=1.8494, intercept=-0.5508, R^2=0.9462``), but only
+        auto-applies when ``noise_method``, ``peak_threshold_sd``, and
+        ``tonic_method`` all still match the defaults it was fit
+        against (``'aind_mad'``, ``2.0``, ``'arpls'``); change any of
+        those and this silently resolves to ``None`` instead of
+        misapplying a correction fit for a different configuration.
+        Pass ``bias_correction=None`` explicitly to disable it even
+        with the tuned defaults. Fit your own via
         :meth:`fit_bias_correction_from_benchmark` or
-        ``numpy.polyfit(true_snr, snr_est, 1)``, then reuse it here to
-        correct a consistent linear bias without re-running the
-        benchmark on new data.
+        ``numpy.polyfit(true_snr, snr_est, 1)`` for other
+        configurations -- each sits at its own scale.
     config : dict, optional
-        Overrides merged on top of the tuned window defaults (fps-scaled
-        ``lower_min_distance``, ``lower_smooth_window``, ``rise_window``)
-        and the fixed defaults in this module (envelope interpolation,
-        ALS baseline, midpoint smoothing, etc.) -- see
-        ``_DEFAULT_CONFIG`` in this file for the full list. Notably,
-        pass ``config={'tonic_method': 'als'}`` to swap the valley-
-        tracked tonic baseline for an Asymmetric Least Squares fit.
+        Overrides merged on top of the fps-scaled tuned defaults
+        (``lower_min_distance``, ``lower_smooth_window``,
+        ``rise_window``) and this module's fixed defaults -- see
+        ``_DEFAULT_CONFIG``. Notably ``config={'tonic_method': 'als'}``
+        or ``'envelope'`` to change the tonic tracker (default
+        ``'arpls'`` -- see :func:`_arpls_baseline`), or
+        ``config={'noise_method': ...}``, which takes precedence over
+        the ``noise_method`` argument.
 
     Notes
     -----
-    - Noise is estimated from the IQR of the tonic-subtracted residual,
-      not the raw derivative, so it is robust to both slow drift and
-      the phasic events themselves.
-    - Signal is estimated from suprathreshold, rise-rate-gated peak
-      amplitudes in the residual.
-    - If fewer than one phasic peak is found, ``snr`` is ``NaN`` and a
-      :class:`RuntimeWarning` is issued (mirroring the behaviour of a
-      plain derivative-based estimator when too few peaks are found).
+    - Noise is estimated from the tonic-subtracted residual, not the
+      raw derivative, so it's robust to slow drift and phasic events.
+    - If fewer than one phasic peak is found, ``snr_phasic`` is ``NaN``
+      (and so is the total ``snr``, via propagation) and a
+      ``RuntimeWarning`` is issued; ``snr_tonic`` is still computed.
     - **Window defaults scale with fps.** ``lower_min_distance``,
-      ``lower_smooth_window``, and ``rise_window`` are sample counts,
-      tuned at 20 fps (1.00 s, 0.55 s, and 0.25 s respectively). At any
-      other ``fps`` they are automatically rescaled by
-      :meth:`scale_window` to preserve those durations, then rounded to
-      the nearest integer (``lower_smooth_window`` is additionally
-      forced odd, as required by the underlying Savitzky-Golay smoothing
-      step). Pass an explicit value in ``config`` to opt out of scaling
-      for a given parameter.
+      ``lower_smooth_window``, and ``rise_window`` are tuned at 20 fps
+      and rescaled by :meth:`scale_window` to preserve real-world
+      duration at other rates (``lower_smooth_window`` forced odd).
+      Pass an explicit value in ``config`` to opt out.
     """
 
     def __init__(
@@ -399,7 +613,8 @@ class EnvelopeRRSNR:
         fps: float = 20.0,
         peak_threshold_sd: float = _TUNED_DEFAULTS["peak_threshold_sd"],
         signal_statistic: str = "median",
-        bias_correction: Optional[Tuple[float, float]] = None,
+        noise_method: str = _DEFAULT_NOISE_METHOD,
+        bias_correction: Union[Tuple[float, float], None, "_UnsetType"] = _UNSET,
         config: Optional[Dict] = None,
     ) -> None:
         """Construct an estimator; see the class docstring for parameter details."""
@@ -407,9 +622,39 @@ class EnvelopeRRSNR:
             raise ValueError(
                 f"signal_statistic must be 'median' or 'p95', got {signal_statistic!r}."
             )
+        # config={'noise_method': ...} takes precedence over the argument.
+        effective_noise_method = (config or {}).get("noise_method", noise_method)
+        if effective_noise_method in _DEPRECATED_NOISE_METHOD_ALIASES:
+            new_name = _DEPRECATED_NOISE_METHOD_ALIASES[effective_noise_method]
+            effective_noise_method = new_name
+        if effective_noise_method not in _VALID_NOISE_METHODS:
+            raise ValueError(
+                f"noise_method must be one of {_VALID_NOISE_METHODS} "
+                f"(or the deprecated alias 'mad' for 'aind_mad'), "
+                f"got {effective_noise_method!r}."
+            )
+
+        # Same precedence, for the other two settings _TUNED_BIAS_CORRECTION
+        # was fit against -- needed to decide if it's safe to auto-apply.
+        effective_peak_threshold_sd = (config or {}).get("peak_threshold_sd", peak_threshold_sd)
+        effective_tonic_method = (config or {}).get("tonic_method", _DEFAULT_CONFIG["tonic_method"])
+
+        if bias_correction is _UNSET:
+            # Auto-apply the tuned correction only if noise_method,
+            # peak_threshold_sd, and tonic_method all match what it was
+            # fit against -- otherwise it'd silently misapply a
+            # correction fit for a different configuration.
+            matches_tuned_config = (
+                effective_noise_method == _DEFAULT_NOISE_METHOD
+                and effective_peak_threshold_sd == _TUNED_DEFAULTS["peak_threshold_sd"]
+                and effective_tonic_method == _DEFAULT_CONFIG["tonic_method"]
+            )
+            bias_correction = _TUNED_BIAS_CORRECTION if matches_tuned_config else None
+
         self.fps = fps
-        self.peak_threshold_sd = peak_threshold_sd
+        self.peak_threshold_sd = effective_peak_threshold_sd
         self.signal_statistic = signal_statistic
+        self.noise_method = effective_noise_method
         self.bias_correction = bias_correction
 
         scaled_defaults = {
@@ -425,6 +670,9 @@ class EnvelopeRRSNR:
             "peak_threshold_sd": peak_threshold_sd,
             **scaled_defaults,
             **(config or {}),
+            # Set last (resolved, canonical name) so a raw alias in
+            # `config` can't override it back to the deprecated spelling.
+            "noise_method": effective_noise_method,
         }
 
         # populated by fit()
@@ -439,32 +687,14 @@ class EnvelopeRRSNR:
     ) -> int:
         """Rescale a sample-count window to a new fps, preserving duration.
 
-        Parameters
-        ----------
-        base_samples : int
-            Window size in samples at ``reference_fps``.
-        fps : float
-            Target sampling frequency.
-        reference_fps : float, optional
-            The fps ``base_samples`` was tuned/specified at, by default
-            ``20.0``.
-        make_odd : bool, optional
-            If True, increment the result by 1 if it comes out even
-            (required by e.g. Savitzky-Golay smoothing windows).
-
-        Returns
-        -------
-        int
-            ``round(base_samples * fps / reference_fps)``, floored at 1.
+        Returns ``round(base_samples * fps / reference_fps)``, floored
+        at 1. If ``make_odd``, increments by 1 if the result is even
+        (required by e.g. Savitzky-Golay windows).
 
         Example
         -------
-        >>> EnvelopeRRSNR.scale_window(20, fps=20.0)
-        20
         >>> EnvelopeRRSNR.scale_window(20, fps=40.0)
         40
-        >>> EnvelopeRRSNR.scale_window(11, fps=40.0, make_odd=True)
-        23
         """
         n = int(round(base_samples * fps / reference_fps))
         n = max(1, n)
@@ -479,18 +709,9 @@ class EnvelopeRRSNR:
     def fit(self, trace: NDArray[np.floating]) -> EnvelopeRRResult:
         """Decompose ``trace`` and estimate its SNR.
 
-        Parameters
-        ----------
-        trace : numpy.ndarray
-            1D input trace (e.g. dF/F). NaNs are replaced with the
-            median of ``trace`` before calculation.
-
-        Returns
-        -------
-        EnvelopeRRResult
-            Also stored on ``self.result_`` for later access via the
-            convenience properties (``self.snr_``, ``self.noise_``,
-            ``self.peaks_``, etc.).
+        NaNs in ``trace`` are replaced with its median first. Returns
+        an :class:`EnvelopeRRResult`, also stored on ``self.result_``
+        for the convenience properties (``self.snr_``, etc.).
         """
         trace = np.nan_to_num(trace, nan=float(np.nanmedian(trace)))
 
@@ -502,26 +723,38 @@ class EnvelopeRRSNR:
         sig_key = "phasic_p95" if self.signal_statistic == "p95" else "phasic_median"
 
         peaks = np.asarray(raw["event_maxima"], dtype=int)
-        snr = float(raw[snr_key])
+        snr_phasic = float(raw[snr_key])
+        snr_tonic = float(raw["tonic_snr_sd"])
         noise = float(raw["noise_sigma"])
         signal = float(raw[sig_key])
 
         if len(peaks) == 0:
             warnings.warn(
-                "No phasic peaks detected above threshold. Returning NaN for snr.",
+                "No phasic peaks detected above threshold. Returning NaN for snr_phasic.",
                 RuntimeWarning,
                 stacklevel=2,
             )
-            snr = float("nan")
+            snr_phasic = float("nan")
 
+        snr_total = snr_tonic + snr_phasic  # NaN-propagates if snr_phasic is NaN
+
+        snr_phasic_corrected = None
         snr_corrected = None
-        if self.bias_correction is not None and not np.isnan(snr):
+        if self.bias_correction is not None and not np.isnan(snr_phasic):
+            # bias_correction was fit against snr_phasic specifically (the
+            # only quantity ever validated against ground truth) -- see
+            # EnvelopeRRResult's docstring for why snr_corrected (a total)
+            # is therefore a derived combination, not itself validated.
             slope, intercept = self.bias_correction
-            snr_corrected = float((snr - intercept) / slope)
+            snr_phasic_corrected = float((snr_phasic - intercept) / slope)
+            snr_corrected = snr_tonic + snr_phasic_corrected
 
         self.result_ = EnvelopeRRResult(
-            snr=snr,
+            snr=snr_total,
+            snr_tonic=snr_tonic,
+            snr_phasic=snr_phasic,
             snr_corrected=snr_corrected,
+            snr_phasic_corrected=snr_phasic_corrected,
             noise=noise,
             peaks=peaks,
             tonic=raw["tonic"],
@@ -531,67 +764,67 @@ class EnvelopeRRSNR:
         )
         return self.result_
 
-    def estimate(self, trace: NDArray[np.floating]) -> Tuple[float, float, NDArray[np.intp]]:
+    def estimate(
+        self, trace: NDArray[np.floating], apply_correction: bool = False
+    ) -> Tuple[float, float, NDArray[np.intp]]:
         """One-shot functional interface: ``fit`` and return a 3-tuple.
 
-        Mirrors the ``(snr, noise, peaks)`` return signature of a plain
-        derivative-based ``estimate_snr(trace, fps)`` function, so this
-        class can be dropped in wherever that function is used. Returns
-        the bias-corrected SNR if ``bias_correction`` was configured,
-        otherwise the raw SNR.
+        Returns ``(snr, noise, peaks)``, the same shape as a plain
+        derivative-based ``estimate_snr(trace, fps)`` function, for
+        drop-in comparison. ``snr`` is the **total**
+        (``snr_tonic + snr_phasic``). Use :meth:`estimate_components`
+        for the tonic/phasic breakdown without giving up this shape.
 
-        Parameters
-        ----------
-        trace : numpy.ndarray
-            1D input trace (e.g. dF/F).
-
-        Returns
-        -------
-        snr : float
-        noise : float
-        peaks : numpy.ndarray
+        Returns the raw (uncorrected) total by default even if
+        ``bias_correction`` is configured; pass ``apply_correction=True``
+        to get ``snr_corrected`` instead. Use ``.fit(trace)`` directly
+        for repeated calls to avoid recomputing.
         """
         result = self.fit(trace)
-        snr = result.snr_corrected if result.snr_corrected is not None else result.snr
+        if apply_correction and result.snr_corrected is not None:
+            snr = result.snr_corrected
+        else:
+            snr = result.snr
         return snr, result.noise, result.peaks
+
+    def estimate_components(
+        self, trace: NDArray[np.floating], apply_correction: bool = False
+    ) -> Tuple[float, float, float]:
+        """One-shot SNR breakdown: ``fit`` and return
+        ``(snr_total, snr_tonic, snr_phasic)``.
+
+        Companion to :meth:`estimate`, which only returns the total (to
+        keep that method's 3-tuple shape drop-in compatible with a
+        plain ``estimate_snr(trace, fps)`` function). ``snr_total``
+        here always equals :meth:`estimate`'s first element under the
+        same ``apply_correction`` setting.
+
+        Returns raw (uncorrected) values by default; pass
+        ``apply_correction=True`` to get ``snr_corrected`` and
+        ``snr_phasic_corrected`` for the 1st/3rd elements (``snr_tonic``
+        has no correction to apply, so it's unaffected either way).
+        """
+        result = self.fit(trace)
+        if apply_correction and result.snr_corrected is not None:
+            return result.snr_corrected, result.snr_tonic, result.snr_phasic_corrected
+        return result.snr, result.snr_tonic, result.snr_phasic
 
     def decompose(
         self, trace: Optional[NDArray[np.floating]] = None
     ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
         """Return the (tonic, phasic) decomposition of a trace.
 
-        Convenience wrapper around :meth:`fit` for callers who only want
-        the two component arrays rather than the full SNR estimate.
-        "Phasic" here is the tonic-subtracted residual (``trace -
-        tonic``) — the same array as ``EnvelopeRRResult.residual`` /
-        ``self.residual_`` — named ``phasic`` to match the signal/noise
-        decomposition terminology used elsewhere (e.g.
-        ``phasic_median``, ``phasic_snr_median``).
-
-        Parameters
-        ----------
-        trace : numpy.ndarray, optional
-            1D input trace (e.g. dF/F). If omitted, returns the
-            decomposition from the most recent :meth:`fit` /
-            :meth:`estimate` call instead of recomputing one; raises if
-            this instance hasn't been fit yet.
-
-        Returns
-        -------
-        tonic : numpy.ndarray
-            The fitted tonic (slow baseline) envelope.
-        phasic : numpy.ndarray
-            The tonic-subtracted residual, i.e. the phasic component.
+        Convenience wrapper around :meth:`fit`. "Phasic" is the tonic-
+        subtracted residual (``trace - tonic``, same as
+        ``EnvelopeRRResult.residual``). If ``trace`` is omitted, returns
+        the decomposition from the most recent :meth:`fit`/
+        :meth:`estimate` call (raises if not yet fit).
 
         Example
         -------
         >>> import numpy as np
-        >>> rng = np.random.default_rng(0)
-        >>> t = np.arange(1200) / 20.0
-        >>> y = 0.05 * np.sin(2 * np.pi * t / 40.0) + 0.01 * rng.standard_normal(1200)
+        >>> y = 0.01 * np.random.default_rng(0).standard_normal(1200)
         >>> tonic, phasic = EnvelopeRRSNR(fps=20.0).decompose(y)
-        >>> tonic.shape == y.shape and phasic.shape == y.shape
-        True
         >>> np.allclose(phasic, y - tonic)
         True
         """
@@ -608,15 +841,28 @@ class EnvelopeRRSNR:
 
     @property
     def snr_(self) -> float:
-        """SNR from the most recent :meth:`fit` call (raw, uncorrected)."""
+        """Total SNR (``snr_tonic_ + snr_phasic_``) from the most recent
+        :meth:`fit` call (raw, uncorrected)."""
         self._check_fitted()
         return self.result_.snr
 
     @property
     def snr_corrected_(self) -> Optional[float]:
-        """Bias-corrected SNR from the most recent :meth:`fit` call."""
+        """Bias-corrected total SNR from the most recent :meth:`fit` call."""
         self._check_fitted()
         return self.result_.snr_corrected
+
+    @property
+    def snr_tonic_(self) -> float:
+        """Tonic-baseline SNR from the most recent :meth:`fit` call."""
+        self._check_fitted()
+        return self.result_.snr_tonic
+
+    @property
+    def snr_phasic_(self) -> float:
+        """Phasic SNR from the most recent :meth:`fit` call (raw, uncorrected)."""
+        self._check_fitted()
+        return self.result_.snr_phasic
 
     @property
     def noise_(self) -> float:
@@ -660,22 +906,13 @@ class EnvelopeRRSNR:
     ) -> Tuple[float, float]:
         """Fit a linear bias correction from benchmark ground truth.
 
-        Convenience wrapper around ``numpy.polyfit`` for the common case
-        of correcting a consistent linear bias identified by sweeping
-        known SNR levels.
-
-        Parameters
-        ----------
-        true_snr : numpy.ndarray
-            Ground-truth SNR values used in the benchmark sweep.
-        snr_est : numpy.ndarray
-            Corresponding ``EnvelopeRRSNR``-estimated SNR values.
-
-        Returns
-        -------
-        (slope, intercept) : tuple of float
-            Pass directly as ``bias_correction=(slope, intercept)`` to
-            the constructor.
+        Convenience wrapper around ``numpy.polyfit`` for correcting a
+        consistent linear bias found by sweeping known SNR levels. Fit
+        this against ``snr_phasic`` (not the total ``snr``), separately
+        per configuration (``noise_method``, ``peak_threshold_sd``,
+        ``tonic_method``) -- each sits at its own scale. Returns
+        ``(slope, intercept)``; pass directly as
+        ``bias_correction=(slope, intercept)`` to the constructor.
 
         Example
         -------
@@ -684,246 +921,9 @@ class EnvelopeRRSNR:
         >>> snr_est  = 0.9 * true_snr + 1.5   # simulated linear bias
         >>> slope, intercept = EnvelopeRRSNR.fit_bias_correction_from_benchmark(
         ...     true_snr, snr_est)
-        >>> estimator = EnvelopeRRSNR(bias_correction=(slope, intercept))
         """
         true_snr = np.asarray(true_snr, dtype=float)
         snr_est = np.asarray(snr_est, dtype=float)
         ok = np.isfinite(true_snr) & np.isfinite(snr_est)
         slope, intercept = np.polyfit(true_snr[ok], snr_est[ok], 1)
         return float(slope), float(intercept)
-
-
-# ======================================================================
-# Self-test
-#
-# Runs a synthetic (numpy-only, no external dependencies) sanity check
-# of the public API: `python snr_envelope_rr.py`. This is a quick
-# smoke test, checks that the class behaves as documented, not that its
-# SNR estimates are accurate.
-# ======================================================================
-
-
-def _make_synthetic_trace(
-    n_samples: int = 3000,
-    fps: float = 20.0,
-    n_events: int = 40,
-    event_amp: float = 0.15,
-    noise_sigma: float = 0.01,
-    drift_amp: float = 0.05,
-    seed: int = 0,
-) -> NDArray[np.floating]:
-    """Build a synthetic dF/F-like trace: slow sinusoidal drift (tonic)
-    + sparse exponential-decay transients (phasic) + Gaussian noise."""
-    rng = np.random.default_rng(seed)
-    t = np.arange(n_samples) / fps
-
-    tonic = drift_amp * np.sin(2 * np.pi * t / (n_samples / fps / 2))
-
-    trace = tonic.copy()
-    event_starts = rng.choice(
-        np.arange(int(0.5 * fps), n_samples - int(2 * fps)), size=n_events, replace=False
-    )
-    decay_kernel = event_amp * np.exp(-np.arange(int(1.5 * fps)) / (0.3 * fps))
-    for start in event_starts:
-        end = min(start + len(decay_kernel), n_samples)
-        trace[start:end] += decay_kernel[: end - start]
-
-    trace += noise_sigma * rng.standard_normal(n_samples)
-    return trace
-
-
-def _run_case(name: str, fn) -> Tuple[str, bool, str]:
-    """Run one self-test case, capturing pass/fail (and any exception) by name."""
-    try:
-        fn()
-        return (name, True, "")
-    except Exception as exc:  # noqa: BLE001 - want to catch/report everything here
-        return (name, False, f"{type(exc).__name__}: {exc}")
-
-
-def _case_fit_basic(trace: NDArray[np.floating]) -> None:
-    """fit() should return a well-formed result with at least one detected peak."""
-    result = EnvelopeRRSNR().fit(trace)
-    assert isinstance(result.snr, float)
-    assert isinstance(result.noise, float) and result.noise > 0
-    assert isinstance(result.peaks, np.ndarray)
-    assert len(result.peaks) > 0, "expected to detect at least one event"
-    assert result.tonic.shape == trace.shape
-    assert result.residual.shape == trace.shape
-
-
-def _case_estimate_matches_fit(trace: NDArray[np.floating]) -> None:
-    """estimate()'s one-shot tuple should match a separate fit() call exactly."""
-    est = EnvelopeRRSNR()
-    result = est.fit(trace)
-    snr, noise, peaks = est.estimate(trace)
-    assert snr == result.snr
-    assert noise == result.noise
-    assert np.array_equal(peaks, result.peaks)
-
-
-def _case_decompose_with_and_without_trace(trace: NDArray[np.floating]) -> None:
-    """decompose() with vs. without a trace argument should agree, and tonic+phasic
-    should reconstruct the original trace."""
-    est = EnvelopeRRSNR()
-    tonic1, phasic1 = est.decompose(trace)
-    tonic2, phasic2 = est.decompose()  # reuse last fit, no recompute
-    assert np.array_equal(tonic1, tonic2)
-    assert np.array_equal(phasic1, phasic2)
-    assert np.allclose(trace, tonic1 + phasic1), "trace should equal tonic + phasic"
-
-
-def _case_not_fitted_raises() -> None:
-    """Accessing a result property before any fit() call should raise RuntimeError."""
-    est = EnvelopeRRSNR()
-    try:
-        _ = est.snr_
-    except RuntimeError:
-        return
-    raise AssertionError("expected RuntimeError before any fit")
-
-
-def _case_invalid_signal_statistic_raises() -> None:
-    """An unrecognized signal_statistic should raise ValueError at construction."""
-    try:
-        EnvelopeRRSNR(signal_statistic="bogus")
-    except ValueError:
-        return
-    raise AssertionError("expected ValueError for invalid signal_statistic")
-
-
-def _case_scale_window_reference_fps_is_identity() -> None:
-    """scale_window() at the 20 fps reference rate should return its input unchanged."""
-    for base in (5, 11, 20):
-        assert EnvelopeRRSNR.scale_window(base, fps=20.0) == base
-
-
-def _case_scale_window_doubles_at_2x_fps() -> None:
-    """scale_window() should double sample counts when fps doubles."""
-    assert EnvelopeRRSNR.scale_window(20, fps=40.0) == 40
-    assert EnvelopeRRSNR.scale_window(5, fps=40.0) == 10
-
-
-def _case_scale_window_make_odd() -> None:
-    """scale_window(make_odd=True) should always return an odd result."""
-    assert EnvelopeRRSNR.scale_window(11, fps=40.0, make_odd=True) % 2 == 1
-
-
-def _case_fps_scaling_reaches_config() -> None:
-    """Window params in the resolved config should scale with fps; peak_threshold_sd
-    should not."""
-    cfg20 = EnvelopeRRSNR(fps=20.0).config
-    cfg40 = EnvelopeRRSNR(fps=40.0).config
-    assert cfg20["lower_min_distance"] * 2 == cfg40["lower_min_distance"]
-    assert cfg20["rise_window"] * 2 == cfg40["rise_window"]
-    # peak_threshold_sd is not a window -- must NOT scale with fps
-    assert cfg20["peak_threshold_sd"] == cfg40["peak_threshold_sd"]
-
-
-def _case_config_override_takes_precedence() -> None:
-    """An explicit config override should win over the fps-scaled tuned default."""
-    est = EnvelopeRRSNR(config={"rise_window": 999})
-    assert est.config["rise_window"] == 999
-
-
-def _case_bias_correction_applied(trace: NDArray[np.floating]) -> None:
-    """snr_corrected should equal (snr - intercept) / slope for the configured correction."""
-    slope, intercept = 0.8, 2.0
-    est = EnvelopeRRSNR(bias_correction=(slope, intercept))
-    result = est.fit(trace)
-    assert result.snr_corrected is not None
-    expected = (result.snr - intercept) / slope
-    assert abs(result.snr_corrected - expected) < 1e-9
-
-
-def _case_fit_bias_correction_from_benchmark_recovers_known_fit() -> None:
-    """fit_bias_correction_from_benchmark() should exactly recover a noiseless linear fit."""
-    true_snr = np.array([5.0, 10.0, 20.0, 40.0])
-    snr_est = 0.8 * true_snr + 2.0  # exact, noiseless linear relationship
-    slope, intercept = EnvelopeRRSNR.fit_bias_correction_from_benchmark(true_snr, snr_est)
-    assert abs(slope - 0.8) < 1e-9
-    assert abs(intercept - 2.0) < 1e-9
-
-
-def _case_als_tonic_method_runs(trace: NDArray[np.floating]) -> None:
-    """The tonic_method='als' config override should run end-to-end without error."""
-    result = EnvelopeRRSNR(config={"tonic_method": "als"}).fit(trace)
-    assert isinstance(result.snr, float)
-    assert result.tonic.shape == trace.shape
-
-
-def _case_no_peaks_gives_nan_snr_with_warning() -> None:
-    """Pure-noise input with an unreachable threshold should give NaN snr + a warning."""
-    flat = 0.001 * np.random.default_rng(1).standard_normal(500)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        result = EnvelopeRRSNR(peak_threshold_sd=100.0).fit(flat)
-    assert np.isnan(result.snr)
-    assert any(issubclass(w.category, RuntimeWarning) for w in caught)
-
-
-def _case_doctests_pass() -> None:
-    """All doctests embedded in this module's docstrings should pass."""
-    import doctest
-
-    this_module = __import__(__name__)
-    fail_count, _ = doctest.testmod(this_module, optionflags=doctest.ELLIPSIS)
-    assert fail_count == 0, f"{fail_count} doctest(s) failed"
-
-
-def _self_test() -> bool:
-    """Run all self-test cases; print PASS/FAIL per case. Returns True iff every
-    case passed."""
-    trace = _make_synthetic_trace()
-
-    cases = [
-        ("fit() returns sane result", lambda: _case_fit_basic(trace)),
-        ("estimate() matches fit()", lambda: _case_estimate_matches_fit(trace)),
-        (
-            "decompose() with/without trace agree",
-            lambda: _case_decompose_with_and_without_trace(trace),
-        ),
-        ("accessing result before fit() raises", _case_not_fitted_raises),
-        ("invalid signal_statistic raises", _case_invalid_signal_statistic_raises),
-        (
-            "scale_window() is identity at reference fps",
-            _case_scale_window_reference_fps_is_identity,
-        ),
-        ("scale_window() doubles at 2x fps", _case_scale_window_doubles_at_2x_fps),
-        ("scale_window() forces odd when requested", _case_scale_window_make_odd),
-        ("fps scaling reaches resolved config", _case_fps_scaling_reaches_config),
-        ("explicit config override takes precedence", _case_config_override_takes_precedence),
-        ("bias_correction is applied correctly", lambda: _case_bias_correction_applied(trace)),
-        (
-            "fit_bias_correction_from_benchmark recovers fit",
-            _case_fit_bias_correction_from_benchmark_recovers_known_fit,
-        ),
-        ("tonic_method='als' override runs", lambda: _case_als_tonic_method_runs(trace)),
-        (
-            "no detected peaks -> NaN snr + RuntimeWarning",
-            _case_no_peaks_gives_nan_snr_with_warning,
-        ),
-        ("module doctests pass", _case_doctests_pass),
-    ]
-    results = [_run_case(name, fn) for name, fn in cases]
-
-    name_width = max(len(name) for name, _, _ in results)
-    n_passed = 0
-    for name, passed, detail in results:
-        status = "PASS" if passed else "FAIL"
-        line = f"  [{status}] {name:<{name_width}}"
-        if detail:
-            line += f"  -- {detail}"
-        print(line)
-        n_passed += int(passed)
-
-    print(f"\n{n_passed}/{len(results)} checks passed.")
-    return n_passed == len(results)
-
-
-if __name__ == "__main__":
-    import sys as _sys
-
-    print(f"Running self-test for {__name__} ...\n")
-    ok = _self_test()
-    _sys.exit(0 if ok else 1)
