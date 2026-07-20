@@ -617,8 +617,13 @@ def plot_session_in_time_nwb_plotly(  # noqa: C901 pragma: no cover
     df_fip = pd.concat(fip_acc, ignore_index=True) if fip_acc else None
 
     return plot_session_in_time_plotly(
-        df_events, df_trials, df_fip, fip=fip,
-        adjust_time=adjust_time, title=title, smooth_factor=smooth_factor
+        df_events,
+        df_trials,
+        df_fip,
+        fip=fip,
+        adjust_time=adjust_time,
+        title=title,
+        smooth_factor=smooth_factor,
     )
 
 
@@ -811,17 +816,17 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                     moving_average(~np.isnan(choice), smooth_factor) + 1e-6
                 )
                 sm[sm > 100] = np.nan
-                xsm = gc[off_s: off_s + len(sm)]
+                xsm = gc[off_s:off_s + len(sm)]
                 choice_x += [*xsm, None]
                 choice_y += [*_to_curve(sm[: len(xsm)]), None]
             lt = np.concatenate([_ev("left_lick_time"), _ev("right_lick_time")])
             if len(lt):
-                counts = np.bincount(_trial_of(lt), minlength=n_tr + 1)[1: n_tr + 1]
+                counts = np.bincount(_trial_of(lt), minlength=n_tr + 1)[1:n_tr + 1]
                 sm = moving_average(counts.astype(float), smooth_factor)
                 top = np.nanmax(sm) if len(sm) else 0
                 if top > 0:
                     sm = sm / top
-                xsm = gc[off_s: off_s + len(sm)]
+                xsm = gc[off_s:off_s + len(sm)]
                 lick_x += [*xsm, None]
                 lick_y += [*_to_curve(sm[: len(xsm)]), None]
 
