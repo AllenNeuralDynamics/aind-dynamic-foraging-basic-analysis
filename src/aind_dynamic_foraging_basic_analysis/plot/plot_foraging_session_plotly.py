@@ -942,6 +942,8 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     y_main_top = params["curve_top"]
 
     # FIP channels (single-session only), normalised and stacked above the behavior panel
+    fip_unclipped_ids = []
+    fip_clipped_ids = []
     if df_fip is not None and len(sessions) == 1 and len(fip) > 0:
         fip_channels = fip
         present = set(df_fip["event"].unique())
@@ -960,7 +962,6 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             # avoid zero-span stacking problems for constant signals
             if np.isnan(span) or span == 0:
                 span = 1.0
-            
 
             # place this channel so its minimum maps to `base`, preserving original scale
             base = params["curve_top"] + 0.1 + band
@@ -971,15 +972,37 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             custom = np.stack([C.timestamps.values, vals], axis=-1)
             hover = f"%{{customdata[0]:.2f}}s %{{customdata[1]:.3f}} <extra>{channel}</extra>"
 
+            fip_unclipped_ids.append(len(fig.data))
             fig.add_trace(
                 go.Scattergl(
                     x=C.timestamps.values + last_off,
                     y=d,
-                    customdata = custom,
+                    customdata=custom,
                     mode="lines",
                     hovertemplate=hover,
                     line=dict(color=color),
                     name=channel,
+                ),
+                row=1,
+                col=1,
+            )
+
+            # clipped version: clip raw values to 1st–99th percentile, same y-offset
+            p01, p99 = np.nanpercentile(vals, 1), np.nanpercentile(vals, 99)
+            vals_clipped = np.clip(vals, p01, p99)
+            d_clipped = vals_clipped + offset
+            fip_clipped_ids.append(len(fig.data))
+            fig.add_trace(
+                go.Scattergl(
+                    x=C.timestamps.values + last_off,
+                    y=d_clipped,
+                    customdata=custom,
+                    mode="lines",
+                    hovertemplate=hover,
+                    line=dict(color=color),
+                    name=channel,
+                    visible=False,
+                    showlegend=False,
                 ),
                 row=1,
                 col=1,
@@ -998,6 +1021,44 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             # advance band by the display span (not raw span) plus a small gap to avoid overlap
             band += span + fip_gap
             y_main_top = base + span + 0.25
+
+    # Toggle button to switch FIP traces between full range and 1–99% clipped
+    if fip_unclipped_ids:
+        n_all = len(fig.data)
+        vis_full = [True] * n_all
+        vis_clip = [True] * n_all
+        for idx in fip_clipped_ids:
+            vis_full[idx] = False
+        for idx in fip_unclipped_ids:
+            vis_clip[idx] = False
+        for idx in fip_clipped_ids:
+            vis_clip[idx] = True
+
+        fig.update_layout(
+            updatemenus=[
+                dict(
+                    type="buttons",
+                    direction="right",
+                    x=1.0,
+                    y=1.0,
+                    xanchor="right",
+                    yanchor="top",
+                    showactive=True,
+                    buttons=[
+                        dict(
+                            label="FIP: full range",
+                            method="restyle",
+                            args=[{"visible": vis_full}],
+                        ),
+                        dict(
+                            label="FIP: clip 1–99%",
+                            method="restyle",
+                            args=[{"visible": vis_clip}],
+                        ),
+                    ],
+                )
+            ]
+        )
 
 
     # Thick vertical lines marking session boundaries (both panels)
