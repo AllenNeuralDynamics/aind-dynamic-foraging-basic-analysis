@@ -1012,7 +1012,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             yticks.extend([base - vmin, base + span / 2.0, base + span])
             ylabels.extend(
                 [
-                    f"0.0",
+                    "0.0",
                     f"{channel.split('_dff')[0]}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",
                     f"{vmax:.2f}",
                 ]
@@ -1059,8 +1059,6 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                 )
             ]
         )
-
-
     # Thick vertical lines marking session boundaries (both panels)
     for b in boundaries:
         for row in (1, 2):
