@@ -37,27 +37,43 @@ Notes
 - Default ``fps`` is 20 Hz; NaNs are filled with the trace median.
 - Needs only numpy/scipy -- no other dependencies for any ``noise_method``.
 
-Example
+Example: random noise with sinusoidal tonic baseline (SNR ~ 10)
+and no real phasic transients (SNR ~ 0)
 -------
+
 >>> import numpy as np
 >>> from snr_envelope_rr import EnvelopeRRSNR
->>> rng = np.random.default_rng(0)
+>>> rng = np.random.default_rng(2)
 >>> t = np.arange(1200) / 20.0
->>> y = 0.05 * np.sin(2 * np.pi * t / 40.0) + 0.01 * rng.standard_normal(1200)
->>> result = EnvelopeRRSNR(fps=20.0).fit(y)
->>> isinstance(result.snr, float) and isinstance(result.noise, float)
+>>> noise_floor = 0.01
+>>> tonic_amp = 5 * noise_floor # 10 * noise floor
+>>> y = tonic_amp * np.sin(2 * np.pi * t / 40.0) + noise_floor * rng.standard_normal(1200)
+>>> estimator = EnvelopeRRSNR(fps=20.0)
+>>> result = estimator.fit(y)
+>>> snr, noise, peaks = estimator.estimate(y)        # one-shot form
+>>> print(f"total SNR: {snr}")
+total SNR: 12.965802243331636
+>>> print(f"noise estimate (true=0.01): {noise}")
+noise estimate (true=0.01): 0.009333765351685406
+>>> print(f"detected peaks: {peaks}")
+detected peaks: [ 56 105 291 348 604 724]
+>>> print(f"tonic SNR (true=10.0): {result.snr_tonic:.2f}")
+tonic SNR (true=10.0): 10.17
+>>> print(f"phasic SNR (true=0.0): {result.snr_phasic:.2f}")
+phasic SNR (true=0.0): 2.80
 True
+
 """
 
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import interpolate, ndimage, signal, stats
+from scipy import interpolate, ndimage, signal
 
 __all__ = ["EnvelopeRRSNR", "EnvelopeRRResult"]
 
@@ -87,6 +103,12 @@ _TUNED_DEFAULTS = {
 # __init__); pass bias_correction=None to disable, or refit via
 # fit_bias_correction_from_benchmark for a different configuration.
 _TUNED_BIAS_CORRECTION: Tuple[float, float] = (1.8494, -0.5508)
+
+# Only used if tonic_range_method='robust' -- samples at the reference
+# fps above (~5.0s); not tuned/validated like _TUNED_DEFAULTS, just a
+# reasonable starting point (see _robust_tonic_range's docstring). Scaled
+# to the instance's actual fps in __init__, same as _TUNED_DEFAULTS.
+_DEFAULT_TONIC_ROBUST_MIN_DISTANCE = 100
 
 
 class _UnsetType:
@@ -211,6 +233,14 @@ def _mad_noise_std(residual: NDArray[np.floating], filter_length: int = 31) -> f
     takes what's left, trims positive-peak outliers, then trims any
     remaining outliers on either side, and returns the scaled MAD of
     that twice-trimmed remainder.
+
+    Falls back to a less-trimmed robust std (rather than NaN) if a
+    trimming step empties out completely -- this happens on short or
+    heavily-anomalous windows (e.g. one chunk of a chunked/windowed
+    estimate landing squarely on a large artifact) where the first
+    trim's own scale estimate collapses to 0. Silently returning NaN
+    there would poison any downstream aggregation across windows
+    (``np.median`` propagates a single NaN to the whole result).
     """
     residual = np.asarray(residual, dtype=np.float64)
     if np.any(np.isnan(residual)):
@@ -221,8 +251,14 @@ def _mad_noise_std(residual: NDArray[np.floating], filter_length: int = 31) -> f
         return float("nan")
     filtered_0 = noise[noise < 1.5 * np.abs(noise.min())]
     rstd = _robust_std(filtered_0)
-    filtered_1 = filtered_0[np.abs(filtered_0) < 2.5 * rstd]
-    return _robust_std(filtered_1)
+    filtered_1 = filtered_0[np.abs(filtered_0) < 2.5 * rstd] if rstd > 0 else np.array([])
+    if filtered_1.size > 0:
+        result = _robust_std(filtered_1)
+        if result > 0:
+            return result
+    if rstd > 0:
+        return rstd
+    return _robust_std(noise)
 
 
 def _moving_average(
@@ -333,7 +369,24 @@ def _arpls_baseline(y, lam: float = 1e7, n_iter: int = 15, ratio: float = 1e-6):
 
 def _detect_peaks_rise_rate(residual, candidates, sigma, rise_window: int = 3):
     """Reject candidate peaks whose approach isn't fast enough to be a
-    real transient onset (vs. a slow drift crossing threshold)."""
+    real transient onset (vs. a slow drift crossing threshold).
+
+    Calibrates its slope threshold from a robust (MAD-based) scale
+    estimate of the below-median ("noise-like") candidate slopes, not
+    an ordinary standard deviation (``scipy.stats.norm.fit``, what this
+    used before). Ordinary std is itself not robust: a single moderate
+    anomaly elsewhere in the trace can spawn a few large-magnitude
+    candidate slopes from its own decay tail, and even just one or two
+    of those landing in the "below-median" bucket can inflate an
+    ordinary std by 2x+ -- which pushes slope_thresh above genuine
+    events' own slopes and silently suppresses their detection
+    (measured: one moderate, localized anomaly cut detected event count
+    from 73 to 19 out of ~80 genuine events, purely through this
+    threshold-calibration side effect, though the anomaly itself was
+    nowhere near most of the suppressed events). The MAD-based estimate
+    used here left detection completely unchanged (73 to 73) on that
+    same case.
+    """
     if len(candidates) < 5:
         return candidates
 
@@ -349,7 +402,7 @@ def _detect_peaks_rise_rate(residual, candidates, sigma, rise_window: int = 3):
 
     lower = slopes[slopes <= np.median(slopes)]
     if len(lower) >= 5:
-        _, sigma_slope = stats.norm.fit(lower)
+        sigma_slope = 1.4826 * np.median(np.abs(lower - np.median(lower)))
         slope_thresh = max(sigma_slope * 3.0, sigma * 0.1)
     else:
         slope_thresh = np.percentile(slopes, 50)
@@ -357,79 +410,288 @@ def _detect_peaks_rise_rate(residual, candidates, sigma, rise_window: int = 3):
     return candidates[slopes > slope_thresh]
 
 
-def _decompose_envelope_rr(x: NDArray[np.floating], config: Dict) -> Dict:
-    """Tonic/phasic decomposition + rise-rate gated peak detection."""
-    cfg = config
+def _despike_interpolate(
+    x: NDArray[np.floating], window: int, k: float
+) -> Tuple[NDArray[np.floating], NDArray[np.bool_], float]:
+    """Flag samples far from a local (rolling-median) baseline and
+    replace them via linear interpolation from the nearest un-flagged
+    samples on either side -- run *before* tonic fitting, not as a
+    replacement for it.
 
-    midpoint = _moving_average(
-        x,
-        window=cfg["midpoint_window"],
-        polyorder=cfg["midpoint_polyorder"],
+    Why this and not a fixed-ceiling clip: clipping a decaying artifact
+    to a hard ceiling turns it into a flat plateau, which a smoothness-
+    penalized fit (arPLS/ALS) can end up tracking *more* readily than
+    the original decay, since a sustained flat elevation looks more
+    like genuine slow drift than a decaying transient does -- clipping
+    can make tonic contamination worse, not better (measured directly:
+    a naive global clip at 50x a robust noise estimate roughly
+    tripled downstream tonic contamination in one test case). Removing
+    the flagged span and interpolating over it avoids introducing that
+    new, more-trackable shape.
+
+    Parameters
+    ----------
+    x : ndarray
+    window : int
+        Rolling-median window (samples) for the local baseline and
+        local MAD estimate.
+    k : float
+        Flag samples where ``|x - rolling_median| > k * local_MAD``.
+
+    Returns
+    -------
+    x_clean : ndarray
+        Copy of ``x`` with flagged samples replaced.
+    flagged : ndarray of bool
+    local_noise_est : float
+        Median of the local MAD estimate across the trace (diagnostic).
+    """
+    rolling_med = ndimage.median_filter(x, size=window, mode="reflect")
+    dev = x - rolling_med
+    local_mad = 1.4826 * ndimage.median_filter(np.abs(dev), size=window, mode="reflect")
+    local_mad = np.maximum(local_mad, 1e-12)
+    flagged = np.abs(dev) > k * local_mad
+
+    x_clean = x.copy()
+    if flagged.any() and not flagged.all():
+        idx = np.arange(len(x))
+        x_clean[flagged] = np.interp(idx[flagged], idx[~flagged], x[~flagged])
+
+    return x_clean, flagged, float(np.median(local_mad))
+
+
+def _robust_tonic_range(tonic: NDArray[np.floating], min_distance: int) -> Tuple[float, int]:
+    """Median peak-to-valley swing amplitude of the tonic curve --
+    mirrors how phasic amplitude is estimated (detect individual
+    events, take the median across them) instead of ``ptp(tonic)``'s
+    single global max-minus-min.
+
+    Detects local maxima and minima in ``tonic``
+    (``scipy.signal.argrelextrema``, ``order=min_distance`` -- the
+    number of samples on each side a point must exceed to count as a
+    local extremum), takes the absolute difference between each pair of
+    temporally-adjacent extrema (each one a single peak-to-valley or
+    valley-to-peak "swing"), and returns the median swing amplitude.
+
+    A one-off contaminated region typically produces only one or two
+    anomalous swings among many genuine ones, so the median has a real
+    breakdown point -- unlike ``ptp(tonic)``, which *is* the
+    contaminated region's own extreme value whenever that region
+    happens to contain the global max or min. Unlike a chunked/windowed
+    estimate (:meth:`EnvelopeRRSNR.fit_chunked`), this doesn't impose an
+    arbitrary fixed-duration window that can slice a genuine slow cycle
+    in half and underestimate it by construction -- it finds extrema
+    wherever the curve's own structure actually puts them, the same
+    principle ``find_peaks`` already uses for phasic events.
+
+    The trade-off: robustness here scales with how many genuine swings
+    get detected, same as phasic's median scales with how many genuine
+    events get detected. A short recording relative to the tonic's own
+    drift period (few genuine cycles) gives the median little to work
+    with, same limitation phasic would have with only a handful of true
+    transients.
+
+    Parameters
+    ----------
+    tonic : ndarray
+        Fitted tonic curve.
+    min_distance : int
+        Minimum spacing (samples) between detected extrema -- should be
+        well below the tonic's own characteristic drift period, but
+        well above any remaining fast wiggle in the fitted curve.
+
+    Returns
+    -------
+    tonic_range : float
+        Median swing amplitude, or ``ptp(tonic)`` if fewer than 2
+        extrema are detected (not enough structure for a meaningful
+        median -- e.g. a very short trace or an almost perfectly flat
+        tonic).
+    n_swings : int
+        Number of swings the median was computed over (0 if it fell
+        back to ``ptp``).
+    """
+    peaks = signal.argrelextrema(tonic, np.greater, order=min_distance)[0]
+    valleys = signal.argrelextrema(tonic, np.less, order=min_distance)[0]
+    extrema_idx = np.sort(np.concatenate([peaks, valleys]))
+    if len(extrema_idx) < 2:
+        return float(np.ptp(tonic)), 0
+    swings = np.abs(np.diff(tonic[extrema_idx]))
+    return float(np.median(swings)), len(swings)
+
+
+def _apply_pre_despike(
+    x: NDArray[np.floating], cfg: Dict
+) -> Tuple[NDArray[np.floating], int, float]:
+    """Optionally despike ``x`` before it's used for tonic fitting.
+
+    Off by default (``cfg['pre_despike_window']`` is ``None``),
+    preserving prior behavior exactly unless opted in. Scoped to
+    protecting the tonic fit only -- callers should run residual/peak
+    detection on the ORIGINAL ``x``, not this function's output, so a
+    genuine large artifact still surfaces as an inspectable outlier
+    rather than silently vanishing. Even with despiking on, a large
+    enough outlier relative to the true tonic's own dynamic range can
+    still leak through a smoothness-penalized fit;
+    ``n_extreme_samples``/``frac_extreme_samples`` are diagnostics for
+    exactly that residual risk, not a guarantee despiking fully
+    removed it.
+
+    Returns
+    -------
+    x_for_tonic : ndarray
+        ``x`` unchanged if pre-despiking is off, else the despiked copy.
+    n_extreme_samples : int
+    frac_extreme_samples : float
+    """
+    pre_despike_window = cfg.get("pre_despike_window", None)
+    if pre_despike_window is None:
+        return x, 0, 0.0
+    x_for_tonic, flagged, _local_noise = _despike_interpolate(
+        x, window=pre_despike_window, k=cfg.get("pre_despike_k", 5.0)
     )
+    n_extreme_samples = int(np.sum(flagged))
+    frac_extreme_samples = float(n_extreme_samples / len(x))
+    return x_for_tonic, n_extreme_samples, frac_extreme_samples
 
-    tonic_method = cfg.get("tonic_method", "envelope")
+
+def _fit_tonic_curve(
+    x_for_tonic: NDArray[np.floating],
+    midpoint: NDArray[np.floating],
+    tonic_method: str,
+    cfg: Dict,
+) -> Tuple[NDArray[np.floating], NDArray[np.intp]]:
+    """Fit the tonic (slow baseline) curve with the requested tracker.
+
+    Parameters
+    ----------
+    x_for_tonic : ndarray
+        Trace to fit (already despiked if pre-despiking was applied).
+    midpoint : ndarray
+        Smoothed reference curve; only used by ``tonic_method='envelope'``.
+    tonic_method : {'als', 'arpls', 'envelope'}
+    cfg : dict
+        Method-specific tuning knobs (``als_lam``/``als_p``/``als_n_iter``,
+        ``arpls_lam``/``arpls_n_iter``/``arpls_ratio``, or
+        ``lower_smooth_window``/``lower_order``/``lower_min_distance``/
+        ``interp_kind``).
+
+    Returns
+    -------
+    tonic : ndarray
+    tonic_minima : ndarray of int
+        Valley indices tracked by the envelope method; empty for
+        ``'als'``/``'arpls'`` (they have no discrete "minima" concept).
+
+    Raises
+    ------
+    ValueError
+        If ``tonic_method`` isn't one of the three supported values.
+    """
     if tonic_method == "als":
         tonic = _als_baseline(
-            x,
+            x_for_tonic,
             lam=cfg.get("als_lam", 1e7),
             p=cfg.get("als_p", 0.01),
             n_iter=cfg.get("als_n_iter", 10),
         )
-        tonic_minima = np.array([], dtype=int)
+        return tonic, np.array([], dtype=int)
     elif tonic_method == "arpls":
         tonic = _arpls_baseline(
-            x,
+            x_for_tonic,
             lam=cfg.get("arpls_lam", 1e7),
             n_iter=cfg.get("arpls_n_iter", 15),
             ratio=cfg.get("arpls_ratio", 1e-6),
         )
-        tonic_minima = np.array([], dtype=int)
+        return tonic, np.array([], dtype=int)
     elif tonic_method == "envelope":
-        tonic, tonic_minima = _lower_envelope(
-            x,
+        return _lower_envelope(
+            x_for_tonic,
             midpoint,
             cfg["lower_smooth_window"],
             cfg["lower_order"],
             cfg["lower_min_distance"],
             interp_kind=cfg["interp_kind"],
         )
-    else:
-        raise ValueError(
-            f"tonic_method must be 'envelope', 'als', or 'arpls'; got {tonic_method!r}."
-        )
+    raise ValueError(f"tonic_method must be 'envelope', 'als', or 'arpls'; got {tonic_method!r}.")
 
-    residual = x - tonic
 
-    noise_method = cfg.get("noise_method", _DEFAULT_NOISE_METHOD)
-    if noise_method in _DEPRECATED_NOISE_METHOD_ALIASES:
-        noise_method = _DEPRECATED_NOISE_METHOD_ALIASES[noise_method]
+def _resolve_noise_method(noise_method: str) -> str:
+    """Resolve a deprecated ``noise_method`` alias (e.g. ``'mad'``) to
+    its canonical name (``'aind_mad'``); returns unrecognized names
+    unchanged so the caller's own validation can reject them."""
+    return _DEPRECATED_NOISE_METHOD_ALIASES.get(noise_method, noise_method)
 
+
+def _estimate_residual_noise(residual: NDArray[np.floating], noise_method: str) -> float:
+    """Dispatch to the requested noise-floor estimator on the tonic-
+    subtracted residual.
+
+    Parameters
+    ----------
+    residual : ndarray
+    noise_method : {'aind_mad', 'folded_iqr', 'mad_iqr_avg'}
+        Deprecated aliases (e.g. ``'mad'``) are resolved first via
+        :func:`_resolve_noise_method`.
+
+    Returns
+    -------
+    float
+
+    Raises
+    ------
+    ValueError
+        If ``noise_method`` (after alias resolution) isn't one of the
+        three supported values.
+    """
+    noise_method = _resolve_noise_method(noise_method)
     if noise_method == "folded_iqr":
-        sigma_iqr = _folded_iqr_noise_std(residual)
+        return _folded_iqr_noise_std(residual)
     elif noise_method == "aind_mad":
-        sigma_iqr = _mad_noise_std(residual)
+        return _mad_noise_std(residual)
     elif noise_method == "mad_iqr_avg":
-        sigma_iqr = 0.5 * (_folded_iqr_noise_std(residual) + _mad_noise_std(residual))
-    else:
-        raise ValueError(
-            f"noise_method must be one of {_VALID_NOISE_METHODS}; "
-            f"got {noise_method!r}."
-        )
+        return 0.5 * (_folded_iqr_noise_std(residual) + _mad_noise_std(residual))
+    raise ValueError(f"noise_method must be one of {_VALID_NOISE_METHODS}; got {noise_method!r}.")
 
-    if len(tonic_minima) >= 5:
-        n = len(residual)
-        mid_idx = ((tonic_minima[:-1] + tonic_minima[1:]) // 2).astype(int)
-        mid_idx = mid_idx[(mid_idx >= 0) & (mid_idx < n)]
-        sigma_minima = float(np.std(residual[mid_idx])) if len(mid_idx) >= 5 else sigma_iqr
-    else:
-        sigma_minima = sigma_iqr
 
-    sigma_fit = sigma_iqr
-    thresh = cfg["peak_threshold_sd"] * sigma_fit
+def _estimate_sigma_minima(
+    residual: NDArray[np.floating],
+    tonic_minima: NDArray[np.intp],
+    fallback_sigma: float,
+) -> float:
+    """Noise estimate from the residual at valley-to-valley midpoints --
+    only meaningful for ``tonic_method='envelope'``, which tracks an
+    explicit list of minima. Falls back to ``fallback_sigma`` if there
+    aren't enough minima (or valid midpoints) for a stable estimate.
+    """
+    if len(tonic_minima) < 5:
+        return fallback_sigma
+    n = len(residual)
+    mid_idx = ((tonic_minima[:-1] + tonic_minima[1:]) // 2).astype(int)
+    mid_idx = mid_idx[(mid_idx >= 0) & (mid_idx < n)]
+    if len(mid_idx) < 5:
+        return fallback_sigma
+    return float(np.std(residual[mid_idx]))
 
+
+def _detect_phasic_events(
+    residual: NDArray[np.floating], sigma_fit: float, cfg: Dict
+) -> Tuple[NDArray[np.intp], float, NDArray[np.floating]]:
+    """Detect suprathreshold phasic peaks and gate them by rise rate
+    (see :func:`_detect_peaks_rise_rate`).
+
+    Returns
+    -------
+    event_maxima : ndarray of int
+    threshold : float
+        ``peak_threshold_sd * sigma_fit`` -- the height cutoff used.
+    peak_amps : ndarray
+        ``residual[event_maxima]``; empty if no events were detected.
+    """
+    threshold = cfg["peak_threshold_sd"] * sigma_fit
     raw_peaks, _ = signal.find_peaks(
         residual,
-        height=thresh,
+        height=threshold,
         distance=cfg.get("upper_min_distance", 3),
     )
     event_maxima = _detect_peaks_rise_rate(
@@ -441,13 +703,119 @@ def _decompose_envelope_rr(x: NDArray[np.floating], config: Dict) -> Dict:
     event_maxima = np.asarray(event_maxima, dtype=int)
     event_maxima = event_maxima[(event_maxima >= 0) & (event_maxima < len(residual))]
     peak_amps = residual[event_maxima] if len(event_maxima) > 0 else np.array([])
+    return event_maxima, threshold, peak_amps
 
-    if len(peak_amps) > 0:
-        phasic_p95 = float(np.percentile(peak_amps, 95))
-        phasic_median = float(np.median(peak_amps))
-        phasic_sd = float(np.std(peak_amps))
-    else:
-        phasic_p95 = phasic_median = phasic_sd = 0.0
+
+def _summarize_phasic_amplitudes(
+    peak_amps: NDArray[np.floating],
+) -> Tuple[float, float, float]:
+    """95th percentile / median / std of detected peak amplitudes; all
+    zero if no events were detected.
+
+    Returns
+    -------
+    (phasic_p95, phasic_median, phasic_sd)
+    """
+    if len(peak_amps) == 0:
+        return 0.0, 0.0, 0.0
+    return (
+        float(np.percentile(peak_amps, 95)),
+        float(np.median(peak_amps)),
+        float(np.std(peak_amps)),
+    )
+
+
+def _compute_tonic_range(
+    tonic: NDArray[np.floating], tonic_range_method: str, cfg: Dict
+) -> Tuple[float, int]:
+    """Dispatch to the requested tonic-amplitude summary statistic.
+
+    ``ptp(tonic)`` (``max - min``) has a breakdown point of exactly one
+    sample -- a single large excursion the tonic fit only partially
+    absorbs (e.g. from a sustained artifact arPLS's reweighting doesn't
+    fully reject) inflates it directly, with nothing to average it out.
+    ``'percentile'`` trims ``tonic_range_trim_pct`` from each tail
+    before taking the range, at the cost of also clipping any genuine
+    tonic dynamic range that happens to live in that trimmed fraction --
+    choose ``tonic_range_trim_pct`` to comfortably exceed the fraction
+    of the trace you expect a real artifact to occupy (e.g. a 5s glitch
+    in a 150s trace is ~3.3% one-sided; ``trim_pct=5`` gives a 5%
+    one-sided margin above that). ``'robust'`` (the default) instead
+    takes the median peak-to-valley swing amplitude across detected
+    local extrema in the tonic curve (see :func:`_robust_tonic_range`),
+    mirroring how phasic amplitude is estimated (detect individual
+    events, take the median across them) rather than reading off a
+    single global extreme value.
+
+    Returns
+    -------
+    tonic_range : float
+    n_tonic_swings : int
+        Only nonzero for ``tonic_range_method='robust'``.
+
+    Raises
+    ------
+    ValueError
+        If ``tonic_range_method`` isn't one of the three supported
+        values.
+    """
+    if tonic_range_method == "ptp":
+        return float(np.ptp(tonic)), 0
+    elif tonic_range_method == "percentile":
+        trim_pct = cfg.get("tonic_range_trim_pct", 5.0)
+        tonic_range = float(np.percentile(tonic, 100 - trim_pct) - np.percentile(tonic, trim_pct))
+        return tonic_range, 0
+    elif tonic_range_method == "robust":
+        min_distance = cfg.get("tonic_robust_min_distance", _DEFAULT_TONIC_ROBUST_MIN_DISTANCE)
+        return _robust_tonic_range(tonic, min_distance)
+    raise ValueError(
+        f"tonic_range_method must be 'ptp', 'percentile', or 'robust'; "
+        f"got {tonic_range_method!r}."
+    )
+
+
+def _decompose_envelope_rr(x: NDArray[np.floating], config: Dict) -> Dict:
+    """Tonic/phasic decomposition + rise-rate gated peak detection.
+
+    A thin orchestrator: optional pre-despiking
+    (:func:`_apply_pre_despike`) -> tonic fit (:func:`_fit_tonic_curve`)
+    -> noise-floor estimate (:func:`_estimate_residual_noise`,
+    :func:`_estimate_sigma_minima`) -> phasic peak detection
+    (:func:`_detect_phasic_events`, :func:`_summarize_phasic_amplitudes`)
+    -> tonic-amplitude summary statistic (:func:`_compute_tonic_range`).
+    See each helper's own docstring for the mechanism and trade-offs of
+    the strategy it dispatches between; this function itself makes no
+    strategy decisions of its own.
+    """
+    cfg = config
+
+    x_for_tonic, n_extreme_samples, frac_extreme_samples = _apply_pre_despike(x, cfg)
+
+    midpoint = _moving_average(
+        x_for_tonic,
+        window=cfg["midpoint_window"],
+        polyorder=cfg["midpoint_polyorder"],
+    )
+
+    tonic_method = cfg.get("tonic_method", "envelope")
+    tonic, tonic_minima = _fit_tonic_curve(x_for_tonic, midpoint, tonic_method, cfg)
+
+    # residual/peak-detection intentionally use the ORIGINAL x, not
+    # x_for_tonic -- despiking is scoped to protecting the tonic fit; a
+    # genuine large artifact should still surface in the residual/phasic
+    # stats as an inspectable outlier rather than being silently erased.
+    residual = x - tonic
+
+    noise_method = cfg.get("noise_method", _DEFAULT_NOISE_METHOD)
+    sigma_iqr = _estimate_residual_noise(residual, noise_method)
+    sigma_minima = _estimate_sigma_minima(residual, tonic_minima, sigma_iqr)
+    sigma_fit = sigma_iqr
+
+    event_maxima, thresh, peak_amps = _detect_phasic_events(residual, sigma_fit, cfg)
+    phasic_p95, phasic_median, phasic_sd = _summarize_phasic_amplitudes(peak_amps)
+
+    tonic_range_method = cfg.get("tonic_range_method", "robust")
+    tonic_range, n_tonic_swings = _compute_tonic_range(tonic, tonic_range_method, cfg)
 
     return {
         "tonic": tonic,
@@ -462,14 +830,17 @@ def _decompose_envelope_rr(x: NDArray[np.floating], config: Dict) -> Dict:
         "peak_threshold": float(thresh),
         "detection_method": "rise_rate",
         "tonic_method": tonic_method,
-        "tonic_range": float(np.ptp(tonic)),
+        "tonic_range": tonic_range,
         "phasic_p95": phasic_p95,
         "phasic_median": phasic_median,
         "phasic_amplitude": phasic_sd,
         "phasic_snr_p95": float(phasic_p95 / sigma_fit) if sigma_fit > 0 else float("nan"),
         "phasic_snr_median": float(phasic_median / sigma_fit) if sigma_fit > 0 else float("nan"),
         "phasic_snr_sd": float(phasic_sd / sigma_fit) if sigma_fit > 0 else float("nan"),
-        "tonic_snr_sd": float(np.ptp(tonic) / sigma_fit) if sigma_fit > 0 else float("nan"),
+        "tonic_snr_sd": float(tonic_range / sigma_fit) if sigma_fit > 0 else float("nan"),
+        "n_extreme_samples": n_extreme_samples,
+        "n_tonic_swings": n_tonic_swings,
+        "frac_extreme_samples": frac_extreme_samples,
         "config": cfg,
     }
 
@@ -519,6 +890,30 @@ class EnvelopeRRResult:
         ``signal_statistic``).
     config : dict
         The resolved configuration used for this fit.
+    n_extreme_samples : int
+        Count of samples flagged and interpolated over by pre-despiking
+        before the tonic fit (0 if ``pre_despike_window`` wasn't set in
+        ``config``). A nonzero count doesn't mean the tonic fit is now
+        clean -- see the module docstring's note on ``tonic_range`` and
+        despiking's actual, partial effectiveness against large,
+        sustained artifacts.
+    frac_extreme_samples : float
+        ``n_extreme_samples / len(trace)``.
+    n_chunks : int or None
+        Number of chunks actually used to compute ``snr_tonic``, if
+        this result came from :meth:`EnvelopeRRSNR.fit_chunked` rather
+        than :meth:`EnvelopeRRSNR.fit`. ``None`` after a plain ``fit``.
+    chunk_duration_s : float or None
+        Chunk length (seconds) used by :meth:`fit_chunked`, if
+        applicable.
+    per_chunk_tonic_snr : list of float or None
+        Each chunk's own ``snr_tonic`` before aggregation, if this
+        result came from :meth:`fit_chunked`.
+    n_tonic_swings : int
+        Number of peak-to-valley swings the median was computed over,
+        if ``config['tonic_range_method'] == 'robust'`` (0 otherwise,
+        including the fallback-to-``ptp`` case when fewer than 2
+        extrema were detected -- see :func:`_robust_tonic_range`).
     """
 
     snr: float
@@ -532,6 +927,12 @@ class EnvelopeRRResult:
     config: Dict = field(repr=False)
     snr_corrected: Optional[float] = None
     snr_phasic_corrected: Optional[float] = None
+    n_extreme_samples: int = 0
+    frac_extreme_samples: float = 0.0
+    n_chunks: Optional[int] = None
+    chunk_duration_s: Optional[float] = None
+    per_chunk_tonic_snr: Optional[list] = None
+    n_tonic_swings: int = 0
 
 
 class EnvelopeRRSNR:
@@ -593,6 +994,23 @@ class EnvelopeRRSNR:
         ``'arpls'`` -- see :func:`_arpls_baseline`), or
         ``config={'noise_method': ...}``, which takes precedence over
         the ``noise_method`` argument.
+
+        ``tonic_range_method`` (default ``'robust'``) controls how
+        ``snr_tonic`` is computed from the fitted tonic curve:
+        ``'robust'`` -- median peak-to-valley swing amplitude across
+        detected local extrema, mirroring how ``snr_phasic`` is
+        estimated (detect individual events, take the median across
+        them), spacing controlled by ``tonic_robust_min_distance``
+        (default 100 samples at 20fps, fps-scaled) -- or ``'ptp'``
+        (``max(tonic) - min(tonic)``, the previous default; a fragile,
+        single-sample-breakdown-point statistic -- kept for backward
+        compatibility, and still useful as a plain, unadorned baseline
+        to compare against), or ``'percentile'`` (trims
+        ``tonic_range_trim_pct`` from each tail before taking the
+        range). See :func:`_robust_tonic_range` for the full mechanism
+        and its own trade-off (robustness scales with how many genuine
+        tonic swings actually get detected, same as ``snr_phasic``'s
+        robustness scales with detected event count).
 
     Notes
     -----
@@ -663,6 +1081,7 @@ class EnvelopeRRSNR:
                 _TUNED_DEFAULTS["lower_smooth_window"], fps, make_odd=True
             ),
             "rise_window": self.scale_window(_TUNED_DEFAULTS["rise_window"], fps),
+            "tonic_robust_min_distance": self.scale_window(_DEFAULT_TONIC_ROBUST_MIN_DISTANCE, fps),
         }
         self.config = {
             **_DEFAULT_CONFIG,
@@ -761,8 +1180,150 @@ class EnvelopeRRSNR:
             residual=raw["residual"],
             signal=signal,
             config=raw["config"],
+            n_extreme_samples=raw["n_extreme_samples"],
+            frac_extreme_samples=raw["frac_extreme_samples"],
+            n_tonic_swings=raw["n_tonic_swings"],
         )
         return self.result_
+
+    def fit_chunked(
+        self,
+        trace: NDArray[np.floating],
+        chunk_duration_s: Optional[float] = None,
+        min_chunk_duration_s: float = 30.0,
+        chunk_fraction: float = 0.20,
+        aggregate: str = "median",
+    ) -> EnvelopeRRResult:
+        """Like :meth:`fit`, but computes ``snr_tonic`` from a chunked,
+        per-window median instead of the single global fit's
+        ``ptp(tonic)``.
+
+        Why: ``ptp(tonic)`` has a breakdown point of exactly one sample
+        -- a single large excursion the tonic fit only partially
+        absorbs (e.g. a sustained artifact arPLS's reweighting doesn't
+        fully reject) inflates it directly, with nothing to average it
+        out. Splitting the trace into independent chunks and fitting
+        each one separately means a one-off artifact can only poison
+        the (hopefully minority of) chunks it actually overlaps; the
+        median across chunks then has a real breakdown point, rather
+        than relying on one global fit's shape being trustworthy in
+        the first place. Measured on synthetic one-off sustained
+        artifacts: brings tonic_snr inflation from ~6x (a flat true
+        baseline, 5000x-noise_sigma artifact) down to ~1.04x, versus
+        ~15-20% reductions from pre-despiking or percentile-trimmed
+        ``tonic_range`` alone -- this changes the failure mode instead
+        of just softening it.
+
+        The trade-off: a chunk shorter than the recording's own genuine
+        tonic drift period will only see a fraction of that drift,
+        biasing ``snr_tonic`` down even on a clean trace (measured:
+        ~3x underestimate using 15s chunks against a 120s-period
+        drift). Default chunk sizing (``chunk_duration_s=None``)
+        balances this with ``max(min_chunk_duration_s, chunk_fraction *
+        recording_duration)`` -- a fixed floor for short recordings,
+        scaling up for longer ones so chunk size tracks a long
+        recording's own timescale rather than staying fixed at the
+        floor. Pass ``chunk_duration_s`` explicitly to match your own
+        recordings' known drift timescale instead of relying on this
+        heuristic -- it's a reasonable default, not a substitute for
+        knowing your own data.
+
+        Everything else (phasic peak detection, noise floor, residual,
+        the returned ``tonic`` curve) is unchanged from :meth:`fit` --
+        only ``snr_tonic`` (and the ``snr``/``snr_corrected`` totals
+        derived from it) differ. New fields not populated by a plain
+        :meth:`fit` call: ``n_chunks``, ``chunk_duration_s``,
+        ``per_chunk_tonic_snr``.
+
+        Parameters
+        ----------
+        trace : ndarray
+        chunk_duration_s : float, optional
+            Chunk length in seconds. If None (default), uses
+            ``max(min_chunk_duration_s, chunk_fraction * len(trace)/fps)``.
+        min_chunk_duration_s : float
+            Floor on the default chunk duration (seconds). Ignored if
+            ``chunk_duration_s`` is given explicitly.
+        chunk_fraction : float
+            Fraction of the recording's total duration used for the
+            default chunk duration, before the floor is applied.
+            Ignored if ``chunk_duration_s`` is given explicitly.
+        aggregate : {'median', 'mean'}
+            How to combine per-chunk ``snr_tonic`` values. ``'median'``
+            (default) is what gives this its outlier robustness;
+            ``'mean'`` has no breakdown point and defeats the purpose --
+            provided mainly for comparison/diagnostics.
+
+        Returns
+        -------
+        EnvelopeRRResult
+            Same structure as :meth:`fit`'s return value, with
+            ``snr_tonic``/``snr``/``snr_corrected`` computed from the
+            chunked-median tonic estimate, plus ``n_chunks``,
+            ``chunk_duration_s``, ``per_chunk_tonic_snr``. Also stored
+            on ``self.result_``.
+        """
+        trace = np.nan_to_num(trace, nan=float(np.nanmedian(trace)))
+
+        # Global fit first: phasic peaks/signal/noise/residual/the
+        # returned tonic curve all come from here, unchanged from a
+        # plain fit() -- only snr_tonic (and totals derived from it)
+        # get overridden below.
+        result = self.fit(trace)
+
+        n = len(trace)
+        if chunk_duration_s is None:
+            chunk_duration_s = max(min_chunk_duration_s, chunk_fraction * (n / self.fps))
+        chunk_len = max(1, int(round(chunk_duration_s * self.fps)))
+        n_chunks_requested = max(1, n // chunk_len)
+        chunks = np.array_split(trace, n_chunks_requested)
+
+        min_samples = max(50, int(self.config.get("midpoint_window", 101)))
+        per_chunk_tonic_snr = []
+        for c in chunks:
+            if len(c) < min_samples:
+                continue
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                r = _decompose_envelope_rr(c, self.config)
+            per_chunk_tonic_snr.append(float(r["tonic_snr_sd"]))
+
+        if aggregate == "median":
+            agg_fn = np.nanmedian
+        elif aggregate == "mean":
+            agg_fn = np.nanmean
+        else:
+            raise ValueError(f"aggregate must be 'median' or 'mean'; got {aggregate!r}.")
+
+        if per_chunk_tonic_snr:
+            snr_tonic_chunked = float(agg_fn(per_chunk_tonic_snr))
+        else:
+            warnings.warn(
+                "No chunk was long enough to fit (trace too short for "
+                "chunk_duration_s/min_chunk_duration_s) -- falling back "
+                "to the global (non-chunked) snr_tonic.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            snr_tonic_chunked = result.snr_tonic
+
+        snr_total_chunked = snr_tonic_chunked + result.snr_phasic  # NaN-propagates
+
+        snr_corrected_chunked = None
+        if self.bias_correction is not None and result.snr_phasic_corrected is not None:
+            snr_corrected_chunked = snr_tonic_chunked + result.snr_phasic_corrected
+
+        chunked_result = replace(
+            result,
+            snr=snr_total_chunked,
+            snr_tonic=snr_tonic_chunked,
+            snr_corrected=snr_corrected_chunked,
+            n_chunks=len(per_chunk_tonic_snr),
+            chunk_duration_s=float(chunk_duration_s),
+            per_chunk_tonic_snr=per_chunk_tonic_snr,
+        )
+        self.result_ = chunked_result
+        return chunked_result
 
     def estimate(
         self, trace: NDArray[np.floating], apply_correction: bool = False
