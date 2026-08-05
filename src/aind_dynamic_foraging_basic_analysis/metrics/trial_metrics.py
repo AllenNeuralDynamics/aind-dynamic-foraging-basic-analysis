@@ -140,13 +140,21 @@ def compute_side_bias(nwb):
             C.append(np.nan)
         elif len(unique) == 2:
             # Fit model
-            out = model.fit_logistic_regression(
-                choice, reward, n_trial_back=n_trials_back, cv=cv, fit_exponential=False
-            )
-            bias.append(out["df_beta"].loc["bias"]["bootstrap_mean"].values[0])
-            ci_lower.append(out["df_beta"].loc["bias"]["bootstrap_CI_lower"].values[0])
-            ci_upper.append(out["df_beta"].loc["bias"]["bootstrap_CI_upper"].values[0])
-            C.append(out["C"])
+            try:
+                out = model.fit_logistic_regression(
+                    choice, reward, n_trial_back=n_trials_back, cv=cv, fit_exponential=False
+                )
+                bias.append(out["df_beta"].loc["bias"]["bootstrap_mean"].values[0])
+                ci_lower.append(out["df_beta"].loc["bias"]["bootstrap_CI_lower"].values[0])
+                ci_upper.append(out["df_beta"].loc["bias"]["bootstrap_CI_upper"].values[0])
+                C.append(out["C"])
+
+            except:
+                print('error computing logistic')
+                bias.append(np.nan)
+                ci_lower.append(-BIAS_LIMIT)
+                ci_upper.append(BIAS_LIMIT)
+                C.append(np.nan)
         elif unique[0] == 0:
             # only left choices, report bias confidence as (-inf, 0)
             bias.append(-1)
