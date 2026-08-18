@@ -713,7 +713,8 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     # Same two-panel layout as the trial-based figure: the raster/curves on top (row 1) over a
     # reward-schedule panel (row 2), with a rangeslider scroller under row 2.
     fig = make_subplots(
-        rows=2, cols=1, shared_xaxes=True, row_heights=[0.85, 0.15], vertical_spacing=0.04
+        rows=2, cols=1, shared_xaxes=True, row_heights=[0.85, 0.15], vertical_spacing=0.04,
+        specs=[[{"secondary_y": True}], [{"secondary_y": False}]],
     )
 
     ev_meta = {
@@ -942,13 +943,19 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
     y_main_top = params["curve_top"]
 
     # FIP channels (single-session only), normalised and stacked above the behavior panel
-    fip_unclipped_ids = []
-    fip_clipped_ids = []
+    fip_trace_names = []
+    fip_yticks = []
+    fip_ylabels = []
+    y_clip_bottom = None
+    y_clip_top = y_main_top
     if df_fip is not None and len(sessions) == 1 and len(fip) > 0:
         fip_channels = fip
         present = set(df_fip["event"].unique())
-        band = 0.0
-        fip_gap = 0.5
+
+        band = params["curve_top"]  # running top of the last placed channel
+        prev_span = 0.0
+        gap_frac = 0.15  # gap before each channel = 15% of previous channel's span
+
         for channel in fip_channels:
             if channel not in present:
                 continue
@@ -956,23 +963,26 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             vals = C["data"].astype(float).to_numpy()
             if vals.size == 0 or np.all(np.isnan(vals)):
                 continue
+
             vmin = np.nanmin(vals)
             vmax = np.nanmax(vals)
             span = vmax - vmin
-            # avoid zero-span stacking problems for constant signals
-            if np.isnan(span) or span == 0:
-                span = 1.0
+            span_capped = np.isnan(span) or span == 0 or span > 5
+            if span_capped:
+                span = 0.5
 
-            # place this channel so its minimum maps to `base`, preserving original scale
-            base = params["curve_top"] + 0.1 + band
-            offset = base - vmin
+            base = band + prev_span * gap_frac  # gap proportional to previous span
+            if span_capped:
+                offset = base + span / 2 - (vmin + vmax) / 2
+            else:
+                offset = base - vmin
             d = vals + offset
 
             color = get_fip_color(channel)
             custom = np.stack([C.timestamps.values, vals], axis=-1)
             hover = f"%{{customdata[0]:.2f}}s %{{customdata[1]:.3f}} <extra>{channel}</extra>"
 
-            fip_unclipped_ids.append(len(fig.data))
+            fip_trace_names.append(channel)
             fig.add_trace(
                 go.Scattergl(
                     x=C.timestamps.values + last_off,
@@ -985,54 +995,37 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                 ),
                 row=1,
                 col=1,
+                secondary_y=True,
             )
 
-            # clipped version: clip raw values to 1st–99th percentile, same y-offset
+            # track 1–99% y extents for the zoom button (no data is removed)
             p01, p99 = np.nanpercentile(vals, 1), np.nanpercentile(vals, 99)
-            vals_clipped = np.clip(vals, p01, p99)
-            d_clipped = vals_clipped + offset
-            fip_clipped_ids.append(len(fig.data))
-            fig.add_trace(
-                go.Scattergl(
-                    x=C.timestamps.values + last_off,
-                    y=d_clipped,
-                    customdata=custom,
-                    mode="lines",
-                    hovertemplate=hover,
-                    line=dict(color=color),
-                    name=channel,
-                    visible=False,
-                    showlegend=False,
-                ),
-                row=1,
-                col=1,
-            )
+            if y_clip_bottom is None:
+                y_clip_bottom = p01 + offset
+            y_clip_top = p99 + offset
 
-            # use three ticks: bottom (vmin), center (channel name), top (vmax)
-            yticks.extend([base - vmin, base + span / 2.0, base + span])
-            ylabels.extend(
-                [
-                    f"0.0",
-                    f"{channel.split('_dff')[0]}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",
-                    f"{vmax:.2f}",
-                ]
-            )
+            # ticks: bottom at vmin position, center with channel name, top at vmax position
+            fip_yticks.extend([base, base + span / 2.0, base + span])
+            fip_ylabels.extend([
+                f"{vmin:.2f}",
+                f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{channel.split('_dff')[0]}",
+                f"{vmax:.2f}",
+            ])
 
-            # advance band by the display span (not raw span) plus a small gap to avoid overlap
-            band += span + fip_gap
-            y_main_top = base + span + 0.25
+            band = base + span
+            prev_span = span
+            y_main_top = band 
 
-    # Toggle button to switch FIP traces between full range and 1–99% clipped
-    if fip_unclipped_ids:
-        n_all = len(fig.data)
-        vis_full = [True] * n_all
-        vis_clip = [True] * n_all
-        for idx in fip_clipped_ids:
-            vis_full[idx] = False
-        for idx in fip_unclipped_ids:
-            vis_clip[idx] = False
-        for idx in fip_clipped_ids:
-            vis_clip[idx] = True
+    # Toggle button to zoom FIP y-axis between full range and 1–99% range
+    if fip_trace_names:
+        # find the secondary y-axis layout key (e.g. "yaxis2") for button range updates
+        fip_yaxis_key = next(
+            (k for k, v in fig.layout.to_plotly_json().items()
+             if k.startswith("yaxis") and isinstance(v, dict) and "overlaying" in v),
+            "yaxis2",
+        )
+        fip_range_full = [params["curve_top"], y_main_top]
+        fip_range_clip = [y_clip_bottom, y_clip_top]
 
         fig.update_layout(
             updatemenus=[
@@ -1047,13 +1040,13 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                     buttons=[
                         dict(
                             label="FIP: full range",
-                            method="restyle",
-                            args=[{"visible": vis_full}],
+                            method="relayout",
+                            args=[{f"{fip_yaxis_key}.range": fip_range_full}],
                         ),
                         dict(
-                            label="FIP: clip 1–99%",
-                            method="restyle",
-                            args=[{"visible": vis_clip}],
+                            label="FIP: zoom 1–99%",
+                            method="relayout",
+                            args=[{f"{fip_yaxis_key}.range": fip_range_clip}],
                         ),
                     ],
                 )
@@ -1075,10 +1068,24 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
         tickvals=yticks,
         ticktext=ylabels,
         fixedrange=True,
-        range=[params["behavior_bottom"] - 0.05, y_main_top + 0.25],
+        range=[params["behavior_bottom"] - 0.05, y_main_top + 1 * len(fip)],
         row=1,
         col=1,
+        secondary_y=False,
     )
+    if fip_trace_names:
+        _fip_span = y_main_top - params["curve_top"]
+        _fip_pad = _fip_span * 0.30  # one Plotly zoom-out step (1.5× span, 0.25× padding per side)
+        fig.update_yaxes(
+            tickvals=fip_yticks,
+            ticktext=fip_ylabels,
+            range=[params["curve_top"] - _fip_pad, y_main_top + _fip_pad],
+            row=1,
+            col=1,
+            secondary_y=True,
+        )
+    else:
+        fig.update_yaxes(visible=False, row=1, col=1, secondary_y=True)
     fig.update_yaxes(title_text="p_reward", range=[0, 1], fixedrange=True, row=2, col=1)
     fig.update_xaxes(range=[t0_view, t0_view + 120], row=1, col=1)
     fig.update_xaxes(
