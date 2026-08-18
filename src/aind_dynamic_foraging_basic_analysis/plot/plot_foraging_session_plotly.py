@@ -1052,8 +1052,6 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                 )
             ]
         )
-
-
     # Thick vertical lines marking session boundaries (both panels)
     for b in boundaries:
         for row in (1, 2):
