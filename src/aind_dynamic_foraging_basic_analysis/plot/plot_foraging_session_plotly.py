@@ -944,15 +944,30 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
 
     y_main_top = params["curve_top"]
 
-    # FIP channels (single-session only), normalised and stacked above the behavior panel
+    # FIP channels, normalised and stacked above the behavior panel. Sessions are placed on the
+    # same concatenated time base as the panels below, so the x axes line up. More than one
+    # session requires a ``session_id`` column in df_fip to know where each sample belongs.
     fip_trace_names = []
     fip_yticks = []
     fip_ylabels = []
     y_clip_bottom = None
     y_clip_top = y_main_top
-    if df_fip is not None and len(sessions) == 1 and len(fip) > 0:
+    fip_has_sess = df_fip is not None and "session_id" in df_fip.columns
+    if len(sessions) > 1 and df_fip is not None and len(fip) > 0 and not fip_has_sess:
+        print("df_fip needs a 'session_id' column to plot FIP across multiple sessions; skipping")
+    if df_fip is not None and len(fip) > 0 and (len(sessions) == 1 or fip_has_sess):
         fip_channels = fip
         present = set(df_fip["event"].unique())
+
+        # Per-session x shift, rebuilt the same way the event loop did it: each session starts
+        # at its running offset (sess_spans) when shifting, otherwise it keeps its own time base.
+        chunk_offsets = []
+        for si, sess in enumerate(sessions):
+            ev_s = df_events if sess is None else df_events[df_events["session_id"] == sess]
+            start = sess_spans[si][0]
+            chunk_offsets.append(
+                (start - np.nanmin(ev_s["timestamps"].to_numpy())) if shift_each else 0.0
+            )
 
         band = params["curve_top"]  # running top of the last placed channel
         prev_span = 0.0
@@ -966,6 +981,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
             if vals.size == 0 or np.all(np.isnan(vals)):
                 continue
 
+            # normalise on the pooled values so one set of y ticks describes every session
             vmin = np.nanmin(vals)
             vmax = np.nanmax(vals)
             span = vmax - vmin
@@ -978,7 +994,25 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
                 offset = base + span / 2 - (vmin + vmax) / 2
             else:
                 offset = base - vmin
-            d = vals + offset
+
+            # Shift each session's samples onto the concatenated time base, separated by a NaN
+            # so the line breaks at the boundary. These stay numpy arrays on purpose: plotly
+            # base64-encodes numpy input, which keeps the HTML far smaller than python lists.
+            nan_gap = np.array([np.nan])
+            x, d, custom = [], [], []
+            for si, sess in enumerate(sessions):
+                Cs = C[C["session_id"] == sess] if fip_has_sess and sess is not None else C
+                if len(Cs) == 0:
+                    continue
+                v = Cs["data"].astype(float).to_numpy()
+                t = Cs["timestamps"].to_numpy()
+                x += [t + chunk_offsets[si], nan_gap]
+                d += [v + offset, nan_gap]
+                # hover keeps each session's own (unshifted) timestamp
+                custom += [np.stack([t, v], axis=-1), np.full((1, 2), np.nan)]
+            if not x:
+                continue
+            x, d, custom = np.concatenate(x), np.concatenate(d), np.concatenate(custom)
 
             color = get_fip_color(channel)
             hover = f"%{{customdata[0]:.2f}}s %{{customdata[1]:.3f}} <extra>{channel}</extra>"
