@@ -13,14 +13,9 @@ from aind_dynamic_foraging_basic_analysis.metrics.snr_envelope_rr import (
     _UNSET,
     EnvelopeRRSNR,
     _detect_peaks_rise_rate,
-    _estimate_residual_noise,
-    _estimate_sigma_minima,
-    _folded_iqr_noise_std,
-    _half_sample_mode,
-    _interpolate_envelope,
-    _lower_envelope,
     _mad_noise_std,
     _robust_std,
+    _robust_tonic_range,
     _UnsetType,
 )
 
@@ -205,8 +200,9 @@ class TestEnvelopeRRSNRArtifact(unittest.TestCase):
         self.assertAlmostEqual(ratio, 1.0, delta=0.5)
 
     def test_tonic_snr_robust_to_large_artifact(self):
-        """snr_tonic (default tonic_range_method='robust') should stay close to its
-        own no-artifact value despite the same large artifact."""
+        """snr_tonic should stay close to its own no-artifact value despite the
+        same large artifact (tonic-range estimation is the median swing across
+        detected extrema, robust to one contaminated region by construction)."""
         result_clean, result_artifact, _, _ = self._clean_and_artifact_results(seed=3)
         ratio = result_artifact.snr_tonic / result_clean.snr_tonic
         self.assertAlmostEqual(ratio, 1.0, delta=0.5)
@@ -276,42 +272,13 @@ class TestEnvelopeRRSNRConvenienceAPI(unittest.TestCase):
 
 
 class TestEnvelopeRRSNRConstructorValidation(unittest.TestCase):
-    """Test constructor argument validation and the not-yet-fitted guard."""
+    """Test the not-yet-fitted guard and convenience-property consistency.
 
-    def test_invalid_signal_statistic_raises(self):
-        """An unrecognized signal_statistic should raise, not silently fall back."""
-        with self.assertRaises(ValueError):
-            EnvelopeRRSNR(fps=FPS, signal_statistic="bogus")
-
-    def test_invalid_noise_method_via_argument_raises(self):
-        """An unrecognized noise_method passed as a constructor argument should raise."""
-        with self.assertRaises(ValueError):
-            EnvelopeRRSNR(fps=FPS, noise_method="bogus")
-
-    def test_invalid_noise_method_via_config_raises(self):
-        """config['noise_method'] takes precedence over the constructor argument,
-        so an invalid value there must be validated too."""
-        with self.assertRaises(ValueError):
-            EnvelopeRRSNR(fps=FPS, config={"noise_method": "bogus"})
-
-    def test_deprecated_mad_alias_resolves_to_aind_mad(self):
-        """The deprecated 'mad' alias should silently resolve to 'aind_mad'."""
-        estimator = EnvelopeRRSNR(fps=FPS, noise_method="mad")
-        self.assertEqual(estimator.noise_method, "aind_mad")
-
-    def test_invalid_tonic_method_raises_on_fit(self):
-        """tonic_method isn't validated until .fit() actually dispatches on it."""
-        trace, _ = make_tonic_only_trace()
-        estimator = EnvelopeRRSNR(fps=FPS, config={"tonic_method": "bogus"})
-        with self.assertRaises(ValueError):
-            estimator.fit(trace)
-
-    def test_invalid_tonic_range_method_raises_on_fit(self):
-        """tonic_range_method isn't validated until .fit() dispatches on it either."""
-        trace, _ = make_tonic_only_trace()
-        estimator = EnvelopeRRSNR(fps=FPS, config={"tonic_range_method": "bogus"})
-        with self.assertRaises(ValueError):
-            estimator.fit(trace)
+    Note: the cut-down estimator no longer exposes `signal_statistic` /
+    `noise_method` / `tonic_method` / `tonic_range_method` knobs (it's a single
+    fixed configuration: arPLS tonic + MAD noise + robust tonic range), so the
+    corresponding validation tests from the fuller estimator don't apply here.
+    """
 
     def test_accessing_result_before_fit_raises(self):
         """Every convenience property (and .decompose() with no argument) should
@@ -348,161 +315,16 @@ class TestEnvelopeRRSNRConstructorValidation(unittest.TestCase):
         np.testing.assert_array_equal(estimator.residual_, result.residual)
 
 
-class TestEnvelopeRRSNRAlternateConfigs(unittest.TestCase):
-    """Test the less-common (non-default) noise_method/tonic_method/
-    tonic_range_method options and related config knobs."""
-
-    def test_folded_iqr_noise_method_runs(self):
-        """noise_method='folded_iqr' should run and give a sane, positive noise estimate."""
-        trace, _ = make_tonic_only_trace()
-        result = EnvelopeRRSNR(fps=FPS, noise_method="folded_iqr").fit(trace)
-        self.assertTrue(np.isfinite(result.noise))
-        self.assertGreater(result.noise, 0)
-
-    def test_mad_iqr_avg_noise_method_runs(self):
-        """noise_method='mad_iqr_avg' should run and give a sane, positive noise estimate."""
-        trace, _ = make_tonic_only_trace()
-        result = EnvelopeRRSNR(fps=FPS, noise_method="mad_iqr_avg").fit(trace)
-        self.assertTrue(np.isfinite(result.noise))
-        self.assertGreater(result.noise, 0)
-
-    def test_als_tonic_method_runs(self):
-        """tonic_method='als' should run and produce a finite, full-length tonic curve."""
-        trace, _ = make_tonic_only_trace()
-        result = EnvelopeRRSNR(fps=FPS, config={"tonic_method": "als"}).fit(trace)
-        self.assertEqual(result.tonic.shape, trace.shape)
-        self.assertTrue(np.all(np.isfinite(result.tonic)))
-
-    def test_envelope_tonic_method_runs(self):
-        """tonic_method='envelope' needs its own window-size config keys, unlike
-        'als'/'arpls' (which only need their own lam/p/n_iter)."""
-        trace, _ = make_tonic_only_trace()
-        result = EnvelopeRRSNR(
-            fps=FPS,
-            config={
-                "tonic_method": "envelope",
-                "lower_smooth_window": 31,
-                "lower_min_distance": 20,
-            },
-        ).fit(trace)
-        self.assertEqual(result.tonic.shape, trace.shape)
-        self.assertTrue(np.all(np.isfinite(result.tonic)))
-
-    def test_envelope_tonic_method_with_linear_interpolation(self):
-        """interp_kind='linear' is a valid alternative to the default 'pchip'."""
-        trace, _ = make_tonic_only_trace()
-        result = EnvelopeRRSNR(
-            fps=FPS,
-            config={
-                "tonic_method": "envelope",
-                "lower_smooth_window": 31,
-                "lower_min_distance": 20,
-                "interp_kind": "linear",
-            },
-        ).fit(trace)
-        self.assertTrue(np.all(np.isfinite(result.tonic)))
-
-    def test_ptp_tonic_range_method_runs(self):
-        """tonic_range_method='ptp' (the pre-'robust' default) should still run cleanly."""
-        trace, _ = make_tonic_only_trace()
-        result = EnvelopeRRSNR(fps=FPS, config={"tonic_range_method": "ptp"}).fit(trace)
-        self.assertEqual(result.tonic_range if hasattr(result, "tonic_range") else True, True)
-        self.assertTrue(np.isfinite(result.snr_tonic))
-
-    def test_percentile_tonic_range_method_runs(self):
-        """tonic_range_method='percentile' should run cleanly with a trim_pct set."""
-        trace, _ = make_tonic_only_trace()
-        result = EnvelopeRRSNR(
-            fps=FPS, config={"tonic_range_method": "percentile", "tonic_range_trim_pct": 5.0}
-        ).fit(trace)
-        self.assertTrue(np.isfinite(result.snr_tonic))
-
-    def test_pre_despike_flags_and_removes_a_spike_before_tonic_fitting(self):
-        """Enabling pre_despike_window should flag and count a large injected spike."""
-        trace, _ = make_tonic_only_trace()
-        trace_with_spike = trace.copy()
-        trace_with_spike[500:505] += 5.0  # one big spike
-
-        result = EnvelopeRRSNR(
-            fps=FPS, config={"pre_despike_window": 101, "pre_despike_k": 5.0}
-        ).fit(trace_with_spike)
-
-        self.assertGreater(result.n_extreme_samples, 0)
-        self.assertGreater(result.frac_extreme_samples, 0.0)
+class TestEnvelopeRRSNRConfigKnobs(unittest.TestCase):
+    """Test the remaining tuning knobs (window scaling) -- the tonic/noise/
+    tonic-range algorithm choices themselves are no longer configurable (this
+    productized estimator keeps only the single tuned configuration: arPLS
+    tonic tracking, MAD noise estimation, robust tonic-range)."""
 
     def test_scale_window_basic(self):
         """scale_window preserves real-world duration across a different fps."""
         self.assertEqual(EnvelopeRRSNR.scale_window(20, fps=40.0), 40)
         self.assertEqual(EnvelopeRRSNR.scale_window(20, fps=20.0), 20)
-
-    def test_scale_window_make_odd_bumps_an_even_result(self):
-        """make_odd=True should bump an otherwise-even scaled result up by one."""
-        # 30 samples at 20 fps (reference) stays 30 (even) unless make_odd=True.
-        self.assertEqual(EnvelopeRRSNR.scale_window(30, fps=20.0, make_odd=False), 30)
-        self.assertEqual(EnvelopeRRSNR.scale_window(30, fps=20.0, make_odd=True), 31)
-
-
-class TestEnvelopeRRSNRFitChunked(unittest.TestCase):
-    """Test fit_chunked's chunk-sizing options, aggregation modes, and the
-    too-short-trace fallback."""
-
-    def test_default_chunking_matches_expected_sizing(self):
-        """Default sizing is max(min_chunk_duration_s, chunk_fraction * duration)."""
-        trace, _ = make_phasic_only_trace()  # 150 s at 20 fps
-        result = EnvelopeRRSNR(fps=FPS).fit_chunked(trace)
-        self.assertEqual(result.chunk_duration_s, 30.0)  # max(30, 0.2 * 150)
-        self.assertEqual(result.n_chunks, 5)
-
-    def test_explicit_chunk_duration_is_respected(self):
-        """An explicit chunk_duration_s should be used as-is, not the default sizing."""
-        trace, _ = make_phasic_only_trace()
-        result = EnvelopeRRSNR(fps=FPS).fit_chunked(trace, chunk_duration_s=30.0)
-        self.assertEqual(result.chunk_duration_s, 30.0)
-
-    def test_aggregate_mean_runs_and_differs_from_median_in_general(self):
-        """aggregate='mean' is a valid alternative aggregation mode to the default 'median'."""
-        trace, _ = make_phasic_only_trace()
-        estimator = EnvelopeRRSNR(fps=FPS)
-        result_median = estimator.fit_chunked(trace, aggregate="median")
-        result_mean = estimator.fit_chunked(trace, aggregate="mean")
-        self.assertTrue(np.isfinite(result_median.snr_tonic))
-        self.assertTrue(np.isfinite(result_mean.snr_tonic))
-
-    def test_invalid_aggregate_raises(self):
-        """An unrecognized aggregate value should raise, not silently default."""
-        trace, _ = make_phasic_only_trace()
-        with self.assertRaises(ValueError):
-            EnvelopeRRSNR(fps=FPS).fit_chunked(trace, aggregate="bogus")
-
-    def test_too_short_trace_falls_back_to_global_snr_tonic_and_warns(self):
-        """A trace with no chunk long enough to fit should warn and fall back to
-        the global (non-chunked) snr_tonic, not raise or silently return garbage."""
-        rng = np.random.default_rng(9)
-        short_trace = NOISE_SIGMA * rng.standard_normal(80)  # 4 s at 20 fps
-        estimator = EnvelopeRRSNR(fps=FPS)
-        result_global = estimator.fit(short_trace)
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            result_chunked = estimator.fit_chunked(short_trace)
-            self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught))
-
-        self.assertEqual(result_chunked.n_chunks, 0)
-        self.assertEqual(result_chunked.snr_tonic, result_global.snr_tonic)
-
-    def test_bias_correction_propagates_through_chunked_result(self):
-        """When bias_correction is active and phasic events are detected, the
-        chunked result's snr_corrected should also be populated (derived from the
-        chunked snr_tonic + the same snr_phasic_corrected as a plain .fit())."""
-        trace, _ = make_phasic_only_trace()
-        estimator = EnvelopeRRSNR(fps=FPS)  # default config -> bias_correction auto-applies
-        result_global = estimator.fit(trace)
-        self.assertIsNotNone(result_global.snr_corrected)
-
-        result_chunked = estimator.fit_chunked(trace)
-        self.assertIsNotNone(result_chunked.snr_corrected)
-        expected = result_chunked.snr_tonic + result_global.snr_phasic_corrected
-        self.assertAlmostEqual(result_chunked.snr_corrected, expected)
 
 
 class TestEnvelopeRRSNRBiasCorrection(unittest.TestCase):
@@ -516,12 +338,12 @@ class TestEnvelopeRRSNRBiasCorrection(unittest.TestCase):
         self.assertIsNotNone(result.snr_corrected)
         self.assertIsNotNone(result.snr_phasic_corrected)
 
-    def test_non_default_noise_method_disables_auto_correction(self):
-        """The tuned correction was fit against noise_method='aind_mad' specifically
-        -- switching it should silently resolve bias_correction to None rather than
-        misapplying a correction fit for a different configuration."""
+    def test_non_default_peak_threshold_sd_disables_auto_correction(self):
+        """The tuned correction was fit against peak_threshold_sd=2.0 specifically
+        -- changing it should silently resolve bias_correction to None rather than
+        misapplying a correction fit for a different threshold."""
         trace, _ = make_phasic_only_trace()
-        result = EnvelopeRRSNR(fps=FPS, noise_method="folded_iqr").fit(trace)
+        result = EnvelopeRRSNR(fps=FPS, peak_threshold_sd=3.0).fit(trace)
         self.assertIsNone(result.snr_corrected)
         self.assertIsNone(result.snr_phasic_corrected)
 
@@ -654,69 +476,21 @@ class TestPrivateHelperEdgeCases(unittest.TestCase):
         return NaN rather than raise."""
         self.assertTrue(np.isnan(_mad_noise_std(np.array([]))))
 
-    def test_half_sample_mode_base_cases(self):
-        """_half_sample_mode's recursive narrowing bottoms out at <=3 elements;
-        exercise each of those base cases (1, 2, and a 3-element tie) directly,
-        since a large, generic residual essentially never narrows down to
-        exactly one of these by chance."""
-        self.assertEqual(_half_sample_mode(np.array([5.0])), 5.0)
-        self.assertEqual(_half_sample_mode(np.array([1.0, 2.0])), 1.5)
-        # 3 elements, evenly spaced -> the two gaps tie, hits the tie branch.
-        self.assertEqual(_half_sample_mode(np.array([1.0, 2.0, 3.0])), 2.0)
-
-    def test_folded_iqr_noise_std_falls_back_on_few_below_anchor_samples(self):
-        """With too few samples below the anchor for a stable IQR (<20), falls
-        back to a plain std of the below-median half."""
-        short_residual = 0.01 * np.random.default_rng(0).standard_normal(20)
-        result = _folded_iqr_noise_std(short_residual)
-        self.assertTrue(np.isfinite(result))
-        self.assertGreater(result, 0)
-
-    def test_estimate_residual_noise_invalid_method_raises(self):
-        """Dead code from EnvelopeRRSNR's own public API (its noise_method is
-        already validated at construction time), but still worth pinning as a
-        safety net for any other internal caller."""
-        residual = 0.01 * np.random.default_rng(0).standard_normal(50)
-        with self.assertRaises(ValueError):
-            _estimate_residual_noise(residual, "bogus")
-
-    def test_estimate_sigma_minima_falls_back_with_too_few_midpoints(self):
-        """tonic_minima with exactly 5 elements (the minimum to pass the first
-        length check) always yields only 4 valley-to-valley midpoints -- one
-        fewer than needed for a stable estimate -- so this always falls back,
-        not just in some edge case."""
-        residual = np.zeros(100)
-        tonic_minima = np.array([0, 20, 40, 60, 80])
-        result = _estimate_sigma_minima(residual, tonic_minima, fallback_sigma=0.5)
-        self.assertEqual(result, 0.5)
-
-    def test_interpolate_envelope_invalid_interp_kind_raises(self):
-        """An unrecognized interp_kind should raise, not silently fall back."""
-        with self.assertRaises(ValueError):
-            _interpolate_envelope(np.array([0, 5, 10]), np.array([1.0, 2.0, 1.5]), 11, "bogus")
-
-    def test_lower_envelope_handles_an_even_smooth_window(self):
-        """smooth_window must be odd for Savitzky-Golay filtering -- an even
-        value should be silently bumped to odd, not raise."""
-        x = 0.01 * np.random.default_rng(1).standard_normal(500)
-        x += 0.05 * np.sin(np.linspace(0, 6, 500))
-        tonic, minima = _lower_envelope(x, x.copy(), smooth_window=30, order=2, min_distance=20)
-        self.assertEqual(tonic.shape, x.shape)
-
-    def test_lower_envelope_falls_back_with_fewer_than_two_minima(self):
-        """A flat (constant) input has no local minima at all -- should return
-        a flat curve at the input's own minimum, not raise or return garbage."""
-        x = np.full(200, 0.5)
-        tonic, minima = _lower_envelope(x, x.copy(), smooth_window=31, order=2, min_distance=20)
-        self.assertLess(len(minima), 2)
-        np.testing.assert_allclose(tonic, 0.5)
-
     def test_unset_sentinel_repr(self):
         """_UnsetType's repr should be short and unambiguous for debugging --
         never actually shown to a normal caller (it's a default-argument
         sentinel), so nothing else exercises it."""
         self.assertEqual(repr(_UNSET), "<unset>")
         self.assertIsInstance(_UNSET, _UnsetType)
+
+    def test_robust_tonic_range_falls_back_to_ptp_with_fewer_than_two_extrema(self):
+        """A perfectly flat tonic curve has no local extrema at all -- should
+        fall back to ptp(tonic) (here 0.0, correctly) rather than raise or
+        return garbage from an empty median."""
+        tonic = np.full(200, 0.5)
+        tonic_range, n_swings = _robust_tonic_range(tonic, min_distance=20)
+        self.assertEqual(tonic_range, 0.0)
+        self.assertEqual(n_swings, 0)
 
 
 if __name__ == "__main__":
