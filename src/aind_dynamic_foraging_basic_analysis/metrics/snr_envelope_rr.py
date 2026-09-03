@@ -31,7 +31,8 @@ drop-in compatible with a plain ``estimate_snr(trace, fps)`` function),
 
 Notes
 -----
-- Feed a dF/F preprocessed trace (peak height is interpreted from zero).
+- Feed a dF/F preprocessed trace (e.g., detrending, motion correction
+should already be applied).
 - Default ``fps`` is 20 Hz; NaNs are filled with the trace median.
 - Needs only numpy/scipy.
 
@@ -65,6 +66,7 @@ _REFERENCE_FPS = 20.0
 _TUNED_PEAK_THRESHOLD_SD = 2.0  # sigma multiplier; unitless, does not scale with fps
 _TUNED_RISE_WINDOW = 5  # 0.25 s at 20 fps
 _DEFAULT_TONIC_ROBUST_MIN_DISTANCE = 100  # 5.0 s at 20 fps
+_DEFAULT_MIN_SAMPLES = 62  # ~3.1 s at 20 fps; see EnvelopeRRSNR's min_samples docstring
 
 # Linear bias correction fit against ground-truth SNR for the tuned defaults
 # above: snr_corrected = (snr_raw - intercept) / slope. R^2=0.9462.
@@ -396,7 +398,9 @@ class EnvelopeRRSNR:
         ``arpls_ratio`` (tonic smoothness), ``upper_min_distance`` (min
         spacing enforced on candidate peaks), ``tonic_robust_min_distance``
         (default 100 samples at 20fps, fps-scaled -- minimum spacing
-        between detected tonic extrema; see :func:`_robust_tonic_range`).
+        between detected tonic extrema; see :func:`_robust_tonic_range`),
+        ``min_samples`` (default 62 samples at 20fps, fps-scaled -- see
+        below).
 
     Notes
     -----
@@ -409,6 +413,23 @@ class EnvelopeRRSNR:
       20 fps and rescaled by :meth:`scale_window` to preserve
       real-world duration at other rates. Pass an explicit value in
       ``config`` to opt out.
+    - **Empty and too-short traces never raise.** ``fit`` (and
+      everything built on it -- ``estimate``, ``estimate_components``,
+      ``decompose``) treats a trace with zero samples, or fewer than
+      ``config["min_samples"]``, as un-fittable: rather than letting the
+      arPLS baseline fit crash outright (its sparse difference matrix is
+      degenerate below 2 samples) or silently returning a noise/tonic
+      estimate computed from too little data to mean anything, it warns
+      once via ``RuntimeWarning`` and returns an all-NaN
+      :class:`EnvelopeRRResult`. ``min_samples`` defaults to 62 samples
+      at 20 fps (fps-scaled elsewhere) -- twice ``_mad_noise_std``'s own
+      50-sample median-filter width, the smallest of the module's fixed
+      internal windows, so the floor is "the noise estimate's own
+      smoothing kernel fits at least twice over," not an arbitrary
+      round number. This is deliberately conservative: a pipeline
+      processing many channels/sessions should get a clearly-flagged
+      NaN for a too-short recording, not a plausible-looking number
+      quietly fit from a handful of samples.
     """
 
     def __init__(
@@ -435,6 +456,7 @@ class EnvelopeRRSNR:
         scaled_defaults = {
             "rise_window": self.scale_window(_TUNED_RISE_WINDOW, fps),
             "tonic_robust_min_distance": self.scale_window(_DEFAULT_TONIC_ROBUST_MIN_DISTANCE, fps),
+            "min_samples": self.scale_window(_DEFAULT_MIN_SAMPLES, fps),
         }
         self.config = {
             **_DEFAULT_CONFIG,
@@ -442,6 +464,11 @@ class EnvelopeRRSNR:
             **scaled_defaults,
             **(config or {}),
         }
+
+        # arPLS's difference matrix is degenerate below 2 samples regardless
+        # of any config -- never let a configured min_samples below that
+        # silently re-open the crash this guard exists to prevent.
+        self.config["min_samples"] = max(2, self.config["min_samples"])
 
         # populated by fit()
         self.result_: Optional[EnvelopeRRResult] = None
@@ -464,13 +491,71 @@ class EnvelopeRRSNR:
     # Core API
     # ------------------------------------------------------------------
 
+    def _nan_result(self, n_input_samples: int, reason: str) -> EnvelopeRRResult:
+        """Build the all-NaN :class:`EnvelopeRRResult` returned when a trace
+        can't be fit (empty, or shorter than ``config["min_samples"]``).
+
+        Shared by both cases so the "un-fittable" result always has the same
+        shape -- callers checking ``np.isnan(result.snr)`` don't need to
+        special-case *why* it's NaN.
+        """
+        warnings.warn(reason, RuntimeWarning, stacklevel=3)
+        self.result_ = EnvelopeRRResult(
+            snr=float("nan"),
+            snr_tonic=float("nan"),
+            snr_phasic=float("nan"),
+            snr_corrected=None,
+            snr_phasic_corrected=None,
+            noise=float("nan"),
+            peaks=np.array([], dtype=int),
+            tonic=np.full(n_input_samples, np.nan, dtype=float),
+            residual=np.full(n_input_samples, np.nan, dtype=float),
+            signal=float("nan"),
+            config=self.config,
+            n_tonic_swings=0,
+        )
+        return self.result_
+
     def fit(self, trace: NDArray[np.floating]) -> EnvelopeRRResult:
         """Decompose ``trace`` and estimate its SNR.
 
         NaNs in ``trace`` are replaced with its median first. Returns
         an :class:`EnvelopeRRResult`, also stored on ``self.result_``
         for the convenience properties (``self.snr_``, etc.).
+
+        Empty and too-short traces never raise -- see "Empty and
+        too-short traces never raise" in the class docstring. Briefly:
+        a trace with zero samples, or fewer than
+        ``self.config["min_samples"]``, returns an all-NaN
+        :class:`EnvelopeRRResult` and issues a ``RuntimeWarning``
+        instead of being fit, so a pipeline processing many
+        channels/sessions doesn't crash -- or silently get a
+        statistically meaningless estimate -- from one short input.
         """
+        trace = np.asarray(trace, dtype=float)
+        n = trace.size
+
+        if n == 0:
+            return self._nan_result(
+                n,
+                "Empty trace passed to EnvelopeRRSNR.fit(); cannot estimate a "
+                "tonic baseline or noise floor from zero samples. Returning "
+                "NaN for all SNR/noise fields.",
+            )
+
+        min_samples = self.config["min_samples"]
+        if n < min_samples:
+            return self._nan_result(
+                n,
+                f"Trace has only {n} sample(s), below min_samples="
+                f"{min_samples} (fps={self.fps}); a tonic/noise estimate "
+                "from this few samples would not be reliable, and the "
+                "arPLS baseline fit is undefined below 2 samples. "
+                "Returning NaN for all SNR/noise fields. Pass a longer "
+                "trace, or lower config['min_samples'] if you understand "
+                "the reliability trade-off.",
+            )
+
         trace = np.nan_to_num(trace, nan=float(np.nanmedian(trace)))
 
         with warnings.catch_warnings():
