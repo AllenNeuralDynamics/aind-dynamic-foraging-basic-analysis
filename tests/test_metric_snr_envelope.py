@@ -137,6 +137,207 @@ class TestEnvelopeRRSNRTonic(unittest.TestCase):
         self.assertFalse(np.isnan(result.snr_tonic))
 
 
+class TestEnvelopeRRSNREmptyTrace(unittest.TestCase):
+    """Test that empty and too-short traces return all-NaN results and warn,
+    rather than raising -- a channel that ends up with zero (or too few)
+    samples after upstream filtering (e.g. an overly aggressive time window
+    on a short session) must not crash a pipeline processing many
+    channels/sessions."""
+
+    def _assert_all_nan_result(self, result, expected_len):
+        """Shared assertions for an EnvelopeRRResult produced from an
+        empty/too-short trace. ``tonic``/``residual`` are NaN-filled at the
+        *input's* length (not forced to zero-length), so downstream code
+        expecting ``len(tonic) == len(trace)`` doesn't also need to
+        special-case the failure path."""
+        self.assertTrue(np.isnan(result.snr))
+        self.assertTrue(np.isnan(result.snr_tonic))
+        self.assertTrue(np.isnan(result.snr_phasic))
+        self.assertTrue(np.isnan(result.noise))
+        self.assertTrue(np.isnan(result.signal))
+        self.assertEqual(len(result.peaks), 0)
+        self.assertEqual(len(result.tonic), expected_len)
+        self.assertEqual(len(result.residual), expected_len)
+        self.assertTrue(np.all(np.isnan(result.tonic)))
+        self.assertTrue(np.all(np.isnan(result.residual)))
+        self.assertEqual(result.n_tonic_swings, 0)
+        # Corrections were never computed (no snr_phasic to correct), not
+        # "computed and NaN" -- mirrors how the module already represents
+        # "no correction configured" elsewhere.
+        self.assertIsNone(result.snr_corrected)
+        self.assertIsNone(result.snr_phasic_corrected)
+
+    def test_fit_on_empty_trace_returns_nan_and_warns(self):
+        """.fit() on an empty array should warn and return an all-NaN result,
+        not raise (an empty trace crashes arPLS's sparse baseline fit
+        otherwise, since its difference matrix needs at least 2 samples)."""
+        empty_trace = np.array([])
+        estimator = EnvelopeRRSNR(fps=FPS)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = estimator.fit(empty_trace)
+            self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught))
+
+        self._assert_all_nan_result(result, expected_len=0)
+
+    def test_estimate_on_empty_trace_returns_nan_and_warns(self):
+        """.estimate() should propagate the same empty-trace handling as .fit()."""
+        empty_trace = np.array([])
+        estimator = EnvelopeRRSNR(fps=FPS)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            snr, noise, peaks = estimator.estimate(empty_trace)
+            self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught))
+
+        self.assertTrue(np.isnan(snr))
+        self.assertTrue(np.isnan(noise))
+        self.assertEqual(len(peaks), 0)
+
+    def test_estimate_components_on_empty_trace_returns_nan(self):
+        """.estimate_components() should also return an all-NaN breakdown."""
+        empty_trace = np.array([])
+        estimator = EnvelopeRRSNR(fps=FPS)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            snr_total, snr_tonic, snr_phasic = estimator.estimate_components(empty_trace)
+
+        self.assertTrue(np.isnan(snr_total))
+        self.assertTrue(np.isnan(snr_tonic))
+        self.assertTrue(np.isnan(snr_phasic))
+
+    def test_decompose_on_empty_trace_returns_empty_arrays(self):
+        """.decompose() should return empty (tonic, residual) arrays, not raise."""
+        empty_trace = np.array([])
+        estimator = EnvelopeRRSNR(fps=FPS)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            tonic, residual = estimator.decompose(empty_trace)
+
+        self.assertEqual(len(tonic), 0)
+        self.assertEqual(len(residual), 0)
+
+    def test_empty_list_input_is_also_handled(self):
+        """A plain empty list (not yet a numpy array) should be handled the same
+        way as an empty ndarray -- callers may pass `.values` or similar
+        array-likes rather than an explicit np.array."""
+        estimator = EnvelopeRRSNR(fps=FPS)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = estimator.fit([])
+            self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught))
+
+        self._assert_all_nan_result(result, expected_len=0)
+
+    def test_convenience_properties_reflect_empty_trace_result(self):
+        """The `*_` properties should mirror the all-NaN result after fitting
+        an empty trace, same as they do for a normal fit."""
+        estimator = EnvelopeRRSNR(fps=FPS)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = estimator.fit(np.array([]))
+
+        self.assertTrue(np.isnan(estimator.snr_))
+        self.assertTrue(np.isnan(estimator.snr_tonic_))
+        self.assertTrue(np.isnan(estimator.snr_phasic_))
+        self.assertTrue(np.isnan(estimator.noise_))
+        self.assertEqual(len(estimator.peaks_), 0)
+        self.assertIsNone(estimator.snr_corrected_)
+        np.testing.assert_array_equal(estimator.tonic_, result.tonic)
+        np.testing.assert_array_equal(estimator.residual_, result.residual)
+
+    # -- Near-empty / too-short (below min_samples), not just literally empty --
+
+    def test_single_sample_trace_does_not_crash(self):
+        """A 1-sample trace used to crash arPLS's sparse difference matrix
+        (degenerate for L<2) before empty/near-empty handling existed;
+        confirm it's now routed through the same NaN+warn path as empty."""
+        estimator = EnvelopeRRSNR(fps=FPS)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = estimator.fit(np.array([0.5]))
+            self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught))
+        self._assert_all_nan_result(result, expected_len=1)
+
+    def test_trace_just_below_min_samples_warns_and_returns_nan(self):
+        """A trace one sample short of config['min_samples'] should hit the
+        too-short guard, not attempt a fit."""
+        estimator = EnvelopeRRSNR(fps=FPS)
+        min_samples = estimator.config["min_samples"]
+        trace = 0.01 * np.random.default_rng(0).standard_normal(min_samples - 1)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = estimator.fit(trace)
+            messages = [str(w.message) for w in caught if issubclass(w.category, RuntimeWarning)]
+            self.assertTrue(any("min_samples" in m for m in messages))
+
+        self._assert_all_nan_result(result, expected_len=min_samples - 1)
+
+    def test_trace_at_exactly_min_samples_is_fit_normally(self):
+        """A trace of exactly config['min_samples'] length should be fit
+        normally (no too-short warning) -- the boundary is inclusive."""
+        estimator = EnvelopeRRSNR(fps=FPS)
+        min_samples = estimator.config["min_samples"]
+        trace = 0.01 * np.random.default_rng(0).standard_normal(min_samples)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = estimator.fit(trace)
+            too_short_warnings = [
+                w
+                for w in caught
+                if issubclass(w.category, RuntimeWarning) and "min_samples" in str(w.message)
+            ]
+            self.assertEqual(len(too_short_warnings), 0)
+
+        self.assertEqual(len(result.tonic), min_samples)
+        self.assertFalse(np.all(np.isnan(result.tonic)))
+
+    def test_min_samples_scales_with_fps(self):
+        """min_samples should scale with fps like the module's other windows,
+        preserving real-world duration rather than a fixed sample count."""
+        e_20 = EnvelopeRRSNR(fps=20.0)
+        e_40 = EnvelopeRRSNR(fps=40.0)
+        ratio = e_40.config["min_samples"] / e_20.config["min_samples"]
+        self.assertAlmostEqual(ratio, 2.0, delta=0.05)
+
+    def test_min_samples_cannot_be_configured_below_hard_floor_of_two(self):
+        """arPLS's sparse difference matrix is degenerate below 2 samples
+        regardless of configuration -- an explicit min_samples override
+        below 2 must be clamped, not silently reopen the original crash."""
+        estimator = EnvelopeRRSNR(fps=FPS, config={"min_samples": 0})
+        self.assertEqual(estimator.config["min_samples"], 2)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            # Must not raise, even with min_samples forced to its floor and a
+            # 1-sample trace (below even that floor).
+            estimator.fit(np.array([0.1]))
+
+    def test_custom_min_samples_is_respected_above_the_floor(self):
+        """A user-supplied min_samples above the hard floor of 2 should be
+        used as given, not overridden by the fps-scaled default."""
+        estimator = EnvelopeRRSNR(fps=FPS, config={"min_samples": 10})
+        self.assertEqual(estimator.config["min_samples"], 10)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = estimator.fit(0.01 * np.random.default_rng(0).standard_normal(9))
+            self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught))
+        self.assertTrue(np.isnan(result.snr))
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = estimator.fit(0.01 * np.random.default_rng(0).standard_normal(10))
+        self.assertEqual(len(result.tonic), 10)
+
+
 class TestEnvelopeRRSNRPhasic(unittest.TestCase):
     """Test snr_phasic / peak detection on traces with a flat tonic and known phasic
     events."""
