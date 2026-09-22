@@ -149,8 +149,8 @@ def compute_side_bias(nwb):
                 ci_upper.append(out["df_beta"].loc["bias"]["bootstrap_CI_upper"].values[0])
                 C.append(out["C"])
 
-            except:
-                print('error computing logistic')
+            except Exception as e:
+                print(f"error computing logistic: {e}")
                 bias.append(np.nan)
                 ci_lower.append(-BIAS_LIMIT)
                 ci_upper.append(BIAS_LIMIT)
