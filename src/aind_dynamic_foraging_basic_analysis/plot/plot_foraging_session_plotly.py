@@ -1014,7 +1014,7 @@ def plot_session_in_time_plotly(  # noqa: C901 pragma: no cover
 
             band = base + span
             prev_span = span
-            y_main_top = band 
+            y_main_top = band
 
     # Toggle button to zoom FIP y-axis between full range and 1–99% range
     if fip_trace_names:
